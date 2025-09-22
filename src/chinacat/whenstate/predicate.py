@@ -13,10 +13,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from .field import Field
-
 
 EMPTY_ITERATOR = () # singleton iterator that contains nothing
+
+
+class _Field: ...
 
 
 @dataclass
@@ -34,13 +35,6 @@ class Predicate(ABC):
         '''
         yield all fields that are part of the predicate
         '''
-
-    def _fields(self, condition: Predicate | Field):
-        '''helper for subclasses to yield predicate fields or field'''
-        if isinstance(condition, Predicate):
-            yield from condition.fields
-        elif isinstance(condition, Field):
-            yield condition
 
 
 @dataclass
@@ -63,27 +57,36 @@ class Constant(Predicate):
 
 @dataclass
 class UnaryPredicate(Predicate):
-    condition: Predicate | Field | Constant
+    condition: Predicate | _Field
 
     def __bool__(self):
         return self.condition()
 
     @property
     def fields(self):
-        yield super()._fields(self.condition)
+        yield from self.condition
 
 
 @dataclass
 class BinaryPredicate(Predicate, ABC):
     '''
     '''
-    left: Predicate | Field
-    right: Predicate | Field
+    left: Predicate | _Field
+    right: Predicate | _Field
+
+    def __post_init__(self):
+        # Everything that isn't a Predicate or a _Field is treated as a
+        # constant. This may need to be reevaluated, but it helps with the
+        # fields() logic for now.
+        if not isinstance(self.left, (Predicate, _Field)):
+            self.left = Constant(self.left)
+        if not isinstance(self.right, (Predicate, _Field)):
+            self.right = Constant(self.right)
 
     @property
     def fields(self):
-        yield from self._fields(self.left)
-        yield from self._fields(self.right)
+            yield from self.left.fields
+            yield from self.right.fields
 
     @abstractmethod
     def __bool__(self): ...

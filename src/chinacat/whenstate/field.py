@@ -4,8 +4,10 @@ Where most of the 'magic' happens.
 from __future__ import annotations
 from typing import Callable, List
 
+from .predicate import Eq, _Field
 
-class Field[C, T]:
+
+class Field[C, T](_Field):
     '''
     An instrumented field of a State.
     - C: is the type of the object the field is a member of
@@ -101,13 +103,16 @@ class Field[C, T]:
 
     def __eq__(self, other):
         '''create an Eq predicate for the field'''
-        from .predicate import Eq  # todo - deferred to avoid import cycle
         return Eq(self, other)
 
     # todo implement these comparison methods.
     def _NotImplementedError(self, *args: object):
         return NotImplementedError(*args)
     __ne__ = __lt__ = __le__ = __gt__ = __ge__ = _NotImplementedError
+
+    @property
+    def fields(self):
+        yield self
 
 
 type Listener[C, T] = Callable[["BoundField[C, T]", T, T], None]
