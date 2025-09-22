@@ -1,9 +1,10 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from unittest import TestCase
 
-from .. import State
-from .. import Field
+from ..state import State
+from ..field import Field
 
 
 class Color(Enum):
@@ -14,17 +15,18 @@ class Color(Enum):
 
 
 @dataclass
-class traffic_light(State):
+class TrafficLight(State):
     '''
     simple model that implements a traffic light:
     '''
     # todo metaclass to wrap attributes with Field
-    color: Color = Field[Color](Color.RED)
+    color: Field[TrafficLight, Color] = Field["TrafficLight",
+                                              Color]('color', Color.RED)
 
-    @State.when(color == Color.RED and State.count == 4)
+    # @State.when(color == Color.RED and State.count == 4)
     def red_to_green(self):
         self.color = Color.GREEN
-        self.count = 0
+        # self.count = 0
 
 
 class TrafficLightTest(TestCase):

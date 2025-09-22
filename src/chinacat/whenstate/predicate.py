@@ -1,31 +1,22 @@
 '''
-Weird sick can't sleep thoughts after seeing:
-https://www.reddit.com/r/Python/comments/1nmta0f/i_built_a_full_programming_language_interpreter/
-Right before going to bed and trying to sleep I thought...I bet a bunch of that
-can be done with standard python using descriptors and ....
+Predicates implement comparison checks.
 
-Then the dogs barked and woke me up early while still sick. Here goes nothing.
-
-The basic language idea is that you specify conditions when code should
-execute based on a state model. But, rather than adding events to your model
-explicitly you write code that appears procedural, but it just sets up
-listeners for model change events. Under the covers the model has a complex
-graph of dependent conditions that are evaluated when the condition changes.
-
-TODO - example
+todo - I'm not sure this is the best name. A lot of what is here are actually
+       expressions, not predicates. Ultimately though they have to be a
+       predicate that evaluates to True or False. I think the name is ok since
+       they are all composed of comparisons which are predicates. The
+       question I have is should callables be allowed, and if so, how to feed
+       their arguments to them (zero-arity functons don't seem very useful).
 '''
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
-import typing
+
+from .field import Field
 
 
-Field = typing.TypeAlias
-
-
-@dataclass
-class Constant:
-    value: Any = None
+EMPTY_ITERATOR = () # singleton iterator that contains nothing
 
 
 @dataclass
@@ -34,10 +25,8 @@ class Predicate(ABC):
     '''
 
     @abstractmethod
-    def __call__(self):
-        '''
-        Evaluate the predicate.
-        '''
+    def __bool__(self):
+        pass
 
     @property
     @abstractmethod
@@ -46,19 +35,37 @@ class Predicate(ABC):
         yield all fields that are part of the predicate
         '''
 
-    def _fields(self, condition: "Predicate" | Field):
+    def _fields(self, condition: Predicate | Field):
         '''helper for subclasses to yield predicate fields or field'''
         if isinstance(condition, Predicate):
             yield from condition.fields
-        else:
+        elif isinstance(condition, Field):
             yield condition
 
 
 @dataclass
-class UnaryPredicate(Predicate):
-    condition: "Predicate" | Field | Constant
+class Constant(Predicate):
+    value: Any = None
 
-    def __call__(self):
+    def __bool__(self):
+        return bool(self.value)
+
+    @property
+    def fields(self):
+        return EMPTY_ITERATOR
+
+    def __eq__(self, other):
+        return self.value == other
+    
+    def __req__(self, other):
+        return self.value == other
+
+
+@dataclass
+class UnaryPredicate(Predicate):
+    condition: Predicate | Field | Constant
+
+    def __bool__(self):
         return self.condition()
 
     @property
@@ -75,14 +82,14 @@ class BinaryPredicate(Predicate, ABC):
 
     @property
     def fields(self):
-        yield from super()._fields(self.left)
-        yield from super()._fields(self.right)
+        yield from self._fields(self.left)
+        yield from self._fields(self.right)
+
+    @abstractmethod
+    def __bool__(self): ...
 
 
 class Eq(BinaryPredicate):
 
-    def __call__(self):
-        return ((self.left() if callable(self.left) else self.left)
-                ==
-                (self.right() if callable(self.right) else self.right))
-    __bool__ = __call__
+    def __bool__(self):
+        return (self.left == self.right)

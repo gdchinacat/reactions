@@ -9,12 +9,11 @@ from dataclasses import dataclass
 from functools import wraps
 
 from .predicate import Predicate
-from .field import Field
 
 
 @dataclass
 class State(ABC):
-    count: int = Field(0)  # cycle counter
+    #count: int = Field(0)  # cycle counter
 
     @classmethod
     def when(cls, predicate: Predicate):
