@@ -9,70 +9,91 @@ todo - I'm not sure this is the best name. A lot of what is here are actually
        their arguments to them (zero-arity functons don't seem very useful).
 '''
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+import logging
+from typing import Any, Callable, Generator, Sequence
 
 
+logger = logging.getLogger("whenstate.predicate")
 EMPTY_ITERATOR = () # singleton iterator that contains nothing
 
 
-class _Field: ...
+type Reaction[C, T] = Callable[["BoundField[C, T]", T, T], None]
+''' Reaction for field value change notifications.'''
+
+
+class _Field[C, T](ABC):
+    '''ABC for field behavior Predicate uses'''
+    @property
+    @abstractmethod
+    def fields(self) -> Generator[_Field[C, T], None, None]: ...
+
+    @abstractmethod
+    def reaction(self, reaction: Reaction[C, T]) -> None: ...
 
 
 @dataclass
-class Predicate(ABC):
+class Predicate[C](ABC):
     '''
     '''
-
-    @abstractmethod
-    def __bool__(self):
-        pass
 
     @property
     @abstractmethod
-    def fields(self):
+    def fields(self) -> Generator[_Field[C, Any], None, None] | \
+                        Sequence[_Field[C, Any]]:
         '''
         yield all fields that are part of the predicate
         '''
 
+    @abstractmethod
+    def __bool__(self) -> bool:
+        pass
+
+    def __and__(self, other):
+        return And(self, other)
+
+    def __call__(self, instance: C) -> bool:
+        raise NotImplementedError('predicate evaluation not implemented')
+
+    def react(self, bound_field, old, new,  # Reaction # todo annotations
+               target: Reaction):
+        logger.debug('%s notified that %s %s -> %s', self, bound_field,
+                     old, new)
+        if self(bound_field.instance):
+            self.react(bound_field.instance, bound_field, old, new)
+        # todo call the target if predicate(bound_field.instance)
+        # 
 
 @dataclass
-class Constant(Predicate):
-    value: Any = None
-
-    def __bool__(self):
-        return bool(self.value)
+class Constant[C, T](Predicate[C]):
+    value: T | None = None
 
     @property
-    def fields(self):
+    def fields(self) -> Sequence[_Field[C, T]]:
         return EMPTY_ITERATOR
 
-    def __eq__(self, other):
+    def __bool__(self) -> bool:
+        return bool(self.value)
+
+    def __eq__(self, other) -> bool:
         return self.value == other
     
-    def __req__(self, other):
-        return self.value == other
+    def __str__(self) -> str:
+        return str(self.value)
 
 
 @dataclass
-class UnaryPredicate(Predicate):
-    condition: Predicate | _Field
-
-    def __bool__(self):
-        return self.condition()
+class BinaryPredicate[C](Predicate[C], ABC):
+    '''
+    '''
+    left: Predicate[C] | _Field[C, Any]
+    right: Predicate[C] | _Field[C, Any]
 
     @property
-    def fields(self):
-        yield from self.condition
-
-
-@dataclass
-class BinaryPredicate(Predicate, ABC):
-    '''
-    '''
-    left: Predicate | _Field
-    right: Predicate | _Field
+    @abstractmethod
+    def token(self) -> str: ...
 
     def __post_init__(self):
         # Everything that isn't a Predicate or a _Field is treated as a
@@ -84,15 +105,31 @@ class BinaryPredicate(Predicate, ABC):
             self.right = Constant(self.right)
 
     @property
-    def fields(self):
+    def fields(self) -> Generator[_Field[C, Any], None, None]:
             yield from self.left.fields
             yield from self.right.fields
 
     @abstractmethod
-    def __bool__(self): ...
+    def __bool__(self) -> bool: ...
+
+    def __str__(self) -> str:
+        return f"({self.left} {self.token} {self.right})"
 
 
-class Eq(BinaryPredicate):
-
-    def __bool__(self):
+class Eq[C](BinaryPredicate[C]):
+    token: str = "=="
+    
+    def __bool__(self) -> bool:
         return (self.left == self.right)
+
+class Ne[C](BinaryPredicate[C]):
+    token: str = "!="
+
+    def __bool__(self) -> bool:
+        return (self.left != self.right)
+
+class And[C](BinaryPredicate[C]):
+    token: str = "&"
+    
+    def __bool__(self) -> bool:
+        return bool(self.left) and bool(self.right)

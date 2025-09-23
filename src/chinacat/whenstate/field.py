@@ -2,12 +2,40 @@
 Where most of the 'magic' happens.
 '''
 from __future__ import annotations
-from typing import Callable, List
+from typing import List
 
-from .predicate import Eq, _Field
+from .predicate import _Field, Reaction, Eq, Ne
 
 
-class Field[C, T](_Field):
+class ReactionMixin[C, T]:
+    '''
+    Implements the Reaction members and methods for Field and BoundField.
+    '''
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.reactions: List[Reaction[C, T]] = []  # todo - use weakrefs
+
+    def reaction(self, reaction: Reaction[C, T]):
+        '''
+        Decorator to indicate the reaction should be called when the field's
+        value changes.
+        '''
+        # todo - defer call until "after" the current execution is "done"
+        #        allow transaction-like semantics?
+        #        remove spurious calls for intermediate value changes
+        self.reactions.append(reaction)
+
+    def react(self, old: T, new: T):
+        '''
+        Notify the reactions that the value changed from old to new.
+        '''
+        # todo - defer?
+        # todo - async await?
+        for reacion in self.reactions:
+            reacion(self, old, new)
+
+
+class Field[C, T](ReactionMixin, _Field):
     '''
     An instrumented field of a State.
     - C: is the type of the object the field is a member of
@@ -31,9 +59,15 @@ class Field[C, T](_Field):
     that instance. # TODO - update this once it's fleshed out.
     '''
     def __init__(self,
+                 classname: str,  # for str/repr
                  attr: str,  # name of the field, value stored as ._{attr}
-                 initial_value: T | None = None):
-        self.attr: str = f"_{attr}"
+                 initial_value: T | None = None,
+                 *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.classname: str = classname
+        self.attr: str = attr                           # public
+        self._attr: str = '_' + attr                    # private
+        self._attr_bound: str = self._attr + '_bound'   # bound field
         self.initial_value: T | None = initial_value
 
     def __hash__(self):
@@ -54,18 +88,17 @@ class Field[C, T](_Field):
         the name.
         todo - @memoize this?
         '''
-        attr = f"{self.attr}_field"
-        bound_field = getattr(instance, attr, None)
+        bound_field = getattr(instance, self._attr_bound, None)
         if bound_field is None:
             bound_field = BoundField[C, T](instance, self)
-            setattr(instance, attr, bound_field)
+            setattr(instance, self._attr_bound, bound_field)
         return bound_field
 
     def _get_with_initialize(self, instance: C) -> T | None:
         try:
-            return getattr(instance, self.attr)
+            return getattr(instance, self._attr)
         except AttributeError:
-            setattr(instance, self.attr, self.initial_value)
+            setattr(instance, self._attr, self.initial_value)
             return self.initial_value
 
     def __get__(self, instance, owner=None):
@@ -100,58 +133,51 @@ class Field[C, T](_Field):
             return
         old: T | None = self._get_with_initialize(instance)
         if value != old:
-            self(instance).notify(old , value)
-            setattr(instance, self.attr, value)
+            self(instance).react(old , value)
+            setattr(instance, self._attr, value)
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> Eq[C]:  # type: ignore[override]
         '''create an Eq predicate for the field'''
-        return Eq(self, other)
+        return Eq[C](self, other)
+
+    def __ne__(self, other) -> Ne[C]:  # type: ignore[override]
+        '''create an Eq predicate for the field'''
+        return Ne[C](self, other)
 
     # todo implement these comparison methods.
     def _NotImplementedError(self, *args: object):
-        return NotImplementedError(*args)
-    __ne__ = __lt__ = __le__ = __gt__ = __ge__ = _NotImplementedError
+        raise NotImplementedError(*args)
+    __lt__ = __le__ = __gt__ = __ge__ = _NotImplementedError
 
     @property
     def fields(self):
         yield self
 
+    def __str__(self):
+        return f"{self.classname}.{self.attr}"
+    __repr__ = __str__
 
-type Listener[C, T] = Callable[["BoundField[C, T]", T, T], None]
-'''Listener for field value change notifications'''
 
-
-class BoundField[C, T]:
+class BoundField[C, T](ReactionMixin):
     '''
-    A field on a specific instance.
+    A field bound to a specific instance.
 
     ALL field state relating to the instance should be on this object so that
     it is collected along with the instance. The Field should have no
     references to any instance specific information.
+
+    The reactions for BoundFields are the *same* as for the unbound Field.
+    TODO - if there is a need for instance specifc reactions this can be made
+           more complex, but for now, simple is better.
     '''
     def __init__(self,
                  instance: C,
-                 field: Field[C, T]):
-        super().__init__()
+                 field: Field[C, T], *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.field: Field[C, T] = field
         self.instance: C = instance
-        self.listeners: List[Listener[C, T]] = []  # todo - use weakrefs
+        self.reactions = field.reactions
 
-    def listen(self, func: Listener[C, T]):
-        '''
-        Decorator to indicate func(field=, instance=) should be called when
-        this fields value changes.
-        '''
-        # todo - defer call until "after" the current execution is "done"
-        #        allow transaction-like semantics?
-        #        remove spurious calls for intermediate value changes
-        self.listeners.append(func)
-
-    def notify(self, old: T, new: T):
-        '''
-        Notify listeeners that the value changed from old to new.
-        '''
-        # todo - defer?
-        # todo - async await?
-        for listener in self.listeners:
-            listener(self, old, new)
+    def __str__(self):
+        return f"{self.field.classname}({id(self.instance)}).{self.field.attr}"
+    __repr__ = __str__

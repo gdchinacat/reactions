@@ -4,34 +4,67 @@ A state machine:
       the fields become true.
     - async loop to execute schduled callables.
 '''
+from __future__ import annotations
+
 from abc import ABC
 from dataclasses import dataclass
-from functools import wraps
+from functools import partial
+import logging
+from typing import Callable, Any, Type
 
+from .field import BoundField, Reaction
 from .predicate import Predicate
 
 
+logger = logging.getLogger('whenstate.state')
+logging.basicConfig(level=logging.DEBUG, force=True)  # todo remove
+
+
+class MustNotBeCalled(RuntimeError):
+    '''
+    Exception raised if a @when decorated function is called directly. These
+    functions should only be called by the predicate.
+
+    The removal of the method from a class definition is very intentional.
+        - readers may reasonably but incorrectly think the @when() is a guard
+          that skips calls if the predicate is false. Avoiding confusion is a
+          good thing.
+        - it would be possible to return a function that does that. Calls that
+          are ignored in this way are likely to hurt performance and suggest
+          the state model is not well , designed, or understood. Encouraging
+          good design and understanding is a good thing.
+        - there is a trivial workaround...invoke the decorator manually on a
+          function definition that will be included and is very explicit about
+          what the function semantics are:
+              def react(self: C, bound_field: BoundField[C, T], old, new): ...
+              State.when(foo==1)(react)
+    '''
+    def __init__(self, func: Reaction, *args, **kwargs):
+        super().__init__(f"{func.__qualname__} is a State reaction method and "
+                         "can not be called directly.", *args, **kwargs)
+
+    def __call__(self, *args, **kwargs):
+        '''raises self to indicate a MustNotBeCalled was in fact called'''
+        raise self
+
 @dataclass
 class State(ABC):
-    #count: int = Field(0)  # cycle counter
-
+    
     @classmethod
-    def when(cls, predicate: Predicate):
+    def when(cls: Type[State], predicate: Predicate) \
+        -> Callable[[Reaction[State, Any]], Callable[..., None]]:
         '''
-        Arrange for the decorated function to be called when the predicate
-        becomes true.
+        Decorate a function to register it for execution when the predicate
+        becomes true. The function is *not* called by the decorator. A dummy
+        function is returned so that directly calling it on instances will
+        raise MustNotBeCalled.
+
+        The fields the predicate uses are listen()ed to react() the predicate
+        on field changes. 
         '''
-        def dec(func):
+        def dec(func) -> Callable[[State, BoundField, Any, Any], None]:
             for field in predicate.fields:
-                print(f"TODO when {field} changes call {func}")
-
-            @wraps(func)
-            def _when(*args, **kwargs):
-                # this isn't at all correct:
-                #    - invariably calls the decorated function
-                #    - doesn't schedule change event on predicate
-                #    - func must not return anything since it is meaningless
-                return func(*args, **kwargs)
-            return _when
+                assert not isinstance(field, BoundField)
+                field.reaction(partial(predicate.react, target=func))
+            return MustNotBeCalled(func)
         return dec
-

@@ -14,8 +14,8 @@ from ..predicate import Predicate
 def class_fixture(test: TestCase, **_) -> type:
     @dataclass
     class C:
-        field_a: Field[C, bool] = Field["C", bool]('field_a')
-        field_b: Field[C, bool] = Field["C", bool]('field_b')
+        field_a: Field[C, bool] = Field["C", bool]('C', 'field_a')
+        field_b: Field[C, bool] = Field["C", bool]('C', 'field_b')
     return C
 
 class TestField(TestCase):
@@ -33,20 +33,20 @@ class TestField(TestCase):
 
         
         # set a notification on c.field_a to call print
-        listener_called = False
-        def listener(field: BoundField[C, bool],
+        reaction_called = False
+        def reaction(field: BoundField[C, bool],
                      old: bool, new: bool):
-            nonlocal listener_called
-            listener_called = True  # @UnusedVariable - it really is used
+            nonlocal reaction_called
+            reaction_called = True  # @UnusedVariable - it really is used
             self.assertEqual((field.instance, field.field, old, new),
                              (c, C.field_a, True, False))
-        C.field_a(c).listen(listener)
+        C.field_a(c).reaction(reaction)  # todo reaction on the class
         
         # verify updated value is properly set and comparison works
         c.field_a = False
         self.assertTrue(c.field_a == False)
         self.assertTrue(c.field_a != True)
-        self.assertTrue(listener_called)
+        self.assertTrue(reaction_called)
 
     @fixture(class_fixture)
     def test_edge_triggered_notify(self, C) -> None:
@@ -55,7 +55,7 @@ class TestField(TestCase):
             changes.append((old, new))
 
         c = C()
-        C.field_a(c).listen(collect)
+        C.field_a(c).reaction(collect)  # todo reaction on the class
 
         for value in (True, False, False, True, True):
             c.field_a = value
