@@ -3,7 +3,9 @@ Error definitions.
 '''
 from typing import Any, Callable
 
+
 __all__ = ['MustNotBeCalled']
+
 
 class MustNotBeCalled(RuntimeError):
     '''

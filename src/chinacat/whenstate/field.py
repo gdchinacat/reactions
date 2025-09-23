@@ -3,17 +3,20 @@ Where most of the 'magic' happens.
 '''
 from __future__ import annotations
 
-from typing import List
+from abc import ABC
+from typing import List, Any, Dict
 
-from .predicate import _Field, Reaction, Contains, Eq, Ne, Lt, Le, Gt, Ge
-from chinacat.whenstate.error import MustNotBeCalled
+from .error import MustNotBeCalled
+from .predicate import (_Field, Reaction, BinaryPredicate,
+                         Contains, Eq, Ne, Lt, Le, Gt, Ge)
 
 
-class ReactionMixin[C, T]:
+class ReactionMixin[C, T](ABC):
     '''
     Implements the Reaction members and methods for Field and BoundField.
     '''
-    def __init__(self, *args, **kwargs):
+
+    def __init__(self, *args: List[Any], **kwargs: Dict[str, Any]):
         super().__init__(*args, **kwargs)
         self.reactions: List[Reaction[C, T]] = []  # todo - use weakrefs
 
@@ -63,6 +66,9 @@ class Field[C, T](ReactionMixin, _Field):
     Calling the field with an instance will return a bound field specific to
     that instance. # TODO - update this once it's fleshed out.
     '''
+
+    instance: None = None
+
     def __init__(self,
                  classname: str,  # for str/repr
                  attr: str,  # name of the field, value stored as ._{attr}
@@ -145,50 +151,47 @@ class Field[C, T](ReactionMixin, _Field):
         old: T | None = self._get_with_initialize(instance)
         if value != old:
             setattr(instance, self._attr, value)
-            self.bound_field(instance).react(old , value)
+            bound_field: BoundField[C, T] =  self.bound_field(instance)
+            bound_field.react(old , value)
 
     __delete__ = MustNotBeCalled(
         None, "removal of state attributes is not permitted")
-        
-    
     # end Descriptor protocol.
     ###########################################################################
 
     ###########################################################################
-    # Predicate creation through comparison operators:
+    # Predicate creation operators
     ###########################################################################
     def __contains__(self, other) -> Contains[C]:  # type: ignore[override]
         '''create a Contains (in predicate for the field'''
         return Contains(self, other)
-    
-    def __eq__(self, other) -> Eq[C]:
+
+    def __eq__(self, other) -> BinaryPredicate[C]:  # type: ignore[override]
         '''create an Eq (==) predicate for the field'''
-        return Eq(self, other)
+        return Eq(self, other)  # pylint: disable=abstract-class-instantiated
 
-    def __ne__(self, other) -> Ne[C]:
+    def __ne__(self, other) -> BinaryPredicate[C]:  # type: ignore[override]
         '''create an Eq predicate for the field'''
-        return Ne(self, other)
+        return Ne(self, other)  # pylint: disable=abstract-class-instantiated
 
-    def __lt__(self, other) -> Lt[C]:
+    def __lt__(self, other) -> BinaryPredicate[C]:  # type: ignore[override]
         '''create an Lt (<) predicate for the field'''
-        return Lt(self, other)
+        return Lt(self, other)  # pylint: disable=abstract-class-instantiated
 
-    def __le__(self, other) -> Le[C]:
+    def __le__(self, other) -> BinaryPredicate[C]:  # type: ignore[override]
         '''create an Le (<=) predicate for the field'''
-        return Le(self, other)
+        return Le(self, other)  # pylint: disable=abstract-class-instantiated
 
-    def __gt__(self, other) -> Gt[C]:
+    def __gt__(self, other) -> BinaryPredicate[C]:  # type: ignore[override]
         '''create an Gt (>) predicate for the field'''
-        return Gt(self, other)
+        return Gt(self, other)  # pylint: disable=abstract-class-instantiated
 
-    def __ge__(self, other) -> Ge[C]:  # type: ignore[override]
+    def __ge__(self, other) -> BinaryPredicate[C]:  # type: ignore[override]
         '''create an Ge (>=) predicate for the field'''
-        return Ge(self, other)
+        return Ge(self, other)  # pylint: disable=abstract-class-instantiated
 
-    # todo implement these comparison methods.
-    def _NotImplementedError(self, *args: object):
-        raise NotImplementedError(*args)
-    __lt__ = __le__ = __gt__ = __ge__ = _NotImplementedError
+    # end Predicate creation operators
+    ###########################################################################
 
     @property
     def fields(self):
@@ -211,6 +214,7 @@ class BoundField[C, T](ReactionMixin):
     TODO - if there is a need for instance specifc reactions this can be made
            more complex, but for now, simple is better.
     '''
+
     def __init__(self,
                  instance: C,
                  field: Field[C, T], *args, **kwargs) -> None:

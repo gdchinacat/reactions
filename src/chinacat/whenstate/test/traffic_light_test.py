@@ -21,7 +21,7 @@ class TrafficLight(State):
     '''
     simple model that implements a traffic light:
     '''
-    
+
     # todo metaclass to wrap attributes with Field
     color: Field[TrafficLight, Color] = \
         Field["TrafficLight", Color]("TrafficLight", 'color', Color.RED)
@@ -36,56 +36,60 @@ class TrafficLight(State):
     ''' cycles: the number of times the light has gone through a full cycle '''
 
     @State.when(cycles == 5)
-    def stop(self,
+    @staticmethod
+    def stop(#self,
              bound_field: BoundField[TrafficLight, int],
              # the field types depend on the predicates
-             old: int,
-             new: int) -> None:
-        self.ticks = None
+             old: int, new: int) -> None:  # @UnusedVariable
+        (self:=bound_field.instance).ticks = None
 
     @State.when(ticks != None)
-    def loop(self,
+    @staticmethod
+    def loop(#self,
              bound_field: BoundField[TrafficLight, int],
              # the field types depend on the predicates
-             old: int,
-             new:int) -> None:
-        self.ticks += 1
+             old: int, new:int) -> None:  # @UnusedVariable
+        (self:=bound_field.instance).ticks += 1
 
     @State.when((color == Color.RED) &
                 (ticks == 4))
-    def red_to_green(self,
+    @staticmethod
+    def red_to_green(#self,
                      bound_field: BoundField[TrafficLight, int | Color],
                      # the field types depend on the predicates
-                     old: int | Color,
-                     new:int | Color) -> None:
+                     old: int | Color, new:int | Color) -> None:  # @UnusedVariable
+        self = bound_field.instance
         self.ticks = 0
         self.color = Color.GREEN
         print("GREEN")
 
     @State.when((color == Color.GREEN) &
                 (ticks == 4))
-    def green_to_yellow(self,
+    @staticmethod
+    def green_to_yellow(#self,
                         bound_field: BoundField[TrafficLight, int | Color],
                         # the field types depend on the predicates
-                        old: int | Color,
-                        new:int | Color) -> None:
+                        old: int | Color, new:int | Color) -> None:  # @UnusedVariable
+        self = bound_field.instance
         self.ticks = 0
         self.color = Color.YELLOW
         print("YELLOW")
 
     @State.when((color == Color.YELLOW) &
                 (ticks == 4))
-    def yellow_to_red(self,
+    @staticmethod
+    def yellow_to_red(#self,
                       bound_field: BoundField[TrafficLight, int | Color],
                       # the field types depend on the predicates
-                      old: int | Color,
-                      new:int | Color) -> None:
+                      old: int | Color, new:int | Color) -> None:  # @UnusedVariable
+        self = bound_field.instance
         self.ticks = 0
         self.color = Color.RED
         print("RED")
 
 
 class TrafficLightTest(TestCase):
+
     def test_traffic_light(self):
         traffic_light = TrafficLight()
 
@@ -93,6 +97,6 @@ class TrafficLightTest(TestCase):
             # there isn't a formal way to start the model...just nudge the
             # state to get it going. It should run to completion.
             traffic_light.ticks = 0
-        
+
         asyncio.run(run())
         self.assertEqual(traffic_light.cycles, 5)

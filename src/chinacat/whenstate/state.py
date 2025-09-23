@@ -12,9 +12,10 @@ from functools import partial
 import logging
 from typing import Callable, Any, Type
 
+from .error import MustNotBeCalled
 from .field import BoundField, Reaction
 from .predicate import Predicate
-from .error import MustNotBeCalled
+
 
 __all__ = ['ReactionMustNotBeCalled', "State"]
 
@@ -49,12 +50,14 @@ class ReactionMustNotBeCalled(MustNotBeCalled):
         '''raises self to indicate method was in fact called'''
         raise self
 
+
 @dataclass
 class State(ABC):
     
     @classmethod
     def when(cls: Type[State], predicate: Predicate) \
-        -> Callable[[Reaction[State, Any]], Callable[..., None]]:
+        -> Callable[[Reaction[State, Any]],
+                    Callable[..., None]]:
         '''
         Decorate a function to register it for execution when the predicate
         becomes true. The function is *not* called by the decorator. A dummy

@@ -14,7 +14,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import logging
 import operator
-from typing import Any, Callable, Generator, Sequence, Type
+from typing import Any, Callable, Generator, Sequence, Type, TypeAlias
 
 from .error import MustNotBeCalled
 
@@ -24,15 +24,15 @@ __all__ = []
 
 logger = logging.getLogger("whenstate.predicate")
 EMPTY_ITERATOR = () # singleton iterator that contains nothing
+type BoundField[C, T] = TypeAlias
 
-
-type Reaction[C, T] = Callable[["BoundField[C, T]", T, T], None]
+type Reaction[C, T] = Callable[[BoundField[C, T], T, T], None]
 ''' Reaction for field value change notifications.'''
 
 
 class _Field[C, T](ABC):
     '''ABC for field behavior Predicate uses'''
-    
+
     @property
     @abstractmethod
     def fields(self) -> Generator[_Field[C, T], None, None]: ...
@@ -42,10 +42,15 @@ class _Field[C, T](ABC):
 
     @abstractmethod
     def evaluate(self, instance: C ) -> T: ...
-        
+
 @dataclass
 class Predicate[C](ABC):
     '''
+    Predicate evaluates expressions.
+
+    Created through Field and Predicate comparison methods:
+        State.field == 'value'
+    They are e
     '''
 
     @property
@@ -57,22 +62,25 @@ class Predicate[C](ABC):
         '''
 
     def __and__(self, other):
-        return And(self, other)
+        return And(self, other)  # pylint: disable=abstract-class-instantiated
 
     @abstractmethod
     def evaluate(self, instance: C) -> Any:
         '''evaluate the predicate against the given model'''
 
-    def react(self, bound_field, old, new,  # Reaction # todo annotations
-               target: Reaction):
+    def react(self,
+              bound_field: BoundField,
+              old: Any,
+              new: Any,
+              *,
+              target: Reaction):
         logger.debug('%s notified that %s %s -> %s', self, bound_field,
                      old, new)
 
-        print(f"{self=} {bound_field=}")
         if self.evaluate(bound_field.instance):
-            target(bound_field.instance, bound_field, old, new)
+            target(bound_field, old, new)
         # todo call the target if predicate(bound_field.instance)
-        # 
+
 
 @dataclass
 class Constant[C, T](Predicate[C]):
@@ -84,17 +92,19 @@ class Constant[C, T](Predicate[C]):
 
     def __eq__(self, other) -> bool:
         return self.value == other
-    
+
     def __str__(self) -> str:
         return str(self.value)
 
-    def evaluate(self, instance: C) -> T | None:
+    def evaluate(self, instance: C) -> T | None: \
+        # @UnusedVariable pylint: disable=unused-argument
         return self.value
 
 
 @dataclass
 class BinaryPredicate[C](Predicate[C], ABC):
     '''
+    Predicate that has two operands.
     '''
     left: Predicate[C] | _Field[C, Any]
     right: Predicate[C] | _Field[C, Any]
@@ -102,10 +112,10 @@ class BinaryPredicate[C](Predicate[C], ABC):
     @property
     @abstractmethod
     def token(self) -> str: ...  # field from subclass
-    
+
     @property
     @abstractmethod
-    def operator(self) -> Callable[[Any, Any], bool]: ...  # field from subclass
+    def operator(self) -> Callable[[Any, Any], bool]: ...
 
     def __post_init__(self):
         # Everything that isn't a Predicate or a _Field is treated as a
@@ -118,8 +128,8 @@ class BinaryPredicate[C](Predicate[C], ABC):
 
     @property
     def fields(self) -> Generator[_Field[C, Any], None, None]:
-            yield from self.left.fields
-            yield from self.right.fields
+        yield from self.left.fields
+        yield from self.right.fields
 
     def evaluate(self, instance: C):
         return self.operator(self.left.evaluate(instance),
@@ -135,35 +145,34 @@ class BinaryPredicate[C](Predicate[C], ABC):
     def factory(cls,
                 name: str,
                 token: str,
-                operator: Callable[[Any, Any], bool]
-               ) -> BinaryPredicate[C]:
+                op: Callable[[Any, Any], bool]
+               ) -> Type[BinaryPredicate[C]]:
         '''
         Create a binary operator using the given function. token is for str/repr
         and has no other use. The class is exported from the module through
         __all__.
         '''
-        
-        ret: BinaryPredicate[C] = type(name,
-                                       (BinaryPredicate, ),
-                                       {'token': token,
-                                        'operator': operator}) 
+
+        ret: Type[BinaryPredicate[C]] = type(name,
+                                             (BinaryPredicate, ),
+                                             {'token': token,
+                                              'operator': op}) 
         __all__.append(name)
         return ret
-    
 
-Eq: Predicate = BinaryPredicate.factory('Eq', '==', operator.eq)
-Ne: Predicate = BinaryPredicate.factory('Ne', '!=', operator.ne)
-And: Predicate = BinaryPredicate.factory('And', '&', operator.and_)
-Lt: Predicate = BinaryPredicate.factory('Lt', '<', operator.lt)
-Le: Predicate = BinaryPredicate.factory('Le', '<=', operator.le)
-Gt: Predicate = BinaryPredicate.factory('Gt', '>', operator.gt)
-Ge: Predicate = BinaryPredicate.factory('Ge', '>=', operator.ge)
-    
+Eq: Type[BinaryPredicate[Any]] = BinaryPredicate.factory('Eq', '==', operator.eq)
+Ne: Type[BinaryPredicate[Any]] = BinaryPredicate.factory('Ne', '!=', operator.ne)
+And: Type[BinaryPredicate[Any]] = BinaryPredicate.factory('And', '&', operator.and_)
+Lt: Type[BinaryPredicate[Any]] = BinaryPredicate.factory('Lt', '<', operator.lt)
+Le: Type[BinaryPredicate[Any]] = BinaryPredicate.factory('Le', '<=', operator.le)
+Gt: Type[BinaryPredicate[Any]] = BinaryPredicate.factory('Gt', '>', operator.gt)
+Ge: Type[BinaryPredicate[Any]] = BinaryPredicate.factory('Ge', '>=', operator.ge)
+
 class Contains[C](BinaryPredicate):
     token: str = 'in'
     operator: Callable[[Any, Any], bool] = operator.contains
 
-    def __init__(self, 
+    def __init__(self,  # pylint: disable=useless-parent-delegation
                  left: Predicate[C] | _Field[C, Any],
                  right: Predicate[C] | _Field[C, Any]):
         # contains() args are reversed the other binary operations, so swap

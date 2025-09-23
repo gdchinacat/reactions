@@ -6,13 +6,13 @@ from unittest import TestCase
 
 from chinacat.fixtures import default_fixture_name, fixture
 
+from ..error import MustNotBeCalled
 from ..field import Field, BoundField
 from ..predicate import Predicate
-from chinacat.whenstate.error import MustNotBeCalled
 
 
 @default_fixture_name('C')
-def class_fixture(test: TestCase, **_) -> type:
+def class_fixture(test: TestCase, **_) -> type:  # @UnusedVariable
     '''create new class with fields for testing'''
     @dataclass
     class C:
@@ -24,7 +24,7 @@ class TestField(TestCase):
 
     @fixture(class_fixture)
     def test_class_field_eq_creates_predicate(self, C):
-        predicate = (C.field_a == True)
+        predicate = C.field_a == True
         self.assertIsInstance(predicate, Predicate)
         self.assertEqual(list(predicate.fields), [C.field_a])
 
@@ -39,7 +39,7 @@ class TestField(TestCase):
     def test_instance_field_equality(self, C):
         c = C(True, False)
         self.assertTrue(c.field_a == True)
-        
+
         # set a notification on c.field_a to call print
         reaction_called = False
         def reaction(field: BoundField[C, bool],
@@ -49,7 +49,7 @@ class TestField(TestCase):
             self.assertEqual((field.instance, field.field, old, new),
                              (c, C.field_a, True, False))
         C.field_a.bound_field(c).reaction(reaction)  # todo reaction on the class
-        
+
         # verify updated value is properly set and comparison works
         c.field_a = False
         self.assertTrue(c.field_a == False)
@@ -59,7 +59,7 @@ class TestField(TestCase):
     @fixture(class_fixture)
     def test_edge_triggered_notify(self, C) -> None:
         changes: List[Tuple[bool, bool]] = list[Tuple[bool, bool]]()
-        def collect(field: BoundField[C, bool], old: bool, new: bool):
+        def collect(_: BoundField[C, bool], old: bool, new: bool):
             changes.append((old, new))
 
         c = C()
