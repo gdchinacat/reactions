@@ -133,8 +133,8 @@ class Field[C, T](ReactionMixin, _Field):
             return
         old: T | None = self._get_with_initialize(instance)
         if value != old:
-            self(instance).react(old , value)
             setattr(instance, self._attr, value)
+            self(instance).react(old , value)
 
     def __eq__(self, other) -> Eq[C]:  # type: ignore[override]
         '''create an Eq predicate for the field'''

@@ -47,10 +47,6 @@ class Predicate[C](ABC):
         yield all fields that are part of the predicate
         '''
 
-    @abstractmethod
-    def __bool__(self) -> bool:
-        pass
-
     def __and__(self, other):
         return And(self, other)
 
@@ -73,9 +69,6 @@ class Constant[C, T](Predicate[C]):
     @property
     def fields(self) -> Sequence[_Field[C, T]]:
         return EMPTY_ITERATOR
-
-    def __bool__(self) -> bool:
-        return bool(self.value)
 
     def __eq__(self, other) -> bool:
         return self.value == other
@@ -108,9 +101,6 @@ class BinaryPredicate[C](Predicate[C], ABC):
     def fields(self) -> Generator[_Field[C, Any], None, None]:
             yield from self.left.fields
             yield from self.right.fields
-
-    @abstractmethod
-    def __bool__(self) -> bool: ...
 
     def __str__(self) -> str:
         return f"({self.left} {self.token} {self.right})"
