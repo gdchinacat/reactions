@@ -13,7 +13,13 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import logging
-from typing import Any, Callable, Generator, Sequence
+import operator
+from typing import Any, Callable, Generator, Sequence, Type
+
+from .error import MustNotBeCalled
+
+
+__all__ = []
 
 
 logger = logging.getLogger("whenstate.predicate")
@@ -26,6 +32,7 @@ type Reaction[C, T] = Callable[["BoundField[C, T]", T, T], None]
 
 class _Field[C, T](ABC):
     '''ABC for field behavior Predicate uses'''
+    
     @property
     @abstractmethod
     def fields(self) -> Generator[_Field[C, T], None, None]: ...
@@ -33,7 +40,9 @@ class _Field[C, T](ABC):
     @abstractmethod
     def reaction(self, reaction: Reaction[C, T]) -> None: ...
 
-
+    @abstractmethod
+    def evaluate(self, instance: C ) -> T: ...
+        
 @dataclass
 class Predicate[C](ABC):
     '''
@@ -50,15 +59,18 @@ class Predicate[C](ABC):
     def __and__(self, other):
         return And(self, other)
 
-    def __call__(self, instance: C) -> bool:
-        raise NotImplementedError('predicate evaluation not implemented')
+    @abstractmethod
+    def evaluate(self, instance: C) -> Any:
+        '''evaluate the predicate against the given model'''
 
     def react(self, bound_field, old, new,  # Reaction # todo annotations
                target: Reaction):
         logger.debug('%s notified that %s %s -> %s', self, bound_field,
                      old, new)
-        if self(bound_field.instance):
-            self.react(bound_field.instance, bound_field, old, new)
+
+        print(f"{self=} {bound_field=}")
+        if self.evaluate(bound_field.instance):
+            target(bound_field.instance, bound_field, old, new)
         # todo call the target if predicate(bound_field.instance)
         # 
 
@@ -76,6 +88,9 @@ class Constant[C, T](Predicate[C]):
     def __str__(self) -> str:
         return str(self.value)
 
+    def evaluate(self, instance: C) -> T | None:
+        return self.value
+
 
 @dataclass
 class BinaryPredicate[C](Predicate[C], ABC):
@@ -86,7 +101,11 @@ class BinaryPredicate[C](Predicate[C], ABC):
 
     @property
     @abstractmethod
-    def token(self) -> str: ...
+    def token(self) -> str: ...  # field from subclass
+    
+    @property
+    @abstractmethod
+    def operator(self) -> Callable[[Any, Any], bool]: ...  # field from subclass
 
     def __post_init__(self):
         # Everything that isn't a Predicate or a _Field is treated as a
@@ -102,24 +121,51 @@ class BinaryPredicate[C](Predicate[C], ABC):
             yield from self.left.fields
             yield from self.right.fields
 
+    def evaluate(self, instance: C):
+        return self.operator(self.left.evaluate(instance),
+                             self.right.evaluate(instance))
+
+    @MustNotBeCalled
+    def __bool__(self): ...
+
     def __str__(self) -> str:
         return f"({self.left} {self.token} {self.right})"
 
-
-class Eq[C](BinaryPredicate[C]):
-    token: str = "=="
+    @classmethod
+    def factory(cls,
+                name: str,
+                token: str,
+                operator: Callable[[Any, Any], bool]
+               ) -> BinaryPredicate[C]:
+        '''
+        Create a binary operator using the given function. token is for str/repr
+        and has no other use. The class is exported from the module through
+        __all__.
+        '''
+        
+        ret: BinaryPredicate[C] = type(name,
+                                       (BinaryPredicate, ),
+                                       {'token': token,
+                                        'operator': operator}) 
+        __all__.append(name)
+        return ret
     
-    def __bool__(self) -> bool:
-        return (self.left == self.right)
 
-class Ne[C](BinaryPredicate[C]):
-    token: str = "!="
-
-    def __bool__(self) -> bool:
-        return (self.left != self.right)
-
-class And[C](BinaryPredicate[C]):
-    token: str = "&"
+Eq: Predicate = BinaryPredicate.factory('Eq', '==', operator.eq)
+Ne: Predicate = BinaryPredicate.factory('Ne', '!=', operator.ne)
+And: Predicate = BinaryPredicate.factory('And', '&', operator.and_)
+Lt: Predicate = BinaryPredicate.factory('Lt', '<', operator.lt)
+Le: Predicate = BinaryPredicate.factory('Le', '<=', operator.le)
+Gt: Predicate = BinaryPredicate.factory('Gt', '>', operator.gt)
+Ge: Predicate = BinaryPredicate.factory('Ge', '>=', operator.ge)
     
-    def __bool__(self) -> bool:
-        return bool(self.left) and bool(self.right)
+class Contains[C](BinaryPredicate):
+    token: str = 'in'
+    operator: Callable[[Any, Any], bool] = operator.contains
+
+    def __init__(self, 
+                 left: Predicate[C] | _Field[C, Any],
+                 right: Predicate[C] | _Field[C, Any]):
+        # contains() args are reversed the other binary operations, so swap
+        # left and right.
+        super().__init__(left, right)

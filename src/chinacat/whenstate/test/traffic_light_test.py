@@ -1,10 +1,12 @@
 from __future__ import annotations
+
+import asyncio
 from dataclasses import dataclass
 from enum import Enum
 from unittest import TestCase
 
-from ..state import State
 from ..field import Field, BoundField
+from ..state import State
 
 
 class Color(Enum):
@@ -87,6 +89,10 @@ class TrafficLightTest(TestCase):
     def test_traffic_light(self):
         traffic_light = TrafficLight()
 
-        # there isn't a formal way to start the model...just nudge the state
-        # to get it going.
-        traffic_light.ticks = 0
+        async def run():
+            # there isn't a formal way to start the model...just nudge the
+            # state to get it going. It should run to completion.
+            traffic_light.ticks = 0
+        
+        asyncio.run(run())
+        self.assertEqual(traffic_light.cycles, 5)

@@ -14,13 +14,15 @@ from typing import Callable, Any, Type
 
 from .field import BoundField, Reaction
 from .predicate import Predicate
+from .error import MustNotBeCalled
 
+__all__ = ['ReactionMustNotBeCalled', "State"]
 
 logger = logging.getLogger('whenstate.state')
 logging.basicConfig(level=logging.DEBUG, force=True)  # todo remove
 
 
-class MustNotBeCalled(RuntimeError):
+class ReactionMustNotBeCalled(MustNotBeCalled):
     '''
     Exception raised if a @when decorated function is called directly. These
     functions should only be called by the predicate.
@@ -40,11 +42,11 @@ class MustNotBeCalled(RuntimeError):
               State.when(foo==1)(react)
     '''
     def __init__(self, func: Reaction, *args, **kwargs):
-        super().__init__(f"{func.__qualname__} is a State reaction method and "
+        super().__init__(None, f"{func.__qualname__} is a State reaction method and "
                          "can not be called directly.", *args, **kwargs)
 
     def __call__(self, *args, **kwargs):
-        '''raises self to indicate a MustNotBeCalled was in fact called'''
+        '''raises self to indicate method was in fact called'''
         raise self
 
 @dataclass
@@ -57,7 +59,7 @@ class State(ABC):
         Decorate a function to register it for execution when the predicate
         becomes true. The function is *not* called by the decorator. A dummy
         function is returned so that directly calling it on instances will
-        raise MustNotBeCalled.
+        raise ReactionMustNotBeCalled.
 
         The fields the predicate uses are listen()ed to react() the predicate
         on field changes. 
@@ -66,5 +68,5 @@ class State(ABC):
             for field in predicate.fields:
                 assert not isinstance(field, BoundField)
                 field.reaction(partial(predicate.react, target=func))
-            return MustNotBeCalled(func)
+            return ReactionMustNotBeCalled(func)
         return dec

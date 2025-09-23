@@ -8,10 +8,12 @@ from chinacat.fixtures import default_fixture_name, fixture
 
 from ..field import Field, BoundField
 from ..predicate import Predicate
+from chinacat.whenstate.error import MustNotBeCalled
 
 
 @default_fixture_name('C')
 def class_fixture(test: TestCase, **_) -> type:
+    '''create new class with fields for testing'''
     @dataclass
     class C:
         field_a: Field[C, bool] = Field["C", bool]('C', 'field_a')
@@ -27,10 +29,16 @@ class TestField(TestCase):
         self.assertEqual(list(predicate.fields), [C.field_a])
 
     @fixture(class_fixture)
+    def test_del_field_not_allowed(self, C):
+        c = C(True, False)
+        with self.assertRaises(MustNotBeCalled):
+            del c.field_a
+            c.field_a
+
+    @fixture(class_fixture)
     def test_instance_field_equality(self, C):
         c = C(True, False)
         self.assertTrue(c.field_a == True)
-
         
         # set a notification on c.field_a to call print
         reaction_called = False
@@ -40,7 +48,7 @@ class TestField(TestCase):
             reaction_called = True  # @UnusedVariable - it really is used
             self.assertEqual((field.instance, field.field, old, new),
                              (c, C.field_a, True, False))
-        C.field_a(c).reaction(reaction)  # todo reaction on the class
+        C.field_a.bound_field(c).reaction(reaction)  # todo reaction on the class
         
         # verify updated value is properly set and comparison works
         c.field_a = False
@@ -55,7 +63,7 @@ class TestField(TestCase):
             changes.append((old, new))
 
         c = C()
-        C.field_a(c).reaction(collect)  # todo reaction on the class
+        C.field_a.bound_field(c).reaction(collect)
 
         for value in (True, False, False, True, True):
             c.field_a = value

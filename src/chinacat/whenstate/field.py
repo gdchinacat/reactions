@@ -2,9 +2,11 @@
 Where most of the 'magic' happens.
 '''
 from __future__ import annotations
+
 from typing import List
 
-from .predicate import _Field, Reaction, Eq, Ne
+from .predicate import _Field, Reaction, Contains, Eq, Ne, Lt, Le, Gt, Ge
+from chinacat.whenstate.error import MustNotBeCalled
 
 
 class ReactionMixin[C, T]:
@@ -21,8 +23,11 @@ class ReactionMixin[C, T]:
         value changes.
         '''
         # todo - defer call until "after" the current execution is "done"
-        #        allow transaction-like semantics?
-        #        remove spurious calls for intermediate value changes
+        # sooner than later...doing it inline means the tick for the machine
+        # just goes in tight loop until recursion limit exceeded.
+        # I thnk async just because it seems like a good fit.
+        # todo - allow transaction-like semantics?
+        #        - remove spurious calls for intermediate value changes
         self.reactions.append(reaction)
 
     def react(self, old: T, new: T):
@@ -31,8 +36,8 @@ class ReactionMixin[C, T]:
         '''
         # todo - defer?
         # todo - async await?
-        for reacion in self.reactions:
-            reacion(self, old, new)
+        for reaction in self.reactions:
+            reaction(self, old, new)
 
 
 class Field[C, T](ReactionMixin, _Field):
@@ -77,7 +82,7 @@ class Field[C, T](ReactionMixin, _Field):
         '''
         return id(self)
 
-    def __call__(self, instance: C):
+    def bound_field(self, instance: C):
         '''
         Get or create the BoundField for this field on the given instance.
         todo - for thread safety it is probably better to create the BoundField
@@ -94,6 +99,9 @@ class Field[C, T](ReactionMixin, _Field):
             setattr(instance, self._attr_bound, bound_field)
         return bound_field
 
+    def evaluate(self, instance: C) -> T:
+        return getattr(instance, self.attr)
+
     def _get_with_initialize(self, instance: C) -> T | None:
         try:
             return getattr(instance, self._attr)
@@ -101,6 +109,9 @@ class Field[C, T](ReactionMixin, _Field):
             setattr(instance, self._attr, self.initial_value)
             return self.initial_value
 
+    ###########################################################################
+    # Descriptor protocol for intercepting field updates
+    ###########################################################################
     def __get__(self, instance, owner=None):
         '''
         Get the value of the field.
@@ -134,15 +145,45 @@ class Field[C, T](ReactionMixin, _Field):
         old: T | None = self._get_with_initialize(instance)
         if value != old:
             setattr(instance, self._attr, value)
-            self(instance).react(old , value)
+            self.bound_field(instance).react(old , value)
 
-    def __eq__(self, other) -> Eq[C]:  # type: ignore[override]
-        '''create an Eq predicate for the field'''
-        return Eq[C](self, other)
+    __delete__ = MustNotBeCalled(
+        None, "removal of state attributes is not permitted")
+        
+    
+    # end Descriptor protocol.
+    ###########################################################################
 
-    def __ne__(self, other) -> Ne[C]:  # type: ignore[override]
+    ###########################################################################
+    # Predicate creation through comparison operators:
+    ###########################################################################
+    def __contains__(self, other) -> Contains[C]:  # type: ignore[override]
+        '''create a Contains (in predicate for the field'''
+        return Contains(self, other)
+    
+    def __eq__(self, other) -> Eq[C]:
+        '''create an Eq (==) predicate for the field'''
+        return Eq(self, other)
+
+    def __ne__(self, other) -> Ne[C]:
         '''create an Eq predicate for the field'''
-        return Ne[C](self, other)
+        return Ne(self, other)
+
+    def __lt__(self, other) -> Lt[C]:
+        '''create an Lt (<) predicate for the field'''
+        return Lt(self, other)
+
+    def __le__(self, other) -> Le[C]:
+        '''create an Le (<=) predicate for the field'''
+        return Le(self, other)
+
+    def __gt__(self, other) -> Gt[C]:
+        '''create an Gt (>) predicate for the field'''
+        return Gt(self, other)
+
+    def __ge__(self, other) -> Ge[C]:  # type: ignore[override]
+        '''create an Ge (>=) predicate for the field'''
+        return Ge(self, other)
 
     # todo implement these comparison methods.
     def _NotImplementedError(self, *args: object):
