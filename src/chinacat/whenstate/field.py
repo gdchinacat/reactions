@@ -61,7 +61,7 @@ class Field[C, T](_Field):
             setattr(instance, attr, bound_field)
         return bound_field
 
-    def _get_with_initialize(self, instance: C):
+    def _get_with_initialize(self, instance: C) -> T | None:
         try:
             return getattr(instance, self.attr)
         except AttributeError:
@@ -98,8 +98,10 @@ class Field[C, T](_Field):
         # if value is self.
         if value is self:
             return
-        self(instance).notify(getattr(instance, self.attr), value)
-        setattr(instance, self.attr, value)
+        old: T | None = self._get_with_initialize(instance)
+        if value != old:
+            self(instance).notify(old , value)
+            setattr(instance, self.attr, value)
 
     def __eq__(self, other):
         '''create an Eq predicate for the field'''
@@ -140,7 +142,6 @@ class BoundField[C, T]:
         Decorator to indicate func(field=, instance=) should be called when
         this fields value changes.
         '''
-        # todo - only call func if the value actually changes?
         # todo - defer call until "after" the current execution is "done"
         #        allow transaction-like semantics?
         #        remove spurious calls for intermediate value changes
@@ -154,5 +155,3 @@ class BoundField[C, T]:
         # todo - async await?
         for listener in self.listeners:
             listener(self, old, new)
-
-        
