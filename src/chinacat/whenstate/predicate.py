@@ -145,9 +145,11 @@ class UnaryPredicate[C](OperatorPredicate["UnaryPredicate", C], ABC):
     '''Predicate that has a single operand.'''
     expression: Predicate[C] | _Field[C, Any]
 
-    def __post_init__(self):
-        if not isinstance(self.expression, (Predicate, _Field)):
-            self.expression = Constant(self.expression)
+    def __init__(self, expression:Predicate[C] | _Field[C, Any] | Any,
+                 *args, **kwargs):
+        if not isinstance(expression, (Predicate, _Field)):
+            expression = Constant(expression)
+        self.expression = expression
 
     @property
     def fields(self) -> Generator[_Field[C, Any], None, None]:
@@ -166,14 +168,21 @@ class BinaryPredicate[C](OperatorPredicate["BinaryPredicate", C], ABC):
     left: Predicate[C] | _Field[C, Any]
     right: Predicate[C] | _Field[C, Any]
 
-    def __post_init__(self):
+    def __init__(self,
+                 left: Predicate[C] | _Field[C, Any] | Any,
+                 right: Predicate[C] | _Field[C, Any] | Any,
+                 *args, **kwargs):
         # Everything that isn't a Predicate or a _Field is treated as a
         # constant. This may need to be reevaluated, but it helps with the
         # fields() logic for now.
-        if not isinstance(self.left, (Predicate, _Field)):
-            self.left = Constant(self.left)
-        if not isinstance(self.right, (Predicate, _Field)):
-            self.right = Constant(self.right)
+        super().__init__(*args, **kwargs)
+        if not isinstance(left, (Predicate, _Field)):
+            left = Constant(left)
+        self.left = left
+
+        if not isinstance(right, (Predicate, _Field)):
+            right = Constant(right)
+        self.right = right
 
     @property
     def fields(self) -> Generator[_Field[C, Any], None, None]:
@@ -187,7 +196,7 @@ class BinaryPredicate[C](OperatorPredicate["BinaryPredicate", C], ABC):
     def __str__(self) -> str:
         return f"({self.left} {self.token} {self.right})"
 
-Not: Type[Predicate[Any]] = UnaryPredicate.factory(
+Not: Type[UnaryPredicate[Any]] = UnaryPredicate.factory(
     'Not', 'not', operator.not_)
 And: Type[BinaryPredicate[Any]] = BinaryPredicate.factory(
     'And', 'and', lambda _, a, b: a and b)
