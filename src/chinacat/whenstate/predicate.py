@@ -64,6 +64,9 @@ class Predicate[C](ABC):
     def __and__(self, other):
         return And(self, other)  # pylint: disable=abstract-class-instantiated
 
+    def __or__(self, other):
+        return Or(self, other)  # pylint: disable=abstract-class-instantiated
+
     @abstractmethod
     def evaluate(self, instance: C) -> Any:
         '''evaluate the predicate against the given model'''
@@ -100,22 +103,67 @@ class Constant[C, T](Predicate[C]):
         # @UnusedVariable pylint: disable=unused-argument
         return self.value
 
+    @MustNotBeCalled
+    def __bool__(self): ...
 
-@dataclass
-class BinaryPredicate[C](Predicate[C], ABC):
-    '''
-    Predicate that has two operands.
-    '''
-    left: Predicate[C] | _Field[C, Any]
-    right: Predicate[C] | _Field[C, Any]
+
+class OperatorPredicate[P, C](Predicate[C], ABC):
+    '''predicate that uses an operator for its logic'''
+
+    operator: Callable[..., bool]
 
     @property
     @abstractmethod
     def token(self) -> str: ...  # field from subclass
 
-    @property
     @abstractmethod
-    def operator(self) -> Callable[[Any, Any], bool]: ...
+    def evaluate(self, instance: C): ...
+
+    @classmethod
+    def factory(cls,
+                name: str,
+                token: str,
+                op: Callable[..., bool]
+               ) -> Type[P]:
+        '''
+        Create a Predicate class using the given op. token is for str/repr
+        and has no other use. The class is exported from the module through
+        __all__.
+        '''
+
+        ret: Type[P] = type(name,
+                            (cls, ),
+                            {'token': token,
+                             'operator': op}) 
+        __all__.append(name)
+        return ret
+
+
+@dataclass
+class UnaryPredicate[C](OperatorPredicate["UnaryPredicate", C], ABC):
+    '''Predicate that has a single operand.'''
+    expression: Predicate[C] | _Field[C, Any]
+
+    def __post_init__(self):
+        if not isinstance(self.expression, (Predicate, _Field)):
+            self.expression = Constant(self.expression)
+
+    @property
+    def fields(self) -> Generator[_Field[C, Any], None, None]:
+        yield from self.expression.fields
+
+    def evaluate(self, instance: C):
+        return self.operator(self.expression.evaluate(instance))
+
+    def __str__(self) -> str:
+        return f"({self.token} {self.expression})"
+
+
+@dataclass
+class BinaryPredicate[C](OperatorPredicate["BinaryPredicate", C], ABC):
+    '''Predicate that has two operands.'''
+    left: Predicate[C] | _Field[C, Any]
+    right: Predicate[C] | _Field[C, Any]
 
     def __post_init__(self):
         # Everything that isn't a Predicate or a _Field is treated as a
@@ -135,46 +183,34 @@ class BinaryPredicate[C](Predicate[C], ABC):
         return self.operator(self.left.evaluate(instance),
                              self.right.evaluate(instance))
 
-    @MustNotBeCalled
-    def __bool__(self): ...
-
     def __str__(self) -> str:
         return f"({self.left} {self.token} {self.right})"
 
-    @classmethod
-    def factory(cls,
-                name: str,
-                token: str,
-                op: Callable[[Any, Any], bool]
-               ) -> Type[BinaryPredicate[C]]:
-        '''
-        Create a binary operator using the given function. token is for str/repr
-        and has no other use. The class is exported from the module through
-        __all__.
-        '''
+Not: Type[Predicate[Any]] = UnaryPredicate.factory(
+    'Not', 'not', operator.not_)
+And: Type[BinaryPredicate[Any]] = BinaryPredicate.factory(
+    'And', 'and', lambda _, a, b: a and b)
+Or: Type[BinaryPredicate[Any]] = BinaryPredicate.factory(
+    'Or', 'or', lambda _, a, b: a or b)
+Eq: Type[BinaryPredicate[Any]] = BinaryPredicate.factory(
+    'Eq', '==', operator.eq)
+Ne: Type[BinaryPredicate[Any]] = BinaryPredicate.factory(
+    'Ne', '!=', operator.ne)
+Lt: Type[BinaryPredicate[Any]] = BinaryPredicate.factory(
+    'Lt', '<', operator.lt)
+Le: Type[BinaryPredicate[Any]] = BinaryPredicate.factory(
+    'Le', '<=', operator.le)
+Gt: Type[BinaryPredicate[Any]] = BinaryPredicate.factory(
+    'Gt', '>', operator.gt)
+Ge: Type[BinaryPredicate[Any]] = BinaryPredicate.factory(
+    'Ge', '>=', operator.ge)
+Contains: Type[BinaryPredicate[Any]] = BinaryPredicate.factory(
+    'Contains','contains', operator.contains)
 
-        ret: Type[BinaryPredicate[C]] = type(name,
-                                             (BinaryPredicate, ),
-                                             {'token': token,
-                                              'operator': op}) 
-        __all__.append(name)
-        return ret
+# BinaryAnd and BinaryOr aren't strictly predicates since they don't evaluate
+# to a bool. Still useful, so included.
+BinaryAnd: Type[BinaryPredicate[Any]] = BinaryPredicate.factory(
+    'BinaryAnd', '&', operator.and_)
+BinaryOr: Type[BinaryPredicate[Any]] = BinaryPredicate.factory(
+    'BinaryOr', '|', operator.or_)
 
-Eq: Type[BinaryPredicate[Any]] = BinaryPredicate.factory('Eq', '==', operator.eq)
-Ne: Type[BinaryPredicate[Any]] = BinaryPredicate.factory('Ne', '!=', operator.ne)
-And: Type[BinaryPredicate[Any]] = BinaryPredicate.factory('And', '&', operator.and_)
-Lt: Type[BinaryPredicate[Any]] = BinaryPredicate.factory('Lt', '<', operator.lt)
-Le: Type[BinaryPredicate[Any]] = BinaryPredicate.factory('Le', '<=', operator.le)
-Gt: Type[BinaryPredicate[Any]] = BinaryPredicate.factory('Gt', '>', operator.gt)
-Ge: Type[BinaryPredicate[Any]] = BinaryPredicate.factory('Ge', '>=', operator.ge)
-
-class Contains[C](BinaryPredicate):
-    token: str = 'in'
-    operator: Callable[[Any, Any], bool] = operator.contains
-
-    def __init__(self,  # pylint: disable=useless-parent-delegation
-                 left: Predicate[C] | _Field[C, Any],
-                 right: Predicate[C] | _Field[C, Any]):
-        # contains() args are reversed the other binary operations, so swap
-        # left and right.
-        super().__init__(left, right)

@@ -8,7 +8,7 @@ from typing import List, Any, Dict
 
 from .error import MustNotBeCalled
 from .predicate import (_Field, Reaction, BinaryPredicate,
-                         Contains, Eq, Ne, Lt, Le, Gt, Ge)
+                         Eq, Ne, Lt, Le, Gt, Ge, And, Or)
 
 
 class ReactionMixin[C, T](ABC):
@@ -162,9 +162,17 @@ class Field[C, T](ReactionMixin, _Field):
     ###########################################################################
     # Predicate creation operators
     ###########################################################################
-    def __contains__(self, other) -> Contains[C]:  # type: ignore[override]
-        '''create a Contains (in predicate for the field'''
-        return Contains(self, other)
+    def __contains__(self, other) -> None:
+        '''not implemented'''
+        raise NotImplementedError('use Contains(self, other) instead')
+
+    def __and__(self, other) -> BinaryPredicate[C]:  # type: ignore[override]
+        '''create an And (&) predicate for the field'''
+        return And(self, other)  # pylint: disable=abstract-class-instantiated
+
+    def __or__(self, other) -> BinaryPredicate[C]:  # type: ignore[override]
+        '''create an Or (|) predicate for the field'''
+        return Or(self, other)  # pylint: disable=abstract-class-instantiated
 
     def __eq__(self, other) -> BinaryPredicate[C]:  # type: ignore[override]
         '''create an Eq (==) predicate for the field'''

@@ -8,16 +8,16 @@ from chinacat.fixtures import default_fixture_name, fixture
 
 from ..error import MustNotBeCalled
 from ..field import Field, BoundField
-from ..predicate import Predicate
+from ..predicate import Predicate, Contains, Not, Or, And
 
 
 @default_fixture_name('C')
-def class_fixture(test: TestCase, **_) -> type:  # @UnusedVariable
+def class_fixture(test: TestCase, a=None, b=None, **_) -> type:  # @UnusedVariable
     '''create new class with fields for testing'''
     @dataclass
     class C:
-        field_a: Field[C, bool] = Field["C", bool]('C', 'field_a')
-        field_b: Field[C, bool] = Field["C", bool]('C', 'field_b')
+        field_a: Field[C, bool] = Field["C", bool]('C', 'field_a', a)
+        field_b: Field[C, bool] = Field["C", bool]('C', 'field_b', b)
     return C
 
 class TestField(TestCase):
@@ -73,3 +73,35 @@ class TestField(TestCase):
                           (False, True),
                           (True, None)],
                          changes)
+
+    @fixture(class_fixture)
+    def test_predicate_operators(self, C) -> None:
+        c = C(True, 0)
+        self.assertTrue((C.field_a == True).evaluate(c))
+        self.assertFalse((C.field_a != True).evaluate(c))
+        self.assertTrue((C.field_b < 1).evaluate(c))
+        self.assertTrue((C.field_b <= 0).evaluate(c))
+        self.assertTrue((C.field_b > -1).evaluate(c))
+        self.assertTrue((C.field_b >= 0).evaluate(c))
+
+        # bitwise and and or, not logical (not strictly predicates)
+        self.assertEqual(1, (C.field_b | 1).evaluate(c))
+        self.assertEqual(0, (C.field_b & 1).evaluate(c))
+
+        # No operators for these predicates
+        self.assertFalse((Not(C.field_a)).evaluate(c))
+        self.assertTrue(Or(C.field_b, True).evaluate(c))
+        self.assertFalse(And(C.field_b, True).evaluate(c))
+
+        # __contains__ doesn't seem to work with non-bool returns (explains why
+        # sqlalchemy uses in_() rather than 'foo in bar' I've wondered about
+        # previously).
+        c.field_b = (True, )
+        with self.assertRaises(NotImplementedError):
+            # while X in Y creates a Contains() predicate, returning it from
+            # __contains__() does not return it to here..rather it is evaluated
+            # as True since it is not None. An exception is raised suggesting
+            # how the predicate can be used directly.
+            _ = C.field_a in C.field_b
+        self.assertTrue(Contains(C.field_b, C.field_a).evaluate(c))
+
