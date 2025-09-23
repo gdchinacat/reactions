@@ -13,8 +13,8 @@ import logging
 from typing import Callable, Any, Type
 
 from .error import MustNotBeCalled
-from .field import BoundField, Reaction
-from .predicate import Predicate
+from .field import BoundField
+from .predicate import Predicate, BoundReaction
 
 
 __all__ = ['ReactionMustNotBeCalled', "State"]
@@ -42,7 +42,7 @@ class ReactionMustNotBeCalled(MustNotBeCalled):
               def react(self: C, bound_field: BoundField[C, T], old, new): ...
               State.when(foo==1)(react)
     '''
-    def __init__(self, func: Reaction, *args, **kwargs):
+    def __init__(self, func: BoundReaction, *args, **kwargs):
         super().__init__(None, f"{func.__qualname__} is a State reaction method and "
                          "can not be called directly.", *args, **kwargs)
 
@@ -51,13 +51,15 @@ class ReactionMustNotBeCalled(MustNotBeCalled):
         raise self
 
 
+type BoundReactionDecorator[C, R] = Callable[[BoundReaction[C, None]],
+                                             BoundReaction[C, R]]
+
 @dataclass
-class State(ABC):
+class State[C](ABC):
     
     @classmethod
-    def when(cls: Type[State], predicate: Predicate) \
-        -> Callable[[Reaction[State, Any]],
-                    Callable[..., None]]:
+    def when(cls, predicate: Predicate) \
+        -> BoundReactionDecorator[C, MustNotBeCalled]:
         '''
         Decorate a function to register it for execution when the predicate
         becomes true. The function is *not* called by the decorator. A dummy
@@ -67,7 +69,8 @@ class State(ABC):
         The fields the predicate uses are reaction()ed to react() the predicate
         on field changes. 
         '''
-        def dec(func) -> Callable[[State, BoundField, Any, Any], None]:
+        def dec(func: BoundReaction[C, None]) \
+                -> BoundReaction[C, ReactionMustNotBeCalled]:
             for field in predicate.fields:
                 assert not isinstance(field, BoundField)
                 field.reaction(partial(predicate.react, target=func))

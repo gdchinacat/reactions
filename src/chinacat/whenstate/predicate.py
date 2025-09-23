@@ -26,9 +26,12 @@ __all__ = []
 logger = logging.getLogger("whenstate.predicate")
 EMPTY_ITERATOR = () # singleton iterator that contains nothing
 type BoundField[C, T] = TypeAlias
-
 type Reaction[C, T] = Callable[[BoundField[C, T], T, T], None]
-''' Reaction for field value change notifications.'''
+type BoundReaction[C, R] = Callable[[C,                   # cls
+                                  BoundField[C, Any],     # bound_field
+                                  Any,                    # old
+                                  Any],                   # new
+                                 R]                       # return None
 
 
 class _Field[C, T](ABC):
@@ -77,13 +80,12 @@ class Predicate[C](ABC):
               old: Any,
               new: Any,
               *,
-              target: Reaction):
+              target: BoundReaction) -> None:
         logger.debug('%s notified that %s %s -> %s', self, bound_field,
                      old, new)
 
         if self.evaluate(bound_field.instance):
-            target(bound_field, old, new)
-        # todo call the target if predicate(bound_field.instance)
+            target(bound_field.instance, bound_field, old, new)
 
 
 @dataclass

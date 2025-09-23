@@ -7,6 +7,7 @@ from typing import Optional
 from unittest import TestCase
 
 from ..field import Field, BoundField
+from ..predicate import And
 from ..state import State
 
 
@@ -36,54 +37,46 @@ class TrafficLight(State):
         Field["TrafficLight", int]("TrafficLight", 'cycles', 0)
     ''' cycles: the number of times the light has gone through a full cycle '''
 
-    @State.when(cycles == 5)
-    @staticmethod
-    def stop(#self,
+    @State["TrafficLight"].when(cycles == 5)
+    def stop(self,
              bound_field: BoundField[TrafficLight, int],
              # the field types depend on the predicates
              old: int, new: int) -> None:  # @UnusedVariable
-        (self:=bound_field.instance).ticks = None
+        self.ticks = None
 
-    @State.when(ticks != None)
-    @staticmethod
-    def loop(#self,
+    @State["TrafficLight"].when(ticks != None)
+    def loop(self,
              bound_field: BoundField[TrafficLight, int],
              # the field types depend on the predicates
              old: int, new:int) -> None:  # @UnusedVariable
-        (self:=bound_field.instance).ticks += 1
+        self.ticks += 1
 
-    @State.when((color == Color.RED) &
-                (ticks == 4))
-    @staticmethod
-    def red_to_green(#self,
+    @State["TrafficLight"].when(And(color == Color.RED,
+                    ticks == 4))
+    def red_to_green(self,
                      bound_field: BoundField[TrafficLight, int | Color],
                      # the field types depend on the predicates
                      old: int | Color, new:int | Color) -> None:  # @UnusedVariable
-        self = bound_field.instance
         self.ticks = 0
         self.color = Color.GREEN
         print("GREEN")
 
-    @State.when((color == Color.GREEN) &
-                (ticks == 4))
-    @staticmethod
-    def green_to_yellow(#self,
+    @State["TrafficLight"].when(And(color == Color.GREEN,
+                    ticks == 4))
+    def green_to_yellow(self,
                         bound_field: BoundField[TrafficLight, int | Color],
                         # the field types depend on the predicates
                         old: int | Color, new:int | Color) -> None:  # @UnusedVariable
-        self = bound_field.instance
         self.ticks = 0
         self.color = Color.YELLOW
         print("YELLOW")
 
-    @State.when((color == Color.YELLOW) &
-                (ticks == 4))
-    @staticmethod
-    def yellow_to_red(#self,
+    @State["TrafficLight"].when(And(color == Color.YELLOW,
+                    ticks == 4))
+    def yellow_to_red(self,
                       bound_field: BoundField[TrafficLight, int | Color],
                       # the field types depend on the predicates
                       old: int | Color, new:int | Color) -> None:  # @UnusedVariable
-        self = bound_field.instance
         self.ticks = 0
         self.color = Color.RED
         print("RED")
