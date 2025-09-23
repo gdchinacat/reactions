@@ -64,7 +64,7 @@ class State(ABC):
         function is returned so that directly calling it on instances will
         raise ReactionMustNotBeCalled.
 
-        The fields the predicate uses are listen()ed to react() the predicate
+        The fields the predicate uses are reaction()ed to react() the predicate
         on field changes. 
         '''
         def dec(func) -> Callable[[State, BoundField, Any, Any], None]:

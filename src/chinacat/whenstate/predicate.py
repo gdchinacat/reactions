@@ -14,7 +14,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import logging
 import operator
-from typing import Any, Callable, Generator, Sequence, Type, TypeAlias
+from typing import (Any, Callable, Generator, Sequence, Type, TypeAlias,
+                    Optional)
 
 from .error import MustNotBeCalled
 
@@ -87,7 +88,7 @@ class Predicate[C](ABC):
 
 @dataclass
 class Constant[C, T](Predicate[C]):
-    value: T | None = None
+    value: Optional[T] = None
 
     @property
     def fields(self) -> Sequence[_Field[C, T]]:
@@ -99,7 +100,7 @@ class Constant[C, T](Predicate[C]):
     def __str__(self) -> str:
         return str(self.value)
 
-    def evaluate(self, instance: C) -> T | None: \
+    def evaluate(self, instance: C) -> Optional[T]: \
         # @UnusedVariable pylint: disable=unused-argument
         return self.value
 

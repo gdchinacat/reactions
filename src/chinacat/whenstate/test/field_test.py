@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Tuple, List
 from unittest import TestCase
 
-from chinacat.fixtures import default_fixture_name, fixture
+from chinacat.fixtures import default_fixture_name, fixture  # todo remove de[
 
 from ..error import MustNotBeCalled
 from ..field import Field, BoundField

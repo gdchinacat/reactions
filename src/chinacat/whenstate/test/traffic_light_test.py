@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
 from unittest import TestCase
 
 from ..field import Field, BoundField
@@ -27,8 +28,8 @@ class TrafficLight(State):
         Field["TrafficLight", Color]("TrafficLight", 'color', Color.RED)
     '''color: the current color of the light'''
 
-    ticks: Field[TrafficLight, int | None] = \
-        Field["TrafficLight", int | None]("TrafficLight", 'ticks', None)
+    ticks: Field[TrafficLight, Optional[int]] = \
+        Field["TrafficLight", Optional[int]]("TrafficLight", 'ticks', None)
     '''tick: the number of ticks for the current color'''
 
     cycles: Field[TrafficLight, int] = \

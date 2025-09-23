@@ -4,7 +4,7 @@ Where most of the 'magic' happens.
 from __future__ import annotations
 
 from abc import ABC
-from typing import List, Any, Dict
+from typing import List, Any, Dict, Optional
 
 from .error import MustNotBeCalled
 from .predicate import (_Field, Reaction, BinaryPredicate,
@@ -72,14 +72,14 @@ class Field[C, T](ReactionMixin, _Field):
     def __init__(self,
                  classname: str,  # for str/repr
                  attr: str,  # name of the field, value stored as ._{attr}
-                 initial_value: T | None = None,
+                 initial_value: Optional[T] = None,
                  *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.classname: str = classname
         self.attr: str = attr                           # public
         self._attr: str = '_' + attr                    # private
         self._attr_bound: str = self._attr + '_bound'   # bound field
-        self.initial_value: T | None = initial_value
+        self.initial_value: Optional[T] = initial_value
 
     def __hash__(self):
         '''
@@ -108,7 +108,7 @@ class Field[C, T](ReactionMixin, _Field):
     def evaluate(self, instance: C) -> T:
         return getattr(instance, self.attr)
 
-    def _get_with_initialize(self, instance: C) -> T | None:
+    def _get_with_initialize(self, instance: C) -> Optional[T]:
         try:
             return getattr(instance, self._attr)
         except AttributeError:
@@ -148,7 +148,7 @@ class Field[C, T](ReactionMixin, _Field):
         # if value is self.
         if value is self:
             return
-        old: T | None = self._get_with_initialize(instance)
+        old: Optional[T] = self._get_with_initialize(instance)
         if value != old:
             setattr(instance, self._attr, value)
             bound_field: BoundField[C, T] =  self.bound_field(instance)
