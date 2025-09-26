@@ -23,3 +23,23 @@ class MustNotBeCalled(RuntimeError):
     def __call__(self, *args, **kwargs):
         '''raises self to indicate a MustNotBeCalled was in fact called'''
         raise self
+
+
+class StateError(RuntimeError):
+    '''base class for state errors'''
+
+
+class StateAlreadyStarted(StateError):
+    '''
+    Error indicating the state has already been started.
+
+    The State may have already terminated, which, as the name implies, is
+    terminal and can't be restarted. This error does not imply the state is
+    running, only that the request to start it failed.
+    '''
+
+class StateNotStarted(StateError):
+    '''
+    Error indicating an action was taken that requires the state event loop
+    to have been started yet wasn't.
+    '''
