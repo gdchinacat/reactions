@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+from asyncio import Future
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
-from unittest import TestCase
+from unittest import TestCase, main
 
 from ..field import Field, BoundField
 from ..predicate import And
@@ -24,6 +25,8 @@ class TrafficLight(State):
     simple model that implements a traffic light:
     '''
 
+    _complete: Optional[Future[None]] = None
+
     # todo metaclass to wrap attributes with Field
     color: Field[TrafficLight, Color] = \
         Field["TrafficLight", Color]("TrafficLight", 'color', Color.RED)
@@ -37,15 +40,21 @@ class TrafficLight(State):
         Field["TrafficLight", int]("TrafficLight", 'cycles', 0)
     ''' cycles: the number of times the light has gone through a full cycle '''
 
+    def start(self) -> Future[None]:
+        self.ticks = 0
+        future = self._complete = Future[None]()
+        return future
+
     @State["TrafficLight"].when(cycles == 5)
-    def stop(self,
+    async def done(self,
              bound_field: BoundField[TrafficLight, int],
              # the field types depend on the predicates
              old: int, new: int) -> None:  # @UnusedVariable
-        self.ticks = None
+        assert self._complete is not None
+        self._complete.set_result(None)
 
     @State["TrafficLight"].when(ticks != None)
-    def loop(self,
+    async def loop(self,
              bound_field: BoundField[TrafficLight, int],
              # the field types depend on the predicates
              old: int, new:int) -> None:  # @UnusedVariable
@@ -53,7 +62,7 @@ class TrafficLight(State):
 
     @State["TrafficLight"].when(And(color == Color.RED,
                     ticks == 4))
-    def red_to_green(self,
+    async def red_to_green(self,
                      bound_field: BoundField[TrafficLight, int | Color],
                      # the field types depend on the predicates
                      old: int | Color, new:int | Color) -> None:  # @UnusedVariable
@@ -63,7 +72,7 @@ class TrafficLight(State):
 
     @State["TrafficLight"].when(And(color == Color.GREEN,
                     ticks == 4))
-    def green_to_yellow(self,
+    async def green_to_yellow(self,
                         bound_field: BoundField[TrafficLight, int | Color],
                         # the field types depend on the predicates
                         old: int | Color, new:int | Color) -> None:  # @UnusedVariable
@@ -73,7 +82,7 @@ class TrafficLight(State):
 
     @State["TrafficLight"].when(And(color == Color.YELLOW,
                     ticks == 4))
-    def yellow_to_red(self,
+    async def yellow_to_red(self,
                       bound_field: BoundField[TrafficLight, int | Color],
                       # the field types depend on the predicates
                       old: int | Color, new:int | Color) -> None:  # @UnusedVariable
@@ -88,9 +97,11 @@ class TrafficLightTest(TestCase):
         traffic_light = TrafficLight()
 
         async def run():
-            # there isn't a formal way to start the model...just nudge the
-            # state to get it going. It should run to completion.
-            traffic_light.ticks = 0
-
+            await traffic_light.start()
         asyncio.run(run())
+        
         self.assertEqual(traffic_light.cycles, 5)
+
+
+if __name__ == "__main__":
+    main()

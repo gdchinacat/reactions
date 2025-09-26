@@ -1,16 +1,39 @@
 '''
-A state machine:
-    - instrumentable fields to schedule callable when predicate using
-      the fields become true.
-    - async loop to execute schduled callables.
+An event driven state machine.
+
+Implementation is done by specifying reaction functions that react to state
+changes based on predicates. When a state field changes the predicates that
+use the changed field are reevaluated and the reaction is scheduled for
+asynchronous execution.
+
+Execution of the reaction is delayed from when the predicate for the reaction
+is evaluated. This means intervening reactions may change state such that the
+predicate is no longer true when the reaction is eventually executed. State
+implementations are expected to take this into account. TODO - mark fields
+for predicates with pending reactions so that updates to them raise exception?
+This would guarantee predicates don't become false before their reactions
+are done executing, but would preclude reactions that change their predicate
+field...implementing a counter would become convoluted (change to count_1
+increments count_2 which has a reaction to change count_1...yuck..but may be
+worth it).
+
+The asynchronous execution of reactions means ordering is not well defined.
+Implementations are expected to take this into account by modeling it in
+sufficient detail to ensure the required semantics.
+
+Implementations are strongly discouraged from using locks or other
+synchronization primitives. Model the state those would manage.
+
+TODO - come up with guidelines for how to safely implement state
 '''
 from __future__ import annotations
 
-from abc import ABC
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
+from asyncio import Future
+from dataclasses import dataclass, field
 from functools import partial
 import logging
-from typing import Callable, Any, Type
+from typing import Callable, Any, Coroutine
 
 from .error import MustNotBeCalled
 from .field import BoundField
@@ -19,8 +42,8 @@ from .predicate import Predicate, BoundReaction
 
 __all__ = ['ReactionMustNotBeCalled', "State"]
 
+
 logger = logging.getLogger('whenstate.state')
-logging.basicConfig(level=logging.DEBUG, force=True)  # todo remove
 
 
 class ReactionMustNotBeCalled(MustNotBeCalled):
@@ -51,15 +74,34 @@ class ReactionMustNotBeCalled(MustNotBeCalled):
         raise self
 
 
-type BoundReactionDecorator[C, R] = Callable[[BoundReaction[C, None]],
-                                             BoundReaction[C, R]]
+type _Coroutine[R] = Coroutine[None, None, R]
+type AsyncCallable[**A, R] = Callable[A, _Coroutine[R]]
+type AsyncBoundReaction[C] = AsyncCallable[
+    [C, BoundField[C, Any], Any, Any],
+    None]
 
 @dataclass
 class State[C](ABC):
-    
+    '''
+    State implements an event driven state machine.
+
+    Each State has its own asyncio event loop that is used for processing the
+    state events.
+    '''
+
+    @abstractmethod
+    def start(self) -> Future:
+        '''
+         Start processing the state machine. Returns a future that indicates
+         when the state machine has entered a terminal state.
+         '''
+
+    # TODO - implement a cancellation mechanism.
+
     @classmethod
     def when(cls, predicate: Predicate) \
-        -> BoundReactionDecorator[C, MustNotBeCalled]:
+        -> Callable[[AsyncBoundReaction[C]],
+                    MustNotBeCalled]:
         '''
         Decorate a function to register it for execution when the predicate
         becomes true. The function is *not* called by the decorator. A dummy
@@ -69,10 +111,17 @@ class State[C](ABC):
         The fields the predicate uses are reaction()ed to react() the predicate
         on field changes. 
         '''
-        def dec(func: BoundReaction[C, None]) \
-                -> BoundReaction[C, ReactionMustNotBeCalled]:
+        
+        def dec(func: AsyncBoundReaction[C]) \
+                -> ReactionMustNotBeCalled:
+            def _async(self: C, bound_field: BoundField[C, Any],
+                       old: Any, new: Any)->None:
+                '''Invoke the reaction asynchrounously.'''
+                raise NotImplementedError(
+                    f'NOT calling {func} asynchronously {old=} {new=}')
+
             for field in predicate.fields:
                 assert not isinstance(field, BoundField)
-                field.reaction(partial(predicate.react, target=func))
+                field.reaction(partial(predicate.react, target=_async))
             return ReactionMustNotBeCalled(func)
         return dec

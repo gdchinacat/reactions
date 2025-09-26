@@ -1,4 +1,4 @@
-from unittest import TestCase
+from unittest import TestCase, main
 
 from ..predicate import (Eq, Ne, Lt, Le, Gt, Ge, Contains, Constant, Not, Or,
                          And, BinaryAnd, BinaryOr)
@@ -61,3 +61,6 @@ class TestPredicate(TestCase):
 
     def test_binary_and_predicate(self):
         self.assertEqual(0b010, BinaryAnd(0b111, 0b010).evaluate(None))
+
+if __name__ == '__main__':
+    main()

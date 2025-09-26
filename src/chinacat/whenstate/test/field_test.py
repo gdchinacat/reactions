@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Tuple, List
-from unittest import TestCase
+from unittest import TestCase, main
 
 from chinacat.fixtures import default_fixture_name, fixture  # todo remove de[
 
@@ -105,3 +105,6 @@ class TestField(TestCase):
             _ = C.field_a in C.field_b
         self.assertTrue(Contains(C.field_b, C.field_a).evaluate(c))
 
+
+if __name__ == '__main__':
+    main()
