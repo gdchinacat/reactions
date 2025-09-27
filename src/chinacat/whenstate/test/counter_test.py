@@ -46,10 +46,7 @@ class CounterTest(TestCase):
 
     def test_counter(self):
         counter = Counter()
-
-        async def run():
-            await counter.start()
-        asyncio.run(run())
+        asyncio.run(counter.run())
         
         self.assertEqual(counter.count, 5)
 

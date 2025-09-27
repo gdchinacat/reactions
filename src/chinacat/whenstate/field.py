@@ -229,6 +229,9 @@ class BoundField[C, T](ReactionMixin):
         super().__init__(*args, **kwargs)
         self.field: Field[C, T] = field
         self.instance: C = instance
+        # TODO - should the reactions be async generators that the bound field
+        #        and values are sent to? Reduce load by avoiding task creation?
+        #        are async generators less expensive than tasks?
         self.reactions = field.reactions
 
     def __str__(self):

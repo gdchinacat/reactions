@@ -110,6 +110,9 @@ class State(ABC):
         self._start()
         return complete
 
+    async def run(self) -> None:
+        await self.start()
+
     @abstractmethod
     def _start(self) -> None:
         '''
@@ -170,16 +173,17 @@ class State(ABC):
                 #        own task rather than a single task for all the state
                 #        reactions. Consider batching by returning tasks rather
                 #        than executing them inlne.
-                execute_logger.info(
+                execute_logger.debug(
                     f'received notification for {predicate} that '
                     f'{bound_field} changed from {old} to {new}')
                 assert self._complete is not None
                 if not self._complete.done():
-                    execute_logger.debug(
+                    execute_logger.info(
                         f'scheduling {func.__qualname__} because {predicate} '
                         f'== True after {bound_field} changed from {old} to '
                         f'{new}')
                     async def safe_func():
+                        # todo - don't create new function on every call
                         async with self.async_exception_handler():
                             return func(self, bound_field, old, new)
                     return create_task(safe_func())
