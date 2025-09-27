@@ -43,3 +43,6 @@ class StateNotStarted(StateError):
     Error indicating an action was taken that requires the state event loop
     to have been started yet wasn't.
     '''
+
+class PredicateError(RuntimeError): ...
+class InvalidPredicateExpression(PredicateError): ...

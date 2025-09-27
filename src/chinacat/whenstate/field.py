@@ -88,7 +88,7 @@ class Field[C, T](ReactionMixin, _Field):
         '''
         return id(self)
 
-    def bound_field(self, instance: C):
+    def bound_field(self, instance: C) -> BoundField[C, T]:
         '''
         Get or create the BoundField for this field on the given instance.
         todo - for thread safety it is probably better to create the BoundField
@@ -105,7 +105,7 @@ class Field[C, T](ReactionMixin, _Field):
             setattr(instance, self._attr_bound, bound_field)
         return bound_field
 
-    def evaluate(self, instance: C) -> T:
+    def evaluate(self, instance: C) -> Optional[T]:
         return getattr(instance, self.attr)
 
     def _get_with_initialize(self, instance: C) -> Optional[T]:

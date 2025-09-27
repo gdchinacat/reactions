@@ -29,11 +29,14 @@ TODO - come up with guidelines for how to safely implement state
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from asyncio import Future
+from asyncio import Future, create_task, Task
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from functools import partial
+from functools import partial, wraps
 import logging
-from typing import Callable, Any, Coroutine
+from typing import Callable, Any, Coroutine, Optional, Type
+
+from chinacat.whenstate.error import StateNotStarted
 
 from .error import MustNotBeCalled
 from .field import BoundField
@@ -43,7 +46,8 @@ from .predicate import Predicate, BoundReaction
 __all__ = ['ReactionMustNotBeCalled', "State"]
 
 
-logger = logging.getLogger('whenstate.state')
+config_logger = logging.getLogger('whenstate.state.config')
+execute_logger = logging.getLogger('whenstate.state.execute')
 
 
 class ReactionMustNotBeCalled(MustNotBeCalled):
@@ -74,33 +78,73 @@ class ReactionMustNotBeCalled(MustNotBeCalled):
         raise self
 
 
-type _Coroutine[R] = Coroutine[None, None, R]
+type _Coroutine[R] = Coroutine[Any, Any, R]
 type AsyncCallable[**A, R] = Callable[A, _Coroutine[R]]
 type AsyncBoundReaction[C] = AsyncCallable[
-    [C, BoundField[C, Any], Any, Any],
+    [C, BoundField[Type[C], Any], Any, Any],
     None]
 
 @dataclass
-class State[C](ABC):
+class State(ABC):
     '''
     State implements an event driven state machine.
 
     Each State has its own asyncio event loop that is used for processing the
     state events.
     '''
+    # TODO - This could be the basis for a tool for debugging otraffic_light_test.pyr
+    #        for understanding how existing complex state machines
+    #        actually work. Just extend StateAnalyzer(State) and
+    #        have it dump the state machine your existing code
+    #        creates. Not really a goal for now, but hmm....dev
+    #        tools that help understand existing complex code are
+    #        quite valuable ($$$).
 
-    @abstractmethod
-    def start(self) -> Future:
+    _complete: Optional[Future[None]] = None
+
+    def start(self) -> Future[None]:
         '''
          Start processing the state machine. Returns a future that indicates
          when the state machine has entered a terminal state.
          '''
+        complete = self._complete = Future()
+        self._start()
+        return complete
 
-    # TODO - implement a cancellation mechanism.
+    @abstractmethod
+    def _start(self) -> None:
+        '''
+        Subclasses must implement this to start the state machine execution.
+        '''
+
+    def stop(self) -> None:
+        if self._complete is None:
+            raise StateNotStarted()
+        self._complete.set_result(None)
+
+    def error(self, exc:Exception) -> None:
+        if self._complete is None:
+            raise StateNotStarted()
+        self._complete.set_exception(exc)
+
+    def cancel(self, *args) -> None:
+        if self._complete is None:
+            raise StateNotStarted()
+        self._complete.cancel(*args)
+
+    @asynccontextmanager
+    async def async_exception_handler(self):
+        '''
+        async context manager to catch exceptions and route them to error()
+        '''
+        try:
+            yield
+        except Exception as exc:
+            self.error(exc)
 
     @classmethod
-    def when(cls, predicate: Predicate) \
-        -> Callable[[AsyncBoundReaction[C]],
+    def when[C](cls, predicate: Predicate) \
+        -> Callable[[AsyncBoundReaction[State]],
                     MustNotBeCalled]:
         '''
         Decorate a function to register it for execution when the predicate
@@ -111,17 +155,35 @@ class State[C](ABC):
         The fields the predicate uses are reaction()ed to react() the predicate
         on field changes. 
         '''
-        
-        def dec(func: AsyncBoundReaction[C]) \
+        def dec(func: AsyncBoundReaction[State]) \
                 -> ReactionMustNotBeCalled:
-            def _async(self: C, bound_field: BoundField[C, Any],
-                       old: Any, new: Any)->None:
-                '''Invoke the reaction asynchrounously.'''
-                raise NotImplementedError(
-                    f'NOT calling {func} asynchronously {old=} {new=}')
 
-            for field in predicate.fields:
+            config_logger.info(f'will call {func.__qualname__} when {predicate}')
+            def reaction(self: State,
+                         bound_field: BoundField[Type[State], Any],
+                         old: Any, new: Any) -> Optional[Task]:
+                '''Invoke the reaction asynchrounously.'''
+                # TODO - this is suboptimal since each true predicate gets its
+                #        own task rather than a sngle task for all the state
+                #        reactions. Consider batching by returning tasks rather
+                #        than executing them inlne.
+                assert self._complete is not None
+                execute_logger.info(
+                    f'received notification for {predicate} that '
+                    f'{bound_field} changed from {old} to {new}')
+                if not self._complete.done():
+                    execute_logger.debug(
+                        f'scheduling {func.__qualname__} because {predicate} '
+                        f'== True after {bound_field} changed from {old} to '
+                        f'{new}')
+                    async def safe_func():
+                        async with self.async_exception_handler():
+                            return func(self, bound_field, old, new)
+                    return create_task(safe_func())
+                return None
+
+            for field in set(predicate.fields):
                 assert not isinstance(field, BoundField)
-                field.reaction(partial(predicate.react, target=_async))
+                field.reaction(partial(predicate.react, target=reaction))
             return ReactionMustNotBeCalled(func)
         return dec

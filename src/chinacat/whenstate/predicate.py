@@ -17,7 +17,7 @@ import operator
 from typing import (Any, Callable, Generator, Sequence, Type, TypeAlias,
                     Optional)
 
-from .error import MustNotBeCalled
+from .error import MustNotBeCalled, InvalidPredicateExpression
 
 
 __all__ = []
@@ -45,7 +45,7 @@ class _Field[C, T](ABC):
     def reaction(self, reaction: Reaction[C, T]) -> None: ...
 
     @abstractmethod
-    def evaluate(self, instance: C ) -> T: ...
+    def evaluate(self, instance: C) -> Optional[T]: ...
 
 @dataclass
 class Predicate[C](ABC):
@@ -197,6 +197,15 @@ class BinaryPredicate[C](OperatorPredicate["BinaryPredicate", C], ABC):
 
     def __str__(self) -> str:
         return f"({self.left} {self.token} {self.right})"
+
+    def __bool__(self) -> bool | Predicate:
+        # TODO - add unit test for this.
+        raise InvalidPredicateExpression(f'{self}.__bool__() call indicates '
+                                         'predicate was improperly created. '
+                                         f' This most likely results from '
+                                         'using it in a logical and '
+                                         'expression ("? < P < ?", '
+                                         '"P and P", etc.')
 
 Not: Type[UnaryPredicate[Any]] = UnaryPredicate.factory(
     'Not', 'not', operator.not_)
