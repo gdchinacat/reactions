@@ -49,7 +49,7 @@ class TrafficLight(State):
 
     @State.when(cycles == 5)
     def done(self,
-             bound_field: BoundField[Type[TrafficLight], int],
+             bound_field: BoundField[TrafficLight, int],
              old: int, new: int) -> None:  # @UnusedVariable
         assert self.cycles == 5
         assert self._complete is not None
@@ -59,7 +59,7 @@ class TrafficLight(State):
     @State.when(And(color == Color.RED,
                     ticks == 4))
     def red_to_green(self,
-                     bound_field: BoundField[Type[TrafficLight], int | Color],
+                     bound_field: BoundField[TrafficLight, int | Color],
                      old: int | Color, new:int | Color) -> None:  # @UnusedVariable
         assert self.ticks == 4, f"resetting from {self.ticks=}"
         self.ticks = 0
@@ -69,7 +69,7 @@ class TrafficLight(State):
     @State.when(And(color == Color.GREEN,
                     ticks == 4))
     def green_to_yellow(self,
-                        bound_field: BoundField[Type[TrafficLight], int | Color],
+                        bound_field: BoundField[TrafficLight, int | Color],
                         old: int | Color, new:int | Color) -> None:  # @UnusedVariable
         logger.debug(f"green_to_yellow called: {bound_field=} {old=} {new=}")
         assert self.ticks == 4, f"resetting from {self.ticks=}"
@@ -80,7 +80,7 @@ class TrafficLight(State):
     @State.when(And(color == Color.YELLOW,
                     ticks == 4))
     def yellow_to_red(self,
-                      bound_field: BoundField[Type[TrafficLight], int | Color],
+                      bound_field: BoundField[TrafficLight, int | Color],
                       old: int | Color, new:int | Color) -> None:  # @UnusedVariable
         assert self.ticks == 4, f"resetting from {self.ticks=}"
         self.ticks = 0
@@ -90,7 +90,7 @@ class TrafficLight(State):
 
     @State.when(ticks != -1)
     def loop(self,
-             bound_field: BoundField[Type[TrafficLight], int],
+             bound_field: BoundField[TrafficLight, int],
              old: int, new: int) -> None:  # @UnusedVariable
         logger.debug(f'loop() called: {self.ticks}+=1 => {self.ticks + 1}')
         self.ticks += 1

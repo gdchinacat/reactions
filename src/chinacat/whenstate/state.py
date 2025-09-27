@@ -32,9 +32,9 @@ from abc import ABC, abstractmethod
 from asyncio import Future, create_task, Task
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from functools import partial, wraps
+from functools import partial
 import logging
-from typing import Callable, Any, Coroutine, Optional, Type
+from typing import Callable, Any, Optional, Type, Generic
 
 from chinacat.whenstate.error import StateNotStarted
 
@@ -77,12 +77,11 @@ class ReactionMustNotBeCalled(MustNotBeCalled):
         '''raises self to indicate method was in fact called'''
         raise self
 
+type ShouldBeState = Any 
+type Decorator[**A, R] = Callable[A, R]
+type Reaction[C] = Callable[[C, BoundField[C, Any], Any, Any], None]
+type StateReaction = Reaction[ShouldBeState]
 
-type _Coroutine[R] = Coroutine[Any, Any, R]
-type AsyncCallable[**A, R] = Callable[A, _Coroutine[R]]
-type AsyncBoundReaction[C] = AsyncCallable[
-    [C, BoundField[Type[C], Any], Any, Any],
-    None]
 
 @dataclass
 class State(ABC):
@@ -143,9 +142,8 @@ class State(ABC):
             self.error(exc)
 
     @classmethod
-    def when[C](cls, predicate: Predicate) \
-        -> Callable[[AsyncBoundReaction[State]],
-                    MustNotBeCalled]:
+    def when(cls, predicate: Predicate) \
+        -> Decorator[[StateReaction], ReactionMustNotBeCalled]:
         '''
         Decorate a function to register it for execution when the predicate
         becomes true. The function is *not* called by the decorator. A dummy
@@ -154,23 +152,28 @@ class State(ABC):
 
         The fields the predicate uses are reaction()ed to react() the predicate
         on field changes. 
-        '''
-        def dec(func: AsyncBoundReaction[State]) \
-                -> ReactionMustNotBeCalled:
 
-            config_logger.info(f'will call {func.__qualname__} when {predicate}')
+        TODO - remove ReactionMustNotBeCalled to allow stacking @when()'s?
+               not sure exactly what the semantics would be...And() the
+               predicates together?
+        TODO - allow async methods to be decorated with @when()?
+        TODO - 
+        '''
+        def dec(func: StateReaction) -> ReactionMustNotBeCalled:
+            config_logger.info(
+                f'{func.__qualname__} will be called when {predicate}')
             def reaction(self: State,
                          bound_field: BoundField[Type[State], Any],
                          old: Any, new: Any) -> Optional[Task]:
                 '''Invoke the reaction asynchrounously.'''
                 # TODO - this is suboptimal since each true predicate gets its
-                #        own task rather than a sngle task for all the state
+                #        own task rather than a single task for all the state
                 #        reactions. Consider batching by returning tasks rather
                 #        than executing them inlne.
-                assert self._complete is not None
                 execute_logger.info(
                     f'received notification for {predicate} that '
                     f'{bound_field} changed from {old} to {new}')
+                assert self._complete is not None
                 if not self._complete.done():
                     execute_logger.debug(
                         f'scheduling {func.__qualname__} because {predicate} '
