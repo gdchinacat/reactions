@@ -44,5 +44,12 @@ class StateNotStarted(StateError):
     to have been started yet wasn't.
     '''
 
+class StateAlreadyComplete(StateError):
+    '''
+    Error indicating the state has already been completed when an attempt
+    to complete it was made.
+    '''
+    
+
 class PredicateError(RuntimeError): ...
 class InvalidPredicateExpression(PredicateError): ...

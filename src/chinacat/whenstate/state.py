@@ -29,16 +29,15 @@ TODO - come up with guidelines for how to safely implement state
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from asyncio import Future, create_task, Task
+from asyncio import Future, create_task, Task, TaskGroup
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from functools import partial
 import logging
-from typing import Callable, Any, Optional, Type, Generic
+from typing import Callable, Any, Optional, Type
 
-from chinacat.whenstate.error import StateNotStarted
-
-from .error import MustNotBeCalled
+from .error import (MustNotBeCalled, StateNotStarted, StateError,
+                    StateAlreadyComplete)
 from .field import BoundField
 from .predicate import Predicate, BoundReaction
 
@@ -99,7 +98,8 @@ class State(ABC):
     #        tools that help understand existing complex code are
     #        quite valuable ($$$).
 
-    _complete: Optional[Future[None]] = None
+    _complete: Optional[Future[None]] = field(init=False, default=None)
+    _task_group: Optional[TaskGroup[None]] = field(init=False, default=None)
 
     def start(self) -> Future[None]:
         '''
@@ -111,7 +111,10 @@ class State(ABC):
         return complete
 
     async def run(self) -> None:
-        await self.start()
+        self._complete = self.start()
+        await self._complete
+        if (exc := self._complete.exception()):
+            raise exc
 
     @abstractmethod
     def _start(self) -> None:
@@ -122,12 +125,20 @@ class State(ABC):
     def stop(self) -> None:
         if self._complete is None:
             raise StateNotStarted()
+        elif self._complete.done():
+            raise StateAlreadyComplete()
         self._complete.set_result(None)
 
-    def error(self, exc:Exception) -> None:
+    def error(self, exc_info: BaseException) -> None:
         if self._complete is None:
             raise StateNotStarted()
-        self._complete.set_exception(exc)
+        elif self._complete.done():
+            # future is already done so nothing to do but log it.
+            execute_logger.exception('exception encountered processing '
+                                     'reaction for closed state',
+                                     exc_info=exc_info)
+        else:
+            self._complete.set_exception(exc_info)
 
     def cancel(self, *args) -> None:
         if self._complete is None:
@@ -187,10 +198,30 @@ class State(ABC):
                         async with self.async_exception_handler():
                             return func(self, bound_field, old, new)
                     return create_task(safe_func())
+                else:
+                    # TODO - this can happen for a bunch of reasons that need
+                    #        to be locked down. Once that has stabilized it may
+                    #        still be possible, so this may need to be removed.
+                    #        For now, I want to know when state updates are
+                    #        happenin after the state has entered terminal
+                    #        state.
+                    #        1) are queued tasks generating these? Why do we
+                    #           have queued tasks for terminal state?
+                    #        2) is the state continuing to execute after
+                    #           completing its future?
+                    #        3) does state completion need to be moved into a
+                    #           task?
+                    #        4) are tasks waiting unexpectedly causing out of
+                    #           order execution?
+                    raise StateError(f'reaction {func.__qualname__} called '
+                                     f'after {self} completed.')
                 return None
 
+            # Register predicate reactions that call our reaction with the
+            # fields the predicate uses.
             for field in set(predicate.fields):
                 assert not isinstance(field, BoundField)
                 field.reaction(partial(predicate.react, target=reaction))
+
             return ReactionMustNotBeCalled(func)
         return dec

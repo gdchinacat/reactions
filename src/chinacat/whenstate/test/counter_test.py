@@ -2,15 +2,11 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-import logging
 from unittest import TestCase, main
 
 from ..field import Field, BoundField
 from ..predicate import And
 from ..state import State
-
-
-logger = logging.getLogger('counter_test')
 
 @dataclass
 class Counter(State):
@@ -20,6 +16,9 @@ class Counter(State):
     specified value.
     '''
 
+    count_to: Field[Counter, int] = \
+        Field["Counter", int]("Counter", 'count_to', 0)
+
     count: Field[Counter, int] = \
         Field["Counter", int]("Counter", 'count', -1)
     '''count: the count'''
@@ -27,28 +26,29 @@ class Counter(State):
     def _start(self) -> None:
         self.count = 0
 
-    @State.when(count == 5)
-    def done(self,
-             bound_field: BoundField[Counter, int],
-             old: int, new:int) -> None:  # @UnusedVariable
-        assert self._complete is not None
-        self._complete.set_result(None)
-        
-    @State.when(And(0 <= count,
-                    count < 5))
+    @State.when(0 <= count)
     def loop(self,
              bound_field: BoundField[Counter, int],
              old: int, new:int) -> None:  # @UnusedVariable
-        self.count += 1
-        
+        assert old + 1 == new, f"count error {old} + 1 != {new}"
+        if self.count == self.count_to:
+            self.stop()
+        else:
+            self.count += 1
+
 
 class CounterTest(TestCase):
 
-    def test_counter(self):
-        counter = Counter()
-        asyncio.run(counter.run())
-        
-        self.assertEqual(counter.count, 5)
+    def test_count(self):
+        counter = Counter(5000)
+        asyncio.run(counter.run(), debug=False)
+
+        # TODO - this test currently fails because the state is completed on
+        #        5000 but loop() was already scheduled by the call to it that
+        #        incremented it to 5000, so it runs. I'd rather not have to
+        #        have a counter reaction have to include the duplicate
+        #        condition for done
+        self.assertEqual(counter.count, counter.count_to)
 
 
 if __name__ == "__main__":

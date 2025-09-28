@@ -40,19 +40,6 @@ class TrafficLight(State):
     def _start(self) -> None:
         self.ticks = 0
 
-    def error(self, exc:Exception)->None:
-        assert self._complete is not None
-        self._complete.set_exception(exc)
-
-    @State.when(cycles == 5)
-    def done(self,
-             bound_field: BoundField[TrafficLight, int],
-             old: int, new: int) -> None:  # @UnusedVariable
-        assert self.cycles == 5
-        assert self._complete is not None
-        self._complete.set_result(None)
-        self.ticks = -1  # todo - shouldn't be necessary...but stops looping
-
     @State.when(And(color == Color.RED,
                     ticks == 4))
     def red_to_green(self,
@@ -89,7 +76,11 @@ class TrafficLight(State):
              bound_field: BoundField[TrafficLight, int],
              old: int, new: int) -> None:  # @UnusedVariable
         assert self.ticks != 4
-        self.ticks += 1
+
+        if self.cycles == 5:
+            self.stop()
+        else:
+            self.ticks += 1
 
 
 class TrafficLightTest(TestCase):
