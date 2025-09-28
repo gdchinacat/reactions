@@ -15,9 +15,17 @@ graph of dependent conditions that are evaluated when the condition changes.
 TODO - example
 '''
 
-from .field import Field  # todo - don't require models use this explicitly (metaclass to do it automatically?)
-from . import logging_config
-from .state import State
+from . import error
+from . import field
+from . import predicate
+from . import state
+from .error import *
+from .field import *
+from .predicate import *
+from .state import *
 
 
-__all__ = ['State', 'Field']
+__all__ = (field.__all__ +
+           error.__all__ +
+           predicate.__all__ +
+           state.__all__)

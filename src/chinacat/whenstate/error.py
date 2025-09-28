@@ -4,7 +4,10 @@ Error definitions.
 from typing import Any, Callable, Optional
 
 
-__all__ = ['MustNotBeCalled']
+__all__ = ['MustNotBeCalled',
+           'StateError', 'StateNotStarted', 'StateAlreadyStarted',
+           'StateAlreadyComplete', 'StateHasPendingReactions',
+           'PredicateError', 'InvalidPredicateExpression', ]
 
 
 class MustNotBeCalled(RuntimeError):

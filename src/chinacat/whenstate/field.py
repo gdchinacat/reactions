@@ -11,6 +11,8 @@ from .predicate import (_Field, Reaction, BinaryPredicate,
                          Eq, Ne, Lt, Le, Gt, Ge, And, Or)
 
 
+__all__ = ['Field', 'BoundField', ]
+
 class ReactionMixin[C, T](ABC):
     '''
     Implements the Reaction members and methods for Field and BoundField.

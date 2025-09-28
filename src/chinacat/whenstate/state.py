@@ -43,7 +43,7 @@ from .field import BoundField
 from .predicate import Predicate, BoundReaction
 
 
-__all__ = ['ReactionMustNotBeCalled', "State"]
+__all__ = ['State', 'ReactionMustNotBeCalled', ]
 
 
 config_logger = logging.getLogger('whenstate.state.config')

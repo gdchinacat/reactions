@@ -20,7 +20,8 @@ from typing import (Any, Callable, Generator, Sequence, Type, TypeAlias,
 from .error import MustNotBeCalled, InvalidPredicateExpression
 
 
-__all__ = []
+__all__ = ['Predicate', 'Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
+           'Contains', 'BinaryAnd', 'BinaryOr', ]
 
 
 logger = logging.getLogger("whenstate.predicate")
