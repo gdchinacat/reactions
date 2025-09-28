@@ -29,8 +29,8 @@ TODO - come up with guidelines for how to safely implement state
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-import asyncio
 from asyncio import Future, create_task, Task, current_task
+import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from functools import partial, wraps

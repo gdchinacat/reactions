@@ -5,9 +5,7 @@ from dataclasses import dataclass
 from enum import Enum
 from unittest import TestCase, main
 
-from ..field import Field, BoundField
-from ..predicate import And
-from ..state import State
+from ... import Field, BoundField, And, State
 
 
 TICKS_PER_LIGHT = 1

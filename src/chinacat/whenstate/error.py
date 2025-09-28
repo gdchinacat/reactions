@@ -1,7 +1,7 @@
 '''
 Error definitions.
 '''
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, NoReturn
 
 
 __all__ = ['MustNotBeCalled', 'ReactionMustNotBeCalled',
@@ -22,7 +22,7 @@ class MustNotBeCalled(RuntimeError):
         else:
             super().__init__(*args, **kwargs)
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> NoReturn:
         '''raises self to indicate a MustNotBeCalled was in fact called'''
         raise self
  
@@ -49,10 +49,6 @@ class ReactionMustNotBeCalled(MustNotBeCalled):
     def __init__(self, func: Callable, *args, **kwargs):
         super().__init__(None, f"{func.__qualname__} is a State reaction method and "
                          "can not be called directly.", *args, **kwargs)
-
-    def __call__(self, *args, **kwargs):
-        '''raises self to indicate method was in fact called'''
-        raise self
 
 
 class StateError(RuntimeError):

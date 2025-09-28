@@ -4,9 +4,8 @@ import asyncio
 from dataclasses import dataclass
 from unittest import TestCase, main
 
-from ..field import Field, BoundField
-from ..predicate import And
-from ..state import State
+from ... import BoundField, Field, State
+
 
 @dataclass
 class Counter(State):
@@ -16,12 +15,8 @@ class Counter(State):
     specified value.
     '''
 
-    count_to: Field[Counter, int] = \
-        Field["Counter", int]("Counter", 'count_to', 0)
-
-    count: Field[Counter, int] = \
-        Field["Counter", int]("Counter", 'count', -1)
-    '''count: the count'''
+    count_to: Field[Counter, int] = Field("Counter", "count_to", 0)
+    count: Field[Counter, int] = Field("Counter", "count", -1)
     
     def _start(self) -> None:
         self.count = 0
