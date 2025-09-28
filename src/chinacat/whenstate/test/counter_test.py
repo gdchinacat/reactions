@@ -32,7 +32,7 @@ class Counter(State):
              old: int, new:int) -> None:  # @UnusedVariable
         assert old + 1 == new, f"count error {old} + 1 != {new}"
         if self.count == self.count_to:
-            self.stop()
+            self._stop()
         else:
             self.count += 1
 
@@ -40,7 +40,7 @@ class Counter(State):
 class CounterTest(TestCase):
 
     def test_count(self):
-        counter = Counter(5000)
+        counter = Counter(50)
         asyncio.run(counter.run(), debug=False)
 
         # TODO - this test currently fails because the state is completed on

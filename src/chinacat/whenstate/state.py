@@ -29,15 +29,16 @@ TODO - come up with guidelines for how to safely implement state
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from asyncio import Future, create_task, Task, TaskGroup
+import asyncio
+from asyncio import Future, create_task, Task, current_task
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from functools import partial
+from functools import partial, wraps
 import logging
-from typing import Callable, Any, Optional, Type
+from typing import Callable, Any, Optional, Type, Set, Tuple
 
 from .error import (MustNotBeCalled, StateNotStarted, StateError,
-                    StateAlreadyComplete)
+                    StateAlreadyComplete, StateHasPendingReactions)
 from .field import BoundField
 from .predicate import Predicate, BoundReaction
 
@@ -49,37 +50,48 @@ config_logger = logging.getLogger('whenstate.state.config')
 execute_logger = logging.getLogger('whenstate.state.execute')
 
 
-class ReactionMustNotBeCalled(MustNotBeCalled):
-    '''
-    Exception raised if a @when decorated function is called directly. These
-    functions should only be called by the predicate.
-
-    The removal of the method from a class definition is very intentional.
-        - readers may reasonably but incorrectly think the @when() is a guard
-          that skips calls if the predicate is false. Avoiding confusion is a
-          good thing.
-        - it would be possible to return a function that does that. Calls that
-          are ignored in this way are likely to hurt performance and suggest
-          the state model is not well , designed, or understood. Encouraging
-          good design and understanding is a good thing.
-        - there is a trivial workaround...invoke the decorator manually on a
-          function definition that will be included and is very explicit about
-          what the function semantics are:
-              def react(self: C, bound_field: BoundField[C, T], old, new): ...
-              State.when(foo==1)(react)
-    '''
-    def __init__(self, func: BoundReaction, *args, **kwargs):
-        super().__init__(None, f"{func.__qualname__} is a State reaction method and "
-                         "can not be called directly.", *args, **kwargs)
-
-    def __call__(self, *args, **kwargs):
-        '''raises self to indicate method was in fact called'''
-        raise self
-
 type ShouldBeState = Any 
 type Decorator[**A, R] = Callable[A, R]
 type Reaction[C] = Callable[[C, BoundField[C, Any], Any, Any], None]
 type StateReaction = Reaction[ShouldBeState]
+
+
+TRACE_ENABLED = True
+
+
+def trace(func: Callable[..., Any]) -> Callable[..., Any]:
+    if not TRACE_ENABLED:
+        return func
+    @wraps(func)
+    def _trace(*args, **kwargs):
+        try:
+            ret = func(*args, **kwargs)
+            execute_logger.debug(
+                f'{func}({args=}, {kwargs=}) = {ret=}')
+        except BaseException as exc:
+            execute_logger.debug(
+                f'!!{func}({args=}, {kwargs=}) raised {exc=}')
+            raise
+    return _trace
+            
+
+@dataclass(frozen=True)
+class PendingTask:
+    '''
+    Elements of State._pending_tasks.
+    Immutable.
+    To enable set removal by either PendingTask or Task the hash is the same
+    as the task has and equality uses only task identity.
+    '''
+    task: Task
+    state: State
+    reaction: str
+    
+    def __hash__(self):
+        return hash(self.task)
+
+    def __eq__(self, other):
+        return self.task is other
 
 
 @dataclass
@@ -99,7 +111,12 @@ class State(ABC):
     #        quite valuable ($$$).
 
     _complete: Optional[Future[None]] = field(init=False, default=None)
-    _task_group: Optional[TaskGroup[None]] = field(init=False, default=None)
+    _pending_tasks: Set[PendingTask] = field(init=False, default_factory=set)
+    '''
+    The set of pending tasks.
+    Used to maintain strong reference as well as to implement cancellation.
+    (reaction.__qualname__, Task)
+    '''
 
     def start(self) -> Future[None]:
         '''
@@ -123,11 +140,38 @@ class State(ABC):
         '''
 
     def stop(self) -> None:
+        '''
+        Stop processing the state.
+        Calling from a reaction will raise StateHasPendingReactions since the
+        reaction is pending while executing. Use _stop() instead.
+        '''
+        self._stop(pending=0)
+        
+    def _stop(self, pending=1) -> None:
+        '''
+        stop the state processing.
+        
+        pending - the number of pending tasks that are allowed (exact number,
+                  not a max number)
+        '''
         if self._complete is None:
             raise StateNotStarted()
         elif self._complete.done():
             raise StateAlreadyComplete()
+        if len(self._pending_tasks) > pending:
+            pending_tasks = list(self._pending_tasks)
+            task = current_task()
+            msg = "\n\t".join(f'{"* " if pending.task is task else "  "}'
+                              f'{pending.reaction}'
+                              for pending in pending_tasks)
+            raise StateHasPendingReactions(f'{len(pending_tasks)} pending '
+                                           f' reactions:\n\t{msg}')
+        self._cancel_pending_tasks()
         self._complete.set_result(None)
+    
+    def _cancel_pending_tasks(self):
+        for pending_task in self._pending_tasks:
+            pending_task.task.cancel()
 
     def error(self, exc_info: BaseException) -> None:
         if self._complete is None:
@@ -137,12 +181,13 @@ class State(ABC):
             execute_logger.exception('exception encountered processing '
                                      'reaction for closed state',
                                      exc_info=exc_info)
-        else:
-            self._complete.set_exception(exc_info)
+        self._cancel_pending_tasks()
+        self._complete.set_exception(exc_info)
 
     def cancel(self, *args) -> None:
         if self._complete is None:
             raise StateNotStarted()
+        self._cancel_pending_tasks()
         self._complete.cancel(*args)
 
     @asynccontextmanager
@@ -164,8 +209,8 @@ class State(ABC):
         function is returned so that directly calling it on instances will
         raise ReactionMustNotBeCalled.
 
-        The fields the predicate uses are reaction()ed to react() the predicate
-        on field changes. 
+        The set of fields the predicate uses are reaction()ed to have the
+        predicate react() by asynchronously calling the method being decorated.
 
         TODO - remove ReactionMustNotBeCalled to allow stacking @when()'s?
                not sure exactly what the semantics would be...And() the
@@ -190,14 +235,27 @@ class State(ABC):
                 assert self._complete is not None
                 if not self._complete.done():
                     execute_logger.info(
-                        f'scheduling {func.__qualname__} because {predicate} '
-                        f'== True after {bound_field} changed from {old} to '
-                        f'{new}')
+                        f'schedule {func.__qualname__}(..., {old},  {new}) '
+                        f'for {predicate}')
                     async def safe_func():
-                        # todo - don't create new function on every call
+                        execute_logger.info(
+                            f' calling {func.__qualname__}(..., {old},  {new}) '
+                            f'for {predicate}')
+                                # todo - don't create new function on every call
                         async with self.async_exception_handler():
+                            # yield control to the event loop to allow already 
+                            # scheduled reactions and task callbacks to run.
+                            # TODO - almost certainly need more robust
+                            #        synchronization/task control to guarantee
+                            #        execution semantics. This works for now.
+                            await asyncio.sleep(0)
                             return func(self, bound_field, old, new)
-                    return create_task(safe_func())
+                    task = create_task(safe_func())
+                    pending = PendingTask(task, self, func.__qualname__)
+                    self._pending_tasks.add(pending)
+                    task.add_done_callback(
+                        partial(self._pending_tasks.remove))
+                    return task
                 else:
                     # TODO - this can happen for a bunch of reasons that need
                     #        to be locked down. Once that has stabilized it may
@@ -225,3 +283,32 @@ class State(ABC):
 
             return ReactionMustNotBeCalled(func)
         return dec
+
+
+class ReactionMustNotBeCalled(MustNotBeCalled):
+    '''
+    Exception raised if a @when decorated function is called directly. These
+    functions should only be called by the predicate.
+
+    The removal of the method from a class definition is very intentional.
+        - readers may reasonably but incorrectly think the @when() is a guard
+          that skips calls if the predicate is false. Avoiding confusion is a
+          good thing.
+        - it would be possible to return a function that does that. Calls that
+          are ignored in this way are likely to hurt performance and suggest
+          the state model is not well , designed, or understood. Encouraging
+          good design and understanding is a good thing.
+        - there is a trivial workaround...invoke the decorator manually on a
+          function definition that will be included and is very explicit about
+          what the function semantics are:
+              def react(self: C, bound_field: BoundField[C, T], old, new): ...
+              State.when(foo==1)(react)
+    '''
+    # TODO - remove dependency on BoundReaction and move to .error
+    def __init__(self, func: BoundReaction, *args, **kwargs):
+        super().__init__(None, f"{func.__qualname__} is a State reaction method and "
+                         "can not be called directly.", *args, **kwargs)
+
+    def __call__(self, *args, **kwargs):
+        '''raises self to indicate method was in fact called'''
+        raise self

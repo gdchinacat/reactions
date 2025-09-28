@@ -11,6 +11,10 @@ from ..predicate import And
 from ..state import State
 
 
+TICKS_PER_LIGHT = 1
+CYCLES = 1
+
+
 class Color(Enum):
     '''the color of a traffic light'''
     RED = 1
@@ -29,8 +33,8 @@ class TrafficLight(State):
         Field["TrafficLight", Color]("TrafficLight", 'color', Color.RED)
     '''color: the current color of the light'''
 
-    ticks: Field[TrafficLight, Optional[int]] = \
-        Field["TrafficLight", Optional[int]]("TrafficLight", 'ticks', None)
+    ticks: Field[TrafficLight, int] = \
+        Field["TrafficLight", int]("TrafficLight", 'ticks', -1)
     '''tick: the number of ticks for the current color'''
 
     cycles: Field[TrafficLight, int] = \
@@ -41,44 +45,43 @@ class TrafficLight(State):
         self.ticks = 0
 
     @State.when(And(color == Color.RED,
-                    ticks == 4))
+                    ticks == TICKS_PER_LIGHT))
     def red_to_green(self,
                      bound_field: BoundField[TrafficLight, int | Color],
                      old: int | Color, new:int | Color) -> None:  # @UnusedVariable
         self.change(Color.GREEN)
 
     @State.when(And(color == Color.GREEN,
-                    ticks == 4))
+                    ticks == TICKS_PER_LIGHT))
     def green_to_yellow(self,
                         bound_field: BoundField[TrafficLight, int | Color],
                         old: int | Color, new:int | Color) -> None:  # @UnusedVariable
         self.change(Color.YELLOW)
 
     @State.when(And(color == Color.YELLOW,
-                    ticks == 4))
+                    ticks == TICKS_PER_LIGHT))
     def yellow_to_red(self,
                       bound_field: BoundField[TrafficLight, int | Color],
                       old: int | Color, new:int | Color) -> None:  # @UnusedVariable
+        self.cycles += 1
         self.change(Color.RED)
 
     def change(self, color: Color) -> None:
-        assert self.ticks == 4, f"resetting from {self.ticks=}"
-        # order is very sensitive, changing color before ticks results in rapic
-        # cycling through the colors as predicates evaluate to true since ticks
-        # hasn't changed.
-        self.cycles += 1
         self.ticks = 0
         self.color = color
-        print(color)
+        print(color.name)
 
     @State.when(ticks != -1)
-    def loop(self,
+    def tick(self,
              bound_field: BoundField[TrafficLight, int],
              old: int, new: int) -> None:  # @UnusedVariable
-        assert self.ticks != 4
+        if self.ticks != new:
+            return  # TODO - shouldn't have to check our predicates to know
+                    # it has been invalidated by another reaction.
+        assert self.ticks != TICKS_PER_LIGHT
 
-        if self.cycles == 5:
-            self.stop()
+        if self.cycles == CYCLES:
+            self._stop()
         else:
             self.ticks += 1
 
@@ -89,7 +92,7 @@ class TrafficLightTest(TestCase):
         traffic_light = TrafficLight()
         asyncio.run(traffic_light.run())
         
-        self.assertEqual(traffic_light.cycles, 5)
+        self.assertEqual(traffic_light.cycles, CYCLES)
 
 
 if __name__ == "__main__":

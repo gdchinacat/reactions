@@ -29,6 +29,12 @@ class StateError(RuntimeError):
     '''base class for state errors'''
 
 
+class StateNotStarted(StateError):
+    '''
+    Error indicating an action was taken that requires the state event loop
+    to have been started yet wasn't.
+    '''
+
 class StateAlreadyStarted(StateError):
     '''
     Error indicating the state has already been started.
@@ -38,16 +44,24 @@ class StateAlreadyStarted(StateError):
     running, only that the request to start it failed.
     '''
 
-class StateNotStarted(StateError):
-    '''
-    Error indicating an action was taken that requires the state event loop
-    to have been started yet wasn't.
-    '''
-
 class StateAlreadyComplete(StateError):
     '''
     Error indicating the state has already been completed when an attempt
     to complete it was made.
+    '''
+
+class StateHasPendingReactions(StateError):
+    '''
+    StateHasPendingReactions is raised when a state is stop()'ed while it has
+    reactions that have not yet executed.
+    TODO - provide guidance on how to implement things so you *don't* have
+    pending reactions. The problem is best illustrated by a state field that
+    counts by incrementing the same field it uses as a predicate. In this case
+    the reaction will always be both executing and pending since the executing
+    calls task will be pending and will enqueue another execution. There is
+    never a time when there isn't one pending reaction. States that are self
+    driven must always have at least one pending reaction or they will cease to
+    be self driven.
     '''
     
 
