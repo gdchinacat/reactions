@@ -35,12 +35,12 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from functools import partial, wraps
 import logging
-from typing import Callable, Any, Optional, Type, Set, Tuple
+from typing import Callable, Any, Optional, Type, Set
 
-from .error import (MustNotBeCalled, StateNotStarted, StateError,
+from .error import (ReactionMustNotBeCalled, StateNotStarted, StateError,
                     StateAlreadyComplete, StateHasPendingReactions)
 from .field import BoundField
-from .predicate import Predicate, BoundReaction
+from .predicate import Predicate
 
 
 __all__ = ['State', 'ReactionMustNotBeCalled', ]
@@ -102,14 +102,6 @@ class State(ABC):
     Each State has its own asyncio event loop that is used for processing the
     state events.
     '''
-    # TODO - This could be the basis for a tool for debugging otraffic_light_test.pyr
-    #        for understanding how existing complex state machines
-    #        actually work. Just extend StateAnalyzer(State) and
-    #        have it dump the state machine your existing code
-    #        creates. Not really a goal for now, but hmm....dev
-    #        tools that help understand existing complex code are
-    #        quite valuable ($$$).
-
     _complete: Optional[Future[None]] = field(init=False, default=None)
     _pending_tasks: Set[PendingTask] = field(init=False, default_factory=set)
     '''
@@ -200,6 +192,24 @@ class State(ABC):
         except Exception as exc:
             self.error(exc)
 
+    async def call_reaction(self,
+                            bound_field: BoundField[Type[State], Any],
+                            predicate: Predicate,
+                            reaction: StateReaction,
+                            old: Any, new: Any):
+        '''method to asynchronously call the reaction in a 'safe' way'''
+        execute_logger.info(
+            f' calling {reaction.__qualname__}(..., {old},  {new}) '
+            f'for {predicate}')
+        async with self.async_exception_handler():
+            # yield control to the event loop to allow already 
+            # scheduled reactions and task callbacks to run.
+            # TODO - almost certainly need more robust
+            #        synchronization/task control to guarantee
+            #        execution semantics. This works for now.
+            await asyncio.sleep(0)
+            reaction(bound_field.instance, bound_field, old, new)
+
     @classmethod
     def when(cls, predicate: Predicate) \
         -> Decorator[[StateReaction], ReactionMustNotBeCalled]:
@@ -216,7 +226,6 @@ class State(ABC):
                not sure exactly what the semantics would be...And() the
                predicates together?
         TODO - allow async methods to be decorated with @when()?
-        TODO - 
         '''
         def dec(func: StateReaction) -> ReactionMustNotBeCalled:
             config_logger.info(
@@ -237,20 +246,10 @@ class State(ABC):
                     execute_logger.info(
                         f'schedule {func.__qualname__}(..., {old},  {new}) '
                         f'for {predicate}')
-                    async def safe_func():
-                        execute_logger.info(
-                            f' calling {func.__qualname__}(..., {old},  {new}) '
-                            f'for {predicate}')
-                                # todo - don't create new function on every call
-                        async with self.async_exception_handler():
-                            # yield control to the event loop to allow already 
-                            # scheduled reactions and task callbacks to run.
-                            # TODO - almost certainly need more robust
-                            #        synchronization/task control to guarantee
-                            #        execution semantics. This works for now.
-                            await asyncio.sleep(0)
-                            return func(self, bound_field, old, new)
-                    task = create_task(safe_func())
+                    task = create_task(self.call_reaction(bound_field,
+                                                          predicate,
+                                                          func,
+                                                          old, new))
                     pending = PendingTask(task, self, func.__qualname__)
                     self._pending_tasks.add(pending)
                     task.add_done_callback(
@@ -261,16 +260,16 @@ class State(ABC):
                     #        to be locked down. Once that has stabilized it may
                     #        still be possible, so this may need to be removed.
                     #        For now, I want to know when state updates are
-                    #        happenin after the state has entered terminal
+                    #        happening after the state has entered terminal
                     #        state.
                     #        1) are queued tasks generating these? Why do we
-                    #           have queued tasks for terminal state?
+                    #           have queued tasks for terminal state? (yes)
                     #        2) is the state continuing to execute after
-                    #           completing its future?
+                    #           completing its future? (only without sleep(0))
                     #        3) does state completion need to be moved into a
-                    #           task?
+                    #           task? (don't think so)
                     #        4) are tasks waiting unexpectedly causing out of
-                    #           order execution?
+                    #           order execution? (don't think so)
                     raise StateError(f'reaction {func.__qualname__} called '
                                      f'after {self} completed.')
                 return None
@@ -285,30 +284,3 @@ class State(ABC):
         return dec
 
 
-class ReactionMustNotBeCalled(MustNotBeCalled):
-    '''
-    Exception raised if a @when decorated function is called directly. These
-    functions should only be called by the predicate.
-
-    The removal of the method from a class definition is very intentional.
-        - readers may reasonably but incorrectly think the @when() is a guard
-          that skips calls if the predicate is false. Avoiding confusion is a
-          good thing.
-        - it would be possible to return a function that does that. Calls that
-          are ignored in this way are likely to hurt performance and suggest
-          the state model is not well , designed, or understood. Encouraging
-          good design and understanding is a good thing.
-        - there is a trivial workaround...invoke the decorator manually on a
-          function definition that will be included and is very explicit about
-          what the function semantics are:
-              def react(self: C, bound_field: BoundField[C, T], old, new): ...
-              State.when(foo==1)(react)
-    '''
-    # TODO - remove dependency on BoundReaction and move to .error
-    def __init__(self, func: BoundReaction, *args, **kwargs):
-        super().__init__(None, f"{func.__qualname__} is a State reaction method and "
-                         "can not be called directly.", *args, **kwargs)
-
-    def __call__(self, *args, **kwargs):
-        '''raises self to indicate method was in fact called'''
-        raise self

@@ -2,6 +2,7 @@ from unittest import TestCase, main
 
 from ..predicate import (Eq, Ne, Lt, Le, Gt, Ge, Contains, Constant, Not, Or,
                          And, BinaryAnd, BinaryOr)
+from chinacat.whenstate.error import InvalidPredicateExpression
 
 class TestPredicate(TestCase):
 
@@ -61,6 +62,12 @@ class TestPredicate(TestCase):
 
     def test_binary_and_predicate(self):
         self.assertEqual(0b010, BinaryAnd(0b111, 0b010).evaluate(None))
+
+    def test_and_invalid_predicate(self):
+        with self.assertRaises(InvalidPredicateExpression):
+            Constant(1) and Constant(1)
+        with self.assertRaises(InvalidPredicateExpression):
+            And(True, True) and And(True, True)
 
 if __name__ == '__main__':
     main()

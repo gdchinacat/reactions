@@ -1,12 +1,5 @@
 '''
 Predicates implement comparison checks.
-
-todo - I'm not sure this is the best name. A lot of what is here are actually
-       expressions, not predicates. Ultimately though they have to be a
-       predicate that evaluates to True or False. I think the name is ok since
-       they are all composed of comparisons which are predicates. The
-       question I have is should callables be allowed, and if so, how to feed
-       their arguments to them (zero-arity functons don't seem very useful).
 '''
 from __future__ import annotations
 
@@ -17,7 +10,7 @@ import operator
 from typing import (Any, Callable, Generator, Sequence, Type, TypeAlias,
                     Optional)
 
-from .error import MustNotBeCalled, InvalidPredicateExpression
+from .error import InvalidPredicateExpression
 
 
 __all__ = ['Predicate', 'Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
@@ -49,13 +42,13 @@ class _Field[C, T](ABC):
     def evaluate(self, instance: C) -> Optional[T]: ...
 
 @dataclass
-class Predicate[C](ABC):
+class Predicate[C, T](ABC):
     '''
     Predicate evaluates expressions.
+    T - the type the predicate evaluate()s to
 
     Created through Field and Predicate comparison methods:
         State.field == 'value'
-    They are e
     '''
 
     @property
@@ -66,14 +59,14 @@ class Predicate[C](ABC):
         yield all fields that are part of the predicate
         '''
 
-    def __and__(self, other):
+    def __and__(self, other) -> Predicate[C, Any]:
         return And(self, other)  # pylint: disable=abstract-class-instantiated
 
-    def __or__(self, other):
+    def __or__(self, other) -> Predicate[C, Any]:
         return Or(self, other)  # pylint: disable=abstract-class-instantiated
 
     @abstractmethod
-    def evaluate(self, instance: C) -> Any:
+    def evaluate(self, instance: C) -> Optional[T]:
         '''evaluate the predicate against the given model'''
 
     def react(self,
@@ -90,7 +83,7 @@ class Predicate[C](ABC):
 
 
 @dataclass
-class Constant[C, T](Predicate[C]):
+class Constant[C, T](Predicate[C, T]):
     value: Optional[T] = None
 
     @property
@@ -107,11 +100,11 @@ class Constant[C, T](Predicate[C]):
         # @UnusedVariable pylint: disable=unused-argument
         return self.value
 
-    @MustNotBeCalled
+    @InvalidPredicateExpression
     def __bool__(self): ...
 
 
-class OperatorPredicate[P, C](Predicate[C], ABC):
+class OperatorPredicate[P, C](Predicate[C, bool], ABC):
     '''predicate that uses an operator for its logic'''
 
     operator: Callable[..., bool]
@@ -121,7 +114,7 @@ class OperatorPredicate[P, C](Predicate[C], ABC):
     def token(self) -> str: ...  # field from subclass
 
     @abstractmethod
-    def evaluate(self, instance: C): ...
+    def evaluate(self, instance: C) -> bool: ...
 
     @classmethod
     def factory(cls,
@@ -146,9 +139,9 @@ class OperatorPredicate[P, C](Predicate[C], ABC):
 @dataclass
 class UnaryPredicate[C](OperatorPredicate["UnaryPredicate", C], ABC):
     '''Predicate that has a single operand.'''
-    expression: Predicate[C] | _Field[C, Any]
+    expression: Predicate[C, bool] | _Field[C, Any]
 
-    def __init__(self, expression:Predicate[C] | _Field[C, Any] | Any,
+    def __init__(self, expression:Predicate[C, bool] | _Field[C, Any] | Any,
                  *args, **kwargs):
         if not isinstance(expression, (Predicate, _Field)):
             expression = Constant(expression)
@@ -168,12 +161,12 @@ class UnaryPredicate[C](OperatorPredicate["UnaryPredicate", C], ABC):
 @dataclass
 class BinaryPredicate[C](OperatorPredicate["BinaryPredicate", C], ABC):
     '''Predicate that has two operands.'''
-    left: Predicate[C] | _Field[C, Any]
-    right: Predicate[C] | _Field[C, Any]
+    left: Predicate[C, bool] | _Field[C, Any]
+    right: Predicate[C, bool] | _Field[C, Any]
 
     def __init__(self,
-                 left: Predicate[C] | _Field[C, Any] | Any,
-                 right: Predicate[C] | _Field[C, Any] | Any,
+                 left: Predicate[C, bool] | _Field[C, Any] | Any,
+                 right: Predicate[C, bool] | _Field[C, Any] | Any,
                  *args, **kwargs):
         # Everything that isn't a Predicate or a _Field is treated as a
         # constant. This may need to be reevaluated, but it helps with the
@@ -199,14 +192,15 @@ class BinaryPredicate[C](OperatorPredicate["BinaryPredicate", C], ABC):
     def __str__(self) -> str:
         return f"({self.left} {self.token} {self.right})"
 
+    @InvalidPredicateExpression
     def __bool__(self) -> bool | Predicate:
-        # TODO - add unit test for this.
-        raise InvalidPredicateExpression(f'{self}.__bool__() call indicates '
-                                         'predicate was improperly created. '
-                                         f' This most likely results from '
-                                         'using it in a logical and '
-                                         'expression ("? < P < ?", '
-                                         '"P and P", etc.')
+        '''
+        A call to this method indicates predicate was improperly created.
+        This most likely results from using it in a logical and expression
+        ("? < P < ?", "P and P", etc.')
+        '''
+        return False
+
 
 Not: Type[UnaryPredicate[Any]] = UnaryPredicate.factory(
     'Not', 'not', operator.not_)

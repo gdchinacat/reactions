@@ -20,17 +20,13 @@ class ReactionMixin[C, T](ABC):
 
     def __init__(self, *args: List[Any], **kwargs: Dict[str, Any]):
         super().__init__(*args, **kwargs)
-        self.reactions: List[Reaction[C, T]] = []  # todo - use weakrefs
+        self.reactions: List[Reaction[C, T]] = []
 
     def reaction(self, reaction: Reaction[C, T]):
         '''
         Decorator to indicate the reaction should be called when the field's
         value changes.
         '''
-        # todo - defer call until "after" the current execution is "done"
-        # sooner than later...doing it inline means the tick for the machine
-        # just goes in tight loop until recursion limit exceeded.
-        # I thnk async just because it seems like a good fit.
         # todo - allow transaction-like semantics?
         #        - remove spurious calls for intermediate value changes
         self.reactions.append(reaction)
@@ -39,8 +35,6 @@ class ReactionMixin[C, T](ABC):
         '''
         Notify the reactions that the value changed from old to new.
         '''
-        # todo - defer?
-        # todo - async await?
         for reaction in self.reactions:
             reaction(self, old, new)
 
@@ -64,9 +58,6 @@ class Field[C, T](ReactionMixin, _Field):
     on the class Field attribute to specify predicates with reactions. The
     class is instantiated and values set on the field inspect the predicates
     and call them when the Fields they are composed of change.
-
-    Calling the field with an instance will return a bound field specific to
-    that instance. # TODO - update this once it's fleshed out.
     '''
 
     instance: None = None
@@ -85,21 +76,17 @@ class Field[C, T](ReactionMixin, _Field):
 
     def __hash__(self):
         '''
-        Make Field 'immutable' so that they can be used in dataclasses. The
-        todo - Field isn't ever mutated so this *should* be ok....right?
+        Make Field 'immutable' so that they can be used in sets. The id() of
+        the field is its hash.
         '''
         return id(self)
 
     def bound_field(self, instance: C) -> BoundField[C, T]:
         '''
         Get or create the BoundField for this field on the given instance.
-        todo - for thread safety it is probably better to create the BoundField
-               when the instance is created rather than doing it here lazily.
-
-        This is not expected to be a frequent operation so the attr name is
-        built when executed. If this assumption proves to be incorrect cache
-        the name.
-        todo - @memoize this?
+        todo - (metaclass) for thread safety it is probably better to create
+               the BoundField when the instance is created rather than doing it
+               here lazily.
         '''
         bound_field = getattr(instance, self._attr_bound, None)
         if bound_field is None:
@@ -221,7 +208,7 @@ class BoundField[C, T](ReactionMixin):
     references to any instance specific information.
 
     The reactions for BoundFields are the *same* as for the unbound Field.
-    TODO - if there is a need for instance specifc reactions this can be made
+    TODO - if there is a need for instance specific reactions this can be made
            more complex, but for now, simple is better.
     '''
 

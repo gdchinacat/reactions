@@ -43,11 +43,6 @@ class CounterTest(TestCase):
         counter = Counter(50)
         asyncio.run(counter.run(), debug=False)
 
-        # TODO - this test currently fails because the state is completed on
-        #        5000 but loop() was already scheduled by the call to it that
-        #        incremented it to 5000, so it runs. I'd rather not have to
-        #        have a counter reaction have to include the duplicate
-        #        condition for done
         self.assertEqual(counter.count, counter.count_to)
 
 
