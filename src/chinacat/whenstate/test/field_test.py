@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple, List
+from typing import Tuple, List, Any, Optional, NoReturn
 from unittest import TestCase, main
 
 from ..error import MustNotBeCalled
@@ -9,11 +9,22 @@ from ..field import Field, BoundField
 from ..predicate import Predicate, Contains, Not, Or, And
 
 
-def create_class():
+class Base:
+    '''
+    exists solely to give create_class() a base class for type annotations
+    '''
+    field_a: Optional[Field[Any, Optional[bool | int]]] = None
+    field_b: Optional[Field[Any, Optional[bool | int]]] = None
+    def __init__(self,
+                 a: Optional[bool | int] = None,
+                 b: Optional[bool | int] = None) -> NoReturn:
+        raise Exception()
+
+def create_class() -> type[Base]:
     @dataclass
-    class C:
-        field_a: Field[C, bool] = Field["C", bool]('C', 'field_a', None)
-        field_b: Field[C, bool] = Field["C", bool]('C', 'field_b', None)
+    class C(Base):
+        field_a: Field[C, Optional[bool | int]] = Field(None, 'C', 'field_a')
+        field_b: Field[C, Optional[bool | int]] = Field(None, 'C', 'field_b')
     return C
 
 class TestField(TestCase):
@@ -56,10 +67,10 @@ class TestField(TestCase):
     def test_edge_triggered_notify(self) -> None:
         C = create_class()
         changes: List[Tuple[bool, bool]] = list[Tuple[bool, bool]]()
-        def collect(_: BoundField[C, bool], old: bool, new: bool):
+        def collect(_: BoundField[Any, bool], old: bool, new: bool):
             changes.append((old, new))
 
-        c = C()
+        c: type[Base] = C()
         C.field_a.bound_field(c).reaction(collect)
 
         for value in (True, False, False, True, True):
@@ -73,7 +84,7 @@ class TestField(TestCase):
 
     def test_predicate_operators(self) -> None:
         C = create_class()
-        c = C(True, 0)
+        c: type[Base] = C(True, 0)
         self.assertTrue((C.field_a == True).evaluate(c))
         self.assertFalse((C.field_a != True).evaluate(c))
         self.assertTrue((C.field_b < 1).evaluate(c))

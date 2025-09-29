@@ -39,8 +39,9 @@ from typing import Callable, Any, Optional, Type, Set
 
 from .error import (ReactionMustNotBeCalled, StateNotStarted, StateError,
                     StateAlreadyComplete, StateHasPendingReactions)
-from .field import BoundField
+from .field import BoundField, Field
 from .predicate import Predicate
+from inspect import get_annotations
 
 
 __all__ = ['State', 'ReactionMustNotBeCalled', ]
@@ -109,6 +110,21 @@ class State(ABC):
     Used to maintain strong reference as well as to implement cancellation.
     (reaction.__qualname__, Task)
     '''
+
+    @classmethod
+    def __init_subclass__(cls: type[State]) -> None:
+        '''
+        Initialize the subclass.
+        This finds the Field members of cls through annotations and populates
+        the Field classname and attr fields. It doesn't inspect the annotation,
+        just uses them to find fields. If a Field member is not annotated it
+        will not be updated. Use annotations.
+        '''
+        for attr in get_annotations(cls):
+            value = getattr(cls, attr)
+            if isinstance(value, Field):
+                value.set_names(cls, attr)
+            
 
     def start(self) -> Future[None]:
         '''

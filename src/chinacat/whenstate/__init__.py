@@ -17,6 +17,7 @@ TODO - example
 
 from . import error
 from . import field
+from . import logging_config  # todo - libraries shouldn't configure logging.
 from . import predicate
 from . import state
 from .error import *

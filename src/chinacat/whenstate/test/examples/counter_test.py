@@ -15,8 +15,8 @@ class Counter(State):
     specified value.
     '''
 
-    count_to: Field[Counter, int] = Field("Counter", "count_to", 0)
-    count: Field[Counter, int] = Field("Counter", "count", -1)
+    count_to: Field[Counter, int] = Field(0)
+    count: Field[Counter, int] = Field(-1)
     
     def _start(self) -> None:
         self.count = 0

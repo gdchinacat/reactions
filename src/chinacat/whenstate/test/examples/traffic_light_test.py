@@ -25,17 +25,13 @@ class TrafficLight(State):
     simple model that implements a traffic light:
     '''
 
-    # todo metaclass to wrap attributes with Field
-    color: Field[TrafficLight, Color] = \
-        Field["TrafficLight", Color]("TrafficLight", 'color', Color.RED)
+    color: Field[TrafficLight, Color] = Field(Color.RED)
     '''color: the current color of the light'''
 
-    ticks: Field[TrafficLight, int] = \
-        Field["TrafficLight", int]("TrafficLight", 'ticks', -1)
+    ticks: Field[TrafficLight, int] = Field(-1)
     '''tick: the number of ticks for the current color'''
 
-    cycles: Field[TrafficLight, int] = \
-        Field["TrafficLight", int]("TrafficLight", 'cycles', 0)
+    cycles: Field[TrafficLight, int] = Field(0)
     ''' cycles: the number of times the light has gone through a full cycle '''
 
     def _start(self) -> None:

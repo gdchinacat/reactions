@@ -9,6 +9,7 @@ from typing import List, Any, Dict, Optional
 from .error import MustNotBeCalled
 from .predicate import (_Field, Reaction, BinaryPredicate,
                          Eq, Ne, Lt, Le, Gt, Ge, And, Or)
+from itertools import count
 
 
 __all__ = ['Field', 'BoundField', ]
@@ -61,18 +62,36 @@ class Field[C, T](ReactionMixin, _Field):
     '''
 
     instance: None = None
+    _field_count = count()  # class member for assigning default attr names
 
     def __init__(self,
-                 classname: str,  # for str/repr
-                 attr: str,  # name of the field, value stored as ._{attr}
                  initial_value: Optional[T] = None,
+                 classname: Optional[str] = None,
+                 attr: Optional[str] = None,
                  *args, **kwargs) -> None:
+        '''
+        initial_value: The initial value for the field.
+        classname: the name of the class this is a member of (display only)
+        attr: the name of the attribute
+        *args, **kwargs: play nice with super()
+
+        classname and attr are optional and will have values provided. However,
+        They will not be very meaningful so it is encouraged that they be set.
+        They aren't required to keep field definitions simple and not repeat
+        the class and name in the definition. State populates these as part of
+        its subclass initialization.
+        '''
         super().__init__(*args, **kwargs)
-        self.classname: str = classname
-        self.attr: str = attr                           # public
-        self._attr: str = '_' + attr                    # private
+        self.classname: str = classname or '<no class associated>'
+        self.attr = attr or f'field_{next(self._field_count)}'
+        self._attr: str = '_' + self.attr                    # private
         self._attr_bound: str = self._attr + '_bound'   # bound field
         self.initial_value: Optional[T] = initial_value
+
+    def set_names(self, cls: type, attr: str):
+        '''Update the field with classname and attr.'''
+        self.classname = cls.__qualname__
+        self.attr = attr
 
     def __hash__(self):
         '''
@@ -95,7 +114,7 @@ class Field[C, T](ReactionMixin, _Field):
         return bound_field
 
     def evaluate(self, instance: C) -> Optional[T]:
-        return getattr(instance, self.attr)
+        return self._get_with_initialize(instance)
 
     def _get_with_initialize(self, instance: C) -> Optional[T]:
         try:
@@ -224,5 +243,5 @@ class BoundField[C, T](ReactionMixin):
         self.reactions = field.reactions
 
     def __str__(self):
-        return f"{self.field.classname}({id(self.instance)}).{self.field.attr}"
+        return f"{self.field.classname}({id(self.instance)}).{self.field}"
     __repr__ = __str__
