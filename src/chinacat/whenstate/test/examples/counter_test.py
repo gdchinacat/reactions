@@ -27,7 +27,7 @@ class Counter(State):
              old: int, new:int) -> None:  # @UnusedVariable
         assert old + 1 == new, f"count error {old} + 1 != {new}"
         if self.count == self.count_to:
-            self._stop()
+            self.stop()
         else:
             self.count += 1
 

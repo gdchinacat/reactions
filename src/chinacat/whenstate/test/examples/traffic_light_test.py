@@ -8,8 +8,8 @@ from unittest import TestCase, main
 from ... import Field, BoundField, And, State
 
 
-TICKS_PER_LIGHT = 1
-CYCLES = 1
+TICKS_PER_LIGHT = 2
+CYCLES = 5
 
 
 class Color(Enum):
@@ -87,7 +87,7 @@ class TrafficLight(State):
         assert self.ticks != TICKS_PER_LIGHT
 
         if self.cycles == CYCLES:
-            self._stop()
+            self.stop()
         else:
             self.ticks += 1
 
