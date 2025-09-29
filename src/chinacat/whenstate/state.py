@@ -29,7 +29,7 @@ TODO - come up with guidelines for how to safely implement state
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from asyncio import Future, create_task, Task, current_task
+from asyncio import Future, Task, current_task, get_event_loop
 import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -99,9 +99,6 @@ class PendingTask:
 class State(ABC):
     '''
     State implements an event driven state machine.
-
-    Each State has its own asyncio event loop that is used for processing the
-    state events.
     '''
     _complete: Optional[Future[None]] = field(init=False, default=None)
     _pending_tasks: Set[PendingTask] = field(init=False, default_factory=set)
@@ -155,7 +152,7 @@ class State(ABC):
         '''
         self._stop(pending=0)
         
-    def _stop(self, pending=1) -> None:
+    def _stop(self, pending=0) -> None:
         '''
         stop the state processing.
         
@@ -166,7 +163,7 @@ class State(ABC):
             raise StateNotStarted()
         elif self._complete.done():
             raise StateAlreadyComplete()
-        if len(self._pending_tasks) > pending:
+        if len(self._pending_tasks) != pending:
             pending_tasks = list(self._pending_tasks)
             task = current_task()
             msg = "\n\t".join(f'{"* " if pending.task is task else "  "}'
@@ -262,15 +259,21 @@ class State(ABC):
                     execute_logger.info(
                         f'schedule {func.__qualname__}(..., {old},  {new}) '
                         f'for {predicate}')
-                    task = create_task(self.call_reaction(bound_field,
-                                                          predicate,
-                                                          func,
-                                                          old, new))
-                    pending = PendingTask(task, self, func.__qualname__)
-                    self._pending_tasks.add(pending)
-                    task.add_done_callback(
-                        partial(self._pending_tasks.remove))
-                    return task
+                    # TODO - running tasks is more than twice as slow as
+                    #        using call_soon(). No feedback mechanism though...
+                    if True:
+                        get_event_loop().call_soon(
+                            func, bound_field.instance, bound_field, old, new)
+                    else:
+                        task = Task(self.call_reaction(bound_field,
+                                                       predicate,
+                                                       func,
+                                                       old, new))
+                        pending = PendingTask(task, self, func.__qualname__)
+                        self._pending_tasks.add(pending)
+                        task.add_done_callback(
+                            partial(self._pending_tasks.remove))
+                        return task
                 else:
                     # TODO - this can happen for a bunch of reasons that need
                     #        to be locked down. Once that has stabilized it may
