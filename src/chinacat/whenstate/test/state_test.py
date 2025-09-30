@@ -117,6 +117,8 @@ class StateTest(TestCase):
 
     @asynctest
     async def _test_reaction_infinite_loop(self):
+        # NOTE - there isn't really a way to interrupt a thread that isn't
+        #        allowing itself to be interrupted so this test is disabled.
         async with running_state(skip_stop=True) as (state, _):
             def stop():
                 state.infinite_loop_running.wait()
