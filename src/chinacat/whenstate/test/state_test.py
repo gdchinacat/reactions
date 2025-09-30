@@ -52,8 +52,8 @@ def asynctest(func):
     def _asynctest(*args, **kwargs):
         @wraps(func)
         async def async_test_runner():
-            #async with asyncio.timeout(1):
-            await func(*args, **kwargs)
+            async with asyncio.timeout(1):
+                await func(*args, **kwargs)
         asyncio.run(async_test_runner())
     return _asynctest
 
@@ -117,8 +117,6 @@ class StateTest(TestCase):
 
     @asynctest
     async def _test_reaction_infinite_loop(self):
-        # TODO - reactions that don't yield are not interruptable.
-        #        - signal.pthread_kill? (unix only)
         async with running_state(skip_stop=True) as (state, _):
             def stop():
                 state.infinite_loop_running.wait()
