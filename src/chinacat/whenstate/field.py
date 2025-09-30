@@ -159,7 +159,7 @@ class Field[C, T](ReactionMixin, _Field):
         old: Optional[T] = self._get_with_initialize(instance)
         if value != old:
             setattr(instance, self._attr, value)
-            bound_field: BoundField[C, T] =  self.bound_field(instance)
+            bound_field = self.bound_field(instance)
             bound_field.react(old , value)
 
     __delete__ = MustNotBeCalled(

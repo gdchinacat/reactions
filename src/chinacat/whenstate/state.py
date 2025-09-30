@@ -32,14 +32,15 @@ from abc import ABC, abstractmethod
 from asyncio import Future, Queue, Task, create_task, QueueShutDown
 from dataclasses import dataclass, field
 from functools import partial, wraps
+from inspect import get_annotations
 from logging import Logger, getLogger
 from typing import Callable, Any, Optional
 
 from .error import (ReactionMustNotBeCalled, StateNotStarted, StateError,
-                    StateAlreadyComplete, StateHasPendingReactions)
+                    StateAlreadyComplete, StateHasPendingReactions,
+                    StateAlreadyStarted)
 from .field import BoundField, Field
 from .predicate import Predicate
-from inspect import get_annotations
 
 
 __all__ = ['State', 'ReactionMustNotBeCalled', ]
@@ -139,7 +140,12 @@ class ReactionExecutor[C: "State", T](Queue[PendingReaction[C, T]],
         self = state._reaction_executor
         assert self.task, "ReactionExecutor not start()'ed"
         
-        if self.task.done():
+        state.logger.debug(
+            f'schedule {reaction.__qualname__}(..., {old},  {new})')
+        pending = PendingReaction(reaction, bound_field, old, new)
+        try:
+            self.put_nowait(pending)
+        except QueueShutDown:
             # TODO - this can happen for a bunch of reasons that need
             #        to be locked down. Once that has stabilized it may
             #        still be possible, so this may need to be removed.
@@ -157,10 +163,6 @@ class ReactionExecutor[C: "State", T](Queue[PendingReaction[C, T]],
             raise StateError(f'reaction {reaction.__qualname__} called '
                              f'after {state} completed.')
 
-        state.logger.debug(
-            f'schedule {reaction.__qualname__}(..., {old},  {new})')
-        pending = PendingReaction(reaction, bound_field, old, new)
-        self.put_nowait(pending)
 
     def start(self):
         self.task = create_task(self.execute_reactions())
@@ -169,7 +171,7 @@ class ReactionExecutor[C: "State", T](Queue[PendingReaction[C, T]],
         '''stop the reaction queue'''
         if not self.empty():
             raise StateHasPendingReactions()
-        self.shutdown()     # stop accepting new reactions
+        self.shutdown()
         self.task.cancel()  # stop processing reactions
 
     async def execute_reactions(self):
@@ -218,7 +220,7 @@ class State(ABC):
     to introduce delays.
     '''
 
-    _complete: Optional[Future[None]] = field(init=False)
+    _complete: Optional[Future[None]] = field(init=False, default=None)
     _reaction_executor: ReactionExecutor = field(
         init=False, default_factory=ReactionExecutor)
     logger: Logger = field(default=execute_logger, kw_only=True)
@@ -248,6 +250,8 @@ class State(ABC):
          caused termination of the state it is available as the futures
          exception.
          '''
+        if self._complete is not None:
+            raise StateAlreadyStarted()
         complete = self._complete = Future()
         self._reaction_executor.start()
         self._start()
@@ -269,9 +273,6 @@ class State(ABC):
         Subclasses must implement this to start the state machine execution.
         '''
 
-    def _stop_reaction_executor(self):
-        self._reaction_executor.stop()
-
     def stop(self) -> None:
         '''
         stop the state processing.
@@ -280,12 +281,11 @@ class State(ABC):
             raise StateNotStarted()
         elif self._complete.done():
             raise StateAlreadyComplete()
-        self._stop_reaction_executor()
+        self._reaction_executor.stop()
         self._complete.set_result(None)
         self.logger.info(f'{self} stopped.')
     
     def error(self, exc_info: Exception) -> None:
-        self.logger.exception(exc_info)
         if self._complete is None:
             raise StateNotStarted()
         elif self._complete.done():
@@ -293,13 +293,13 @@ class State(ABC):
             self.logger.exception('exception encountered processing '
                                   'reaction for closed state',
                                   exc_info=exc_info)
-        self._stop_reaction_executor()
+        self._reaction_executor.stop()
         self._complete.set_exception(exc_info)
 
     def cancel(self, *args) -> None:
         if self._complete is None:
             raise StateNotStarted()
-        self._stop_reaction_executor()
+        self._reaction_executor.stop()
         self._complete.cancel(*args)
 
     @classmethod
@@ -328,9 +328,9 @@ class State(ABC):
             # Register predicate reactions that call our reaction with the
             # fields the predicate uses.
             for field in set(predicate.fields):
-                target = partial(ReactionExecutor.react, func)
+                reaction = partial(ReactionExecutor.react, func)
                 field.reaction(partial(predicate.react,
-                                       target=target))
+                                       reaction=reaction))
 
             return ReactionMustNotBeCalled(func)
         return dec

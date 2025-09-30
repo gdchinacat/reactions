@@ -74,12 +74,12 @@ class Predicate[C, T](ABC):
               old: Any,
               new: Any,
               *,
-              target: BoundReaction) -> None:
+              reaction: BoundReaction) -> None:
         logger.debug('%s notified that %s %s -> %s', self, bound_field,
                      old, new)
 
         if self.evaluate(bound_field.instance):
-            target(bound_field.instance, bound_field, old, new)
+            reaction(bound_field.instance, bound_field, old, new)
 
 
 @dataclass
