@@ -30,14 +30,14 @@ class _State(State):
         pass
 
     @State.when(exception != None)
-    def _exception(self,
+    async def _exception(self,
              bound_field: BoundField[_State, int],
              old: int, new:int) -> None:  # @UnusedVariable
         '''raise an exception'''
         raise self.exception
 
     @State.when(infinite_loop == True)
-    def _infinite_loop(self,
+    async def _infinite_loop(self,
              bound_field: BoundField[_State, int],
              old: int, new:int) -> None:  # @UnusedVariable
         '''enter an infinite loop. Currently no way to exit it.'''

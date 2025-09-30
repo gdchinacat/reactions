@@ -22,9 +22,9 @@ class Counter(State):
         self.count = 0
 
     @State.when(0 <= count)
-    def loop(self,
-             bound_field: BoundField[Counter, int],
-             old: int, new:int) -> None:  # @UnusedVariable
+    async def loop(self,
+                   bound_field: BoundField[Counter, int],
+                   old: int, new:int) -> None:  # @UnusedVariable
         assert old + 1 == new, f"count error {old} + 1 != {new}"
         if self.count == self.count_to:
             self.stop()
@@ -35,7 +35,7 @@ class Counter(State):
 class CounterTest(TestCase):
 
     def test_count(self):
-        counter = Counter(50)
+        counter = Counter(5)
         asyncio.run(counter.run(), debug=False)
 
         self.assertEqual(counter.count, counter.count_to)

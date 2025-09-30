@@ -34,7 +34,7 @@ from dataclasses import dataclass, field
 from functools import partial, wraps
 from inspect import get_annotations
 from logging import Logger, getLogger
-from typing import Callable, Any, Optional
+from typing import Callable, Any, Optional, Coroutine
 
 from .error import (ReactionMustNotBeCalled, StateNotStarted, StateError,
                     StateAlreadyComplete, StateHasPendingReactions,
@@ -55,7 +55,10 @@ type Decorator[**A, R] = Callable[A, R]
 # TODO - change Reaction args to be [State, Field, T, T] so reactions don't
 #        have to be aware of BoundField or get instance in multiple ways.
 type Reaction[C, T] = Callable[[C, BoundField[ShouldBeState, T], T, T], None]
+type AsyncReaction[C, T] = Callable[[C, BoundField[ShouldBeState, T], T, T],
+                                    Coroutine[None, None, None]]
 type StateReaction = Reaction[ShouldBeState, Any]
+type AsyncStateReaction = AsyncReaction[ShouldBeState, Any]
 
 
 TRACE_ENABLED = True
@@ -82,7 +85,7 @@ class PendingReaction[C, T]:
     '''
     A reaction that is scheduled for asynchronous execution.
     '''
-    reaction: Reaction[C, T]
+    reaction: AsyncReaction[C, T]
     bound_field: BoundField[C, Any]
     old: T
     new: T
@@ -91,15 +94,15 @@ class PendingReaction[C, T]:
     def instance(self):
         return self.bound_field.instance
 
-    def execute(self):
+    async def execute(self):
         '''
         Call the reaction.
         TODO - support async reactions?
         '''
         instance = self.bound_field.instance
-        self.reaction(instance,
-                      self.bound_field,
-                      self.old, self.new)
+        await self.reaction(instance,
+                            self.bound_field,
+                            self.old, self.new)
 
     def __str__(self):
         return f'{self.reaction.__qualname__}(..., {self.old}, {self.new})'
@@ -119,7 +122,7 @@ class ReactionExecutor[C: "State", T](Queue[PendingReaction[C, T]],
     '''the task that is processing the queue to execute reactions'''
 
     @staticmethod
-    def react(reaction: Reaction[C, T],
+    def react(reaction: AsyncReaction[C, T],
               state: C,
               bound_field: BoundField[C, T],
               old: T, new: T) -> None:
@@ -182,7 +185,7 @@ class ReactionExecutor[C: "State", T](Queue[PendingReaction[C, T]],
                 break
             pending.instance.logger.info(f'calling {pending}')
             try:
-                pending.execute()
+                await pending.execute()
             except Exception as exc:
                 pending.bound_field.instance.error(exc)
             finally:
@@ -304,7 +307,7 @@ class State(ABC):
 
     @classmethod
     def when(cls, predicate: Predicate) \
-        -> Decorator[[StateReaction], ReactionMustNotBeCalled]:
+        -> Decorator[[AsyncStateReaction], ReactionMustNotBeCalled]:
         '''
         Decorate a function to register it for execution when the predicate
         becomes true. The function is *not* called by the decorator. A dummy
@@ -319,7 +322,7 @@ class State(ABC):
                predicates together?
         TODO - allow async methods to be decorated with @when()?
         '''
-        def dec(func: StateReaction) -> ReactionMustNotBeCalled:
+        def dec(func: AsyncStateReaction) -> ReactionMustNotBeCalled:
             # TODO - this log message happens during subclass definition,
             #        before the classname and attr has been set to the proper
             #        values and is pretty meaningless.
