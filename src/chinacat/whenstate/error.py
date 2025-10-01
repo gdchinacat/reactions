@@ -15,7 +15,7 @@ class MustNotBeCalled(RuntimeError):
     Raised by methods that are easy to call when they really aren't what should
     be called.
     '''
-    def __init__(self, func: Optional[Callable[[Any], Any]], *args, **kwargs):
+    def __init__(self, func: Optional[Callable[..., Any]], *args, **kwargs):
         if func:
             # subclasses don't have to pass func if they already handled it.
             super().__init__(f'{func} must not be called', *args, **kwargs)

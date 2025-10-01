@@ -61,7 +61,6 @@ class Field[C, T](ReactionMixin, _Field):
     and call them when the Fields they are composed of change.
     '''
 
-    instance: None = None
     _field_count = count()  # class member for assigning default attr names
 
     def __init__(self,

@@ -4,7 +4,6 @@ from asyncio import Future
 import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from functools import wraps
 from typing import Optional, AsyncIterator, Tuple
 from unittest import TestCase, main
 
@@ -12,6 +11,7 @@ from chinacat.whenstate.error import ReactionMustNotBeCalled, \
     StateAlreadyComplete, StateAlreadyStarted
 
 from .. import BoundField, Field, State
+from .async_helpers import asynctest
 
 
 @dataclass
@@ -43,18 +43,6 @@ class _State(State):
         self.infinite_loop_running.set_result(None)
         while True:
             await asyncio.sleep(1)
-
-def asynctest(func):
-    '''decorator to execute async test functions'''
-    @wraps(func)
-    def _asynctest(*args, **kwargs):
-        @wraps(func)
-        async def async_test_runner():
-            async with asyncio.timeout(1):
-                await func(*args, **kwargs)
-        asyncio.run(async_test_runner())
-    return _asynctest
-
 
 @asynccontextmanager
 async def running_state(skip_stop=False,
