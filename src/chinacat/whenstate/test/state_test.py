@@ -5,8 +5,6 @@ import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from functools import wraps
-from threading import Event, Thread
-from time import sleep
 from typing import Optional, AsyncIterator, Tuple
 from unittest import TestCase, main
 
@@ -24,7 +22,7 @@ class _State(State):
 
     exception: Field[_State, Optional[Exception]] = Field()
     infinite_loop: Field[_State, bool] = Field(False)
-    infinite_loop_running: Event = Event()
+    infinite_loop_running: Optional[Future[None]] = None
     
     def _start(self) -> None:
         pass
@@ -37,14 +35,14 @@ class _State(State):
         raise self.exception
 
     @State.when(infinite_loop == True)
-    async def _infinite_loop(self,
+    async def _infinite_interuptable_loop(self,
              bound_field: BoundField[_State, int],
              old: int, new:int) -> None:  # @UnusedVariable
         '''enter an infinite loop. Currently no way to exit it.'''
         assert self.infinite_loop_running is not None
-        self.infinite_loop_running.set()
+        self.infinite_loop_running.set_result(None)
         while True:
-            sleep(1)
+            await asyncio.sleep(1)
 
 def asynctest(func):
     '''decorator to execute async test functions'''
@@ -116,20 +114,14 @@ class StateTest(TestCase):
                 state._exception()
 
     @asynctest
-    async def _test_reaction_infinite_loop(self):
-        # NOTE - there isn't really a way to interrupt a thread that isn't
-        #        allowing itself to be interrupted so this test is disabled.
-        async with running_state(skip_stop=True) as (state, _):
-            def stop():
-                state.infinite_loop_running.wait()
-                state.stop()
-            stop_thread = Thread(target=stop)
-            stop_thread.start()
-
+    async def test_reaction_infinite_interruptable_loop(self):
+        async with running_state(skip_stop=True) as (state, complete):
+            state.infinite_loop_running = Future()
             state.infinite_loop = True
             await asyncio.sleep(0)  # yield so reaction can run
-
-            stop_thread.join(1)
+            await state.infinite_loop_running
+            state.stop()
+            await complete
 
 
 if __name__ == "__main__":
