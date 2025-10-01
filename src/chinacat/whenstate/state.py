@@ -183,7 +183,7 @@ class ReactionExecutor[C: "State", T](Queue[PendingReaction[C, T]],
                 pending = await self.get()
             except QueueShutDown:
                 break
-            pending.instance.logger.info(f'calling {pending}')
+            pending.instance.logger.debug(f'calling {pending}')
             try:
                 await pending.execute()
             except Exception as exc:
@@ -286,7 +286,7 @@ class State(ABC):
             raise StateAlreadyComplete()
         self._reaction_executor.stop()
         self._complete.set_result(None)
-        self.logger.info(f'{self} stopped.')
+        self.logger.debug(f'{self} stopped.')
     
     def error(self, exc_info: Exception) -> None:
         if self._complete is None:
