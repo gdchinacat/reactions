@@ -14,7 +14,7 @@ from .error import InvalidPredicateExpression
 
 
 __all__ = ['Predicate', 'Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
-           'Contains', 'BinaryAnd', 'BinaryOr', ]
+           'Contains', 'BinaryAnd', 'BinaryOr', 'Constant']
 
 
 logger = logging.getLogger("whenstate.predicate")

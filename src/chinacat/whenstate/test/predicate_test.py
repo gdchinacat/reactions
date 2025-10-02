@@ -1,8 +1,7 @@
 from unittest import TestCase, main
 
-from ..predicate import (Eq, Ne, Lt, Le, Gt, Ge, Contains, Constant, Not, Or,
-                         And, BinaryAnd, BinaryOr)
-from chinacat.whenstate.error import InvalidPredicateExpression
+from .. import (Eq, Ne, Lt, Le, Gt, Ge, Contains, Constant, Not, Or,
+                And, BinaryAnd, BinaryOr, InvalidPredicateExpression)
 
 class TestPredicate(TestCase):
 
