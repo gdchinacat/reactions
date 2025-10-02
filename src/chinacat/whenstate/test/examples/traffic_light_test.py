@@ -12,7 +12,7 @@ from ... import Field, And, State
 
 
 NUMBER_OF_TRAFFIC_LIGHTS = 10_000
-TIME_PER_TICK = .3333 # in seconds
+TIME_PER_TICK = 1/3
 TICKS_PER_LIGHT = 1
 CYCLES = 2
 

@@ -33,7 +33,7 @@ from asyncio import Future, Queue, Task, create_task, QueueShutDown
 from dataclasses import dataclass, field
 from functools import partial, wraps
 from logging import Logger, getLogger
-from typing import Callable, Any, Optional, Coroutine
+from typing import Callable, Any, Optional, Coroutine, Type, Tuple
 
 from .error import (ReactionMustNotBeCalled, StateNotStarted, StateError,
                     StateAlreadyComplete, StateHasPendingReactions,
@@ -49,12 +49,13 @@ config_logger: Logger = getLogger('whenstate.state.config')
 execute_logger: Logger = getLogger('whenstate.state.execute')
 
 
-type ShouldBeState = Any  # TODO - use correct incantation rather than Any
+type ShouldBeState = Any #"State"  # TODO - use correct incantation rather than Any
 type Decorator[**A, R] = Callable[A, R]
 # TODO - change Reaction args to be [State, Field, T, T] so reactions don't
 #        have to be aware of BoundField or get instance in multiple ways.
 type Reaction[C, T] = Callable[[Any, Field[ShouldBeState, T], T, T], None]
-type AsyncReaction[C, T] = Callable[[Any, Field[ShouldBeState, T], T, T],
+type AsyncReaction[C, T] = Callable[[ShouldBeState,
+                                     Field[C, T], T, T],
                                     Coroutine[None, None, None]]
 type StateReaction = Reaction[ShouldBeState, Any]
 type AsyncStateReaction = AsyncReaction[ShouldBeState, Any]
@@ -79,36 +80,9 @@ def trace(func: Callable[..., Any]) -> Callable[..., Any]:
     return _trace
             
 
-@dataclass
-class PendingReaction[C, T]:
-    '''
-    A reaction that is scheduled for asynchronous execution.
-    '''
-    reaction: AsyncReaction[C, T]
-    bound_field: BoundField[C, Any]
-    old: T
-    new: T
-
-    @property
-    def instance(self):
-        return self.bound_field.instance
-
-    async def execute(self):
-        '''
-        Call the reaction.
-        TODO - support async reactions?
-        '''
-        instance = self.bound_field.instance
-        await self.reaction(instance,
-                            self.bound_field,
-                            self.old, self.new)
-
-    def __str__(self):
-        return f'{self.reaction.__qualname__}(..., {self.old}, {self.new})'
-
-
-class ReactionExecutor[C: "State", T](Queue[PendingReaction[C, T]],
-                                    Task):
+class ReactionExecutor[C: "State", T](
+        Queue[Tuple[C, Coroutine[None, None, T]]]
+        ):
     '''
     ReactionExecutor is created by State.start() to execute the states
     reactions asynchronously.
@@ -142,11 +116,11 @@ class ReactionExecutor[C: "State", T](Queue[PendingReaction[C, T]],
         self = state._reaction_executor
         assert self.task, "ReactionExecutor not start()'ed"
         
-        state.logger.debug(
-            f'schedule {reaction.__qualname__}(..., {old},  {new})')
-        pending = PendingReaction(reaction, bound_field, old, new)
+        state.logger.debug(f'schedule %s (..., %s,  %s)',
+                           reaction.__qualname__, old, new)
+        coro = reaction(bound_field.instance, bound_field.field, old, new)
         try:
-            self.put_nowait(pending)
+            self.put_nowait((bound_field.instance, coro))
         except QueueShutDown:
             # TODO - this can happen for a bunch of reasons that need
             #        to be locked down. Once that has stabilized it may
@@ -172,21 +146,29 @@ class ReactionExecutor[C: "State", T](Queue[PendingReaction[C, T]],
     def stop(self):
         '''stop the reaction queue'''
         if not self.empty():
+            # todo - haven't seen this, write a unit test to make sure it
+            #        actually works.
             raise StateHasPendingReactions()
         self.shutdown()
         self.task.cancel()  # stop processing reactions
 
     async def execute_reactions(self):
+        '''
+        Queue worker that gets pending tasks from the queue and executes
+        them.
+
+        The pending tasks are processed synchronously.
+        '''
         while True:
             try:
-                pending = await self.get()
+                (instance, coro) = await self.get()
             except QueueShutDown:
                 break
-            pending.instance.logger.debug(f'calling {pending}')
             try:
-                await pending.execute()
+                instance.logger.debug(f'calling {coro}')
+                await coro
             except Exception as exc:
-                pending.bound_field.instance.error(exc)
+                instance.error(exc)
             finally:
                 self.task_done()
 
@@ -330,17 +312,32 @@ class State(metaclass=StateMeta):
         -> Decorator[[AsyncStateReaction], ReactionMustNotBeCalled]:
         '''
         Decorate a function to register it for execution when the predicate
-        becomes true. The function is *not* called by the decorator. A dummy
+        becomes true. The function is *not* called by the decorator, but rather
+        the predicate when a field change causes it to become true. A dummy
         function is returned so that directly calling it on instances will
         raise ReactionMustNotBeCalled.
 
         The set of fields the predicate uses are reaction()ed to have the
-        predicate react() by asynchronously calling the method being decorated.
+        predicate react() by calling the method being decorated.
+
+        The reaction is called asynchronously in the event loop. It can rely on
+        the semantics of coroutine cooperative scheduling to make atomic
+        updates to the state by only yielding to the event loop when the state
+        is consistent. Failure to yield for "long" periods of time will block
+        execution of other asynchronous tasks, including reactions (don't
+        time.sleep()).
+
+        Reaction execution start order is implementation specific. It is too
+        premature to define it well. It is currently determined by the order
+        of the reactions on the field which is the order the @when() decorator
+        was applied to the fields in the predicate. It is therefore sensitive
+        to which side a field is placed in a predicate, the method definition
+        order, and the import order. This should be better defined, but at this
+        time it is not. TODO
 
         TODO - remove ReactionMustNotBeCalled to allow stacking @when()'s?
                not sure exactly what the semantics would be...And() the
                predicates together?
-        TODO - allow async methods to be decorated with @when()?
         '''
         def dec(func: AsyncStateReaction) -> ReactionMustNotBeCalled:
             config_logger.info(
