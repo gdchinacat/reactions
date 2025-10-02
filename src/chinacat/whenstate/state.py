@@ -203,7 +203,6 @@ class FieldNamingDict(dict[str, Any]):
     def __setitem__(self, attr: str, value: Any)->None:
         if isinstance(value, Field):
             # Populate Field classname and attr fields.
-            config_logger.info(f"populating field {attr} on {self.classname}")
             value.set_names(self.classname, attr)
         super().__setitem__(attr, value)
 
