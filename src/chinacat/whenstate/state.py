@@ -28,11 +28,10 @@ TODO - come up with guidelines for how to safely implement state
 '''
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 from asyncio import Future, Queue, Task, create_task, QueueShutDown
 from dataclasses import dataclass, field
 from functools import partial, wraps
-from inspect import get_annotations
 from logging import Logger, getLogger
 from typing import Callable, Any, Optional, Coroutine
 
@@ -192,8 +191,39 @@ class ReactionExecutor[C: "State", T](Queue[PendingReaction[C, T]],
                 self.task_done()
 
 
+class FieldNamingDict(dict[str, Any]):
+    '''
+    A dict that is used by StateMeta for State class creation to provide
+    members that are instances of Field with the class and attribute name.
+    '''
+
+    def __init__(self, classname: str):
+        self.classname = classname
+
+    def __setitem__(self, attr: str, value: Any)->None:
+        if isinstance(value, Field):
+            # Populate Field classname and attr fields.
+            config_logger.info(f"populating field {attr} on {self.classname}")
+            value.set_names(self.classname, attr)
+        super().__setitem__(attr, value)
+
+class StateMeta(ABCMeta, type):
+    '''
+    Metaclass for State objects.
+    Modifies State class definition to set the classname and attr on Field
+    members.
+    '''
+    @classmethod
+    def __prepare__(cls, name, bases):
+        return FieldNamingDict(name)
+
+    #@staticmethod
+    #def __new__(cls, name, bases, classdict):
+    #    return super().__new__(cls, name, bases, dict(classdict))
+
+
 @dataclass
-class State(ABC):
+class State(metaclass=StateMeta):
     '''
     State implements an event driven state machine.
 
@@ -231,20 +261,6 @@ class State(ABC):
     Each state can have its own logger, for example to identify instance
     that logged. Defaults to execute_logger.
     '''
-
-    @classmethod
-    def __init_subclass__(cls: type[State]) -> None:
-        '''
-        Initialize the subclass.
-        This finds the Field members of cls through annotations and populates
-        the Field classname and attr fields. It doesn't inspect the annotation,
-        just uses them to find fields. If a Field member is not annotated it
-        will not be updated. Use annotations.
-        '''
-        for attr in get_annotations(cls):
-            value = getattr(cls, attr)
-            if isinstance(value, Field):
-                value.set_names(cls, attr)
 
     def start(self) -> Future[None]:
         '''
@@ -323,11 +339,8 @@ class State(ABC):
         TODO - allow async methods to be decorated with @when()?
         '''
         def dec(func: AsyncStateReaction) -> ReactionMustNotBeCalled:
-            # TODO - this log message happens during subclass definition,
-            #        before the classname and attr has been set to the proper
-            #        values and is pretty meaningless.
-            #config_logger.info(
-            #    f'{func.__qualname__} will be called when {predicate}')
+            config_logger.info(
+                f'{func.__qualname__} will be called when {predicate}')
             # Register predicate reactions that call our reaction with the
             # fields the predicate uses.
             for field in set(predicate.fields):

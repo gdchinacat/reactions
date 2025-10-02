@@ -87,9 +87,9 @@ class Field[C, T](ReactionMixin, _Field):
         self._attr_bound: str = self._attr + '_bound'   # bound field
         self.initial_value: Optional[T] = initial_value
 
-    def set_names(self, cls: type, attr: str):
+    def set_names(self, classname: str, attr: str):
         '''Update the field with classname and attr.'''
-        self.classname = cls.__qualname__
+        self.classname = classname
         self.attr = attr
 
     def __hash__(self):
