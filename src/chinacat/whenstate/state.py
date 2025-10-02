@@ -206,6 +206,7 @@ class FieldNamingDict(dict[str, Any]):
             value.set_names(self.classname, attr)
         super().__setitem__(attr, value)
 
+
 class StateMeta(ABCMeta, type):
     '''
     Metaclass for State objects.
@@ -216,9 +217,13 @@ class StateMeta(ABCMeta, type):
     def __prepare__(cls, name, bases):
         return FieldNamingDict(name)
 
-    #@staticmethod
-    #def __new__(cls, name, bases, classdict):
-    #    return super().__new__(cls, name, bases, dict(classdict))
+    def __setattr__(self, attr: str, value: Any):
+        '''
+        Intercept calls to set attributes on instances to name Field members.
+        '''
+        if isinstance(value, Field):
+            value.set_names(self.__qualname__, attr)
+        super().__setattr__(attr, value)
 
 
 @dataclass

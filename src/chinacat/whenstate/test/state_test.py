@@ -44,6 +44,7 @@ class _State(State):
         while True:
             await asyncio.sleep(1)
 
+
 @asynccontextmanager
 async def running_state(skip_stop=False,
                         skip_await=False,
@@ -110,6 +111,24 @@ class StateTest(TestCase):
             await state.infinite_loop_running
             state.stop()
             await complete
+
+    def test_defined_state_fields_are_named(self):
+        self.assertEqual('_State', _State.exception.classname)
+        self.assertEqual('exception', _State.exception.attr)
+
+    def test_added_state_fields_are_named(self):
+        obj = object()
+        _State.foo = Field(obj)
+        try:
+            # test that it got named properly
+            self.assertEqual("_State", _State.foo.classname)
+            self.assertEqual("foo", _State.foo.attr)
+
+            # And that it functions as a field.
+            state = _State()
+            self.assertIs(obj, state.foo)
+        finally:
+            del _State.foo
 
 
 if __name__ == "__main__":
