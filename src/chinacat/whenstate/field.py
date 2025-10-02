@@ -12,7 +12,7 @@ from .predicate import (_Field, Reaction, BinaryPredicate,
 from itertools import count
 
 
-__all__ = ['Field', 'BoundField', ]
+__all__ = ['Field', ]
 
 class ReactionMixin[C, T](ABC):
     '''

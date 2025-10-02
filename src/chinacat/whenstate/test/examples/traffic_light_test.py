@@ -8,7 +8,7 @@ from time import time
 from typing import List, Coroutine
 from unittest import TestCase, main
 
-from ... import Field, BoundField, And, State
+from ... import Field, And, State
 
 
 NUMBER_OF_TRAFFIC_LIGHTS = 10_000
@@ -56,21 +56,21 @@ class TrafficLight(State):
     @State.when(And(color == Color.RED,
                     ticks == TICKS_PER_LIGHT))
     async def red_to_green(self,
-                     bound_field: BoundField[TrafficLight, int | Color],
+                     field: Field[TrafficLight, int | Color],
                      old: int | Color, new:int | Color) -> None:  # @UnusedVariable
         self.change(Color.GREEN)
 
     @State.when(And(color == Color.GREEN,
                     ticks == TICKS_PER_LIGHT))
     async def green_to_yellow(self,
-                        bound_field: BoundField[TrafficLight, int | Color],
+                        field: Field[TrafficLight, int | Color],
                         old: int | Color, new:int | Color) -> None:  # @UnusedVariable
         self.change(Color.YELLOW)
 
     @State.when(And(color == Color.YELLOW,
                     ticks == TICKS_PER_LIGHT))
     async def yellow_to_red(self,
-                      bound_field: BoundField[TrafficLight, int | Color],
+                      field: Field[TrafficLight, int | Color],
                       old: int | Color, new:int | Color) -> None:  # @UnusedVariable
         self.cycles += 1
         self.change(Color.RED)
@@ -83,7 +83,7 @@ class TrafficLight(State):
 
     @State.when(ticks != -1)
     async def tick(self, 
-             bound_field: BoundField[TrafficLight, int],
+             field: Field[TrafficLight, int],
              old: int, new: int) -> None:  # @UnusedVariable
         
         if self.ticks != new:

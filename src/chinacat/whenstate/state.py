@@ -53,8 +53,8 @@ type ShouldBeState = Any  # TODO - use correct incantation rather than Any
 type Decorator[**A, R] = Callable[A, R]
 # TODO - change Reaction args to be [State, Field, T, T] so reactions don't
 #        have to be aware of BoundField or get instance in multiple ways.
-type Reaction[C, T] = Callable[[C, BoundField[ShouldBeState, T], T, T], None]
-type AsyncReaction[C, T] = Callable[[C, BoundField[ShouldBeState, T], T, T],
+type Reaction[C, T] = Callable[[Any, Field[ShouldBeState, T], T, T], None]
+type AsyncReaction[C, T] = Callable[[Any, Field[ShouldBeState, T], T, T],
                                     Coroutine[None, None, None]]
 type StateReaction = Reaction[ShouldBeState, Any]
 type AsyncStateReaction = AsyncReaction[ShouldBeState, Any]

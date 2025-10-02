@@ -7,10 +7,9 @@ from dataclasses import dataclass
 from typing import Optional, AsyncIterator, Tuple
 from unittest import TestCase, main
 
-from chinacat.whenstate.error import ReactionMustNotBeCalled, \
-    StateAlreadyComplete, StateAlreadyStarted
-
-from .. import BoundField, Field, State
+from .. import (ReactionMustNotBeCalled, StateAlreadyComplete,
+                 StateAlreadyStarted)
+from .. import Field, State
 from .async_helpers import asynctest
 
 
@@ -29,14 +28,14 @@ class _State(State):
 
     @State.when(exception != None)
     async def _exception(self,
-             bound_field: BoundField[_State, int],
+             field: Field[_State, int],
              old: int, new:int) -> None:  # @UnusedVariable
         '''raise an exception'''
         raise self.exception
 
     @State.when(infinite_loop == True)
     async def _infinite_interuptable_loop(self,
-             bound_field: BoundField[_State, int],
+             field: Field[_State, int],
              old: int, new:int) -> None:  # @UnusedVariable
         '''enter an infinite loop. Currently no way to exit it.'''
         assert self.infinite_loop_running is not None

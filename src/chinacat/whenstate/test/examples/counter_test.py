@@ -4,7 +4,7 @@ import asyncio
 from dataclasses import dataclass
 from unittest import TestCase, main
 
-from ... import BoundField, Field, State
+from ... import Field, State
 
 
 @dataclass
@@ -23,7 +23,7 @@ class Counter(State):
 
     @State.when(0 <= count)
     async def loop(self,
-                   bound_field: BoundField[Counter, int],
+                   field: Field[Counter, int],
                    old: int, new:int) -> None:  # @UnusedVariable
         assert old + 1 == new, f"count error {old} + 1 != {new}"
         if self.count == self.count_to:
