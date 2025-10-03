@@ -9,7 +9,7 @@ from functools import partial
 import logging
 import operator
 from typing import (Any, Callable, Generator, Sequence, Type, TypeAlias,
-                    Optional)
+                    Optional, Coroutine)
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
 
@@ -27,6 +27,8 @@ type BoundReaction[C, R] = Callable[[C,                   # cls
                                   Any,                    # old
                                   Any],                   # new
                                  R]                       # return None
+type AsyncReaction[C, T] = Callable[[C, BoundField[C, T], T, T],
+                                    Coroutine[None, None, None]]
 
 
 class _Field[C, T](ABC):
@@ -86,12 +88,12 @@ class Predicate[C, T](ABC):
         if self.evaluate(bound_field.instance):
             reaction_executor = bound_field.instance._reaction_executor
             reaction_executor.react(reaction,
-                                    bound_field.instance,
+                                    bound_field.instance,  # todo - don't use bound_field for reaction instance
                                     bound_field,
                                     old, new)
 
 
-    def __call__(self, func: Reaction[C, T]
+    def __call__(self, func: AsyncReaction[C, T]
                 )->ReactionMustNotBeCalled:
         '''
         Call the decorated method when the predicate becomes True.
@@ -257,14 +259,10 @@ class BinaryPredicate[C](OperatorPredicate["BinaryPredicate", C], ABC):
     def __str__(self) -> str:
         return f"({self.left} {self.token} {self.right})"
 
-    @InvalidPredicateExpression
-    def __bool__(self) -> bool | Predicate:
-        '''
-        A call to this method indicates predicate was improperly created.
-        This most likely results from using it in a logical and expression
-        ("? < P < ?", "P and P", etc.')
-        '''
-        return False
+    __bool__ = InvalidPredicateExpression(
+        None, 
+        "'Predicate and Predicate' not supported, use "
+        "'And(Predicate, Predicate)' instead")
 
 
 Not: Type[UnaryPredicate[Any]] = UnaryPredicate.factory(

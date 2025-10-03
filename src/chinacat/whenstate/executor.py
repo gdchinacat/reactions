@@ -8,8 +8,9 @@ from dataclasses import dataclass, field
 from logging import Logger, getLogger
 from typing import Callable, Any, Optional, Coroutine, Tuple
 
-from .error import StateError
 from .field import BoundField, Field
+from .logging_config import VERBOSE
+from itertools import count
 
 __all__ = ['ReactorBase']
 
@@ -17,13 +18,14 @@ __all__ = ['ReactorBase']
 logger: Logger = getLogger('whenstate.executor')
 
 
-type Reaction[C, T] = Callable[[Any, Field[C, T], T, T], None]
 type AsyncReaction[C, T] = Callable[[C, Field[C, T], T, T],
                                     Coroutine[None, None, None]]
+'''
+AsyncReaction is the type for functions that implement reactions.
+'''
 
 
 class ReactionExecutor[C: "ReactorBase", T](
-        Queue[Tuple[C, Coroutine[None, None, T]]]
         ):
     '''
     ReactionExecutor executes reactions for sublcasses of ReactorBase.
@@ -44,9 +46,42 @@ class ReactionExecutor[C: "ReactorBase", T](
     task: Optional[Task] = None
     '''the task that is processing the queue to execute reactions'''
 
+    queue: Queue[Tuple[int, C, Coroutine[None, None, T], Any]]
+    '''
+    The queue of reactions to execute.
+    TODO - The Tuple has grown to the point an actual class makes sense.
+           Initially the queue only contained the coroutine and was 'fast' in
+           that scheduling and executing a reaction didn't require creation of
+           a wrapper object. But, that is no longer the case...the tuple has to
+           be created, so it might as well just be a custom object that is
+           readable.
+    Tuple elements are:
+        [0] - the id of the reaction (for logging)
+        [1] - the instance the reaction is called on
+              (todo - is actually the instance of the field that changed)
+              stop() is called on this if the reaction raises an exception
+        [2] - the coroutine that implements the reaction (*not* the coroutine
+              function, but the coroutine the function returns)
+        [3] - the args (used only for logging)
+    '''
+
+    _ids: count = count()
+    '''
+    _ids assigns a unique id to each reaction handled by the executor. It is
+    used only for informational purposes, but this may change if there is a
+    need. It is a class member, not instance, so reaction ids are unique within
+    a process. Log messages should include the assigned id to aid in log
+    analysis.
+    '''
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.queue = Queue()
+
     @staticmethod
     def react(reaction: AsyncReaction[C, T],
               instance: C,
+              # TODO - should be the instance of the class that defined the reaction, not the instance of the class that field change triggered reaction
               bound_field: BoundField[C, T],
               old: T, new: T) -> None:
         '''reaction that asynchronously executes the reaction'''
@@ -65,30 +100,23 @@ class ReactionExecutor[C: "ReactorBase", T](
         # Get self and assert state is acceptable.
         self = instance._reaction_executor
         assert self.task, "ReactionExecutor not start()'ed"
-        
-        instance.logger.debug(f'schedule %s (..., %s,  %s)',
-                           reaction.__qualname__, old, new)
-        print(f"{reaction=}")
-        coro = reaction(instance, bound_field.field, old, new)
+
+        id_ = next(self._ids)
+
         try:
-            self.put_nowait((bound_field.instance, coro))
-        except QueueShutDown:
-            # TODO - this can happen for a bunch of reasons that need
-            #        to be locked down. Once that has stabilized it may
-            #        still be possible, so this may need to be removed.
-            #        For now, I want to know when state updates are
-            #        happening after the state has entered terminal
-            #        state.
-            #        1) are queued tasks generating these? Why do we
-            #           have queued tasks for terminal state? (yes)
-            #        2) is the state continuing to execute after
-            #           completing its future? (only without sleep(0))
-            #        3) does state completion need to be moved into a
-            #           task? (don't think so)
-            #        4) are tasks waiting unexpectedly causing out of
-            #           order execution? (don't think so)
-            raise StateError(f'reaction {reaction.__qualname__} called '
-                             f'after {self} completed.')
+            coro = reaction(instance, bound_field.field, old, new)
+            self.queue.put_nowait((id_,
+                                   bound_field.instance,
+                                   coro,
+                                   (bound_field, old, new)))
+            instance.logger.log(VERBOSE,
+                '%d scheduled %s (..., %s,  %s)',
+                id_, reaction.__qualname__, old, new)
+        except Exception:
+            instance.logger.exception(
+                '%d failed to schedule %s (..., %s,  %s)',
+                id_, reaction.__qualname__, old, new)
+            raise
 
 
     def start(self):
@@ -96,11 +124,9 @@ class ReactionExecutor[C: "ReactorBase", T](
 
     def stop(self):
         '''stop the reaction queue'''
-        if not self.empty():
-            # todo - disabled for development, restore this
-            # raise StateHasPendingReactions()
-            pass
-        self.shutdown()
+        if not self.queue.empty():
+            logger.error(f'stoping {self} with pending reactions.')
+        self.queue.shutdown(immediate=True)
         self.task.cancel()  # stop processing reactions
 
     async def execute_reactions(self):
@@ -112,16 +138,18 @@ class ReactionExecutor[C: "ReactorBase", T](
         '''
         while True:
             try:
-                (instance, coro) = await self.get()
+                (id_, instance, coro, args) = await self.queue.get()
             except QueueShutDown:
                 break
+
             try:
-                instance.logger.debug(f'calling {coro}')
+                instance.logger.debug(f'%s calling %s(%s)',
+                    id_, coro.__qualname__, str(args))
                 await coro
             except Exception as exc:
                 instance.error(exc)
             finally:
-                self.task_done()
+                self.queue.task_done()
 
 @dataclass
 class ReactorBase:

@@ -49,18 +49,6 @@ config_logger: Logger = getLogger('whenstate.state.config')
 execute_logger: Logger = getLogger('whenstate.state.execute')
 
 
-type ShouldBeState = Any #"State"  # TODO - use correct incantation rather than Any
-type Decorator[**A, R] = Callable[A, R]
-# TODO - change Reaction args to be [State, Field, T, T] so reactions don't
-#        have to be aware of BoundField or get instance in multiple ways.
-type Reaction[C, T] = Callable[[Any, Field[ShouldBeState, T], T, T], None]
-type AsyncReaction[C, T] = Callable[[ShouldBeState,
-                                     Field[C, T], T, T],
-                                    Coroutine[None, None, None]]
-type StateReaction = Reaction[ShouldBeState, Any]
-type AsyncStateReaction = AsyncReaction[ShouldBeState, Any]
-
-
 TRACE_ENABLED = True
 
 
@@ -197,11 +185,8 @@ class State(ReactorBase, metaclass=StateMeta):
     def error(self, exc_info: Exception) -> None:
         if self._complete is None:
             raise StateNotStarted()
-        elif self._complete.done():
-            # future is already done so nothing to do but log it.
-            self.logger.exception('exception encountered processing '
-                                  'reaction for closed state',
-                                  exc_info=exc_info)
+        self.logger.exception(
+            exc_info, 'exception encountered processing reaction for %s', self)
         self._reaction_executor.stop()
         self._complete.set_exception(exc_info)
 

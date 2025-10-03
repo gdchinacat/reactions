@@ -1,14 +1,15 @@
 '''
 Load the logging config from a file.
 '''
+from logging import DEBUG, addLevelName
 from logging.config import fileConfig
 from os.path import expanduser
 
 
-__all__ = ['_']
+__all__ = ['VERBOSE']
 
-
-_ = None  # give importers something to import
-
+# Define a custom log level.
+VERBOSE = DEBUG - 5
+addLevelName(VERBOSE, 'VERBOSE')
 
 fileConfig(f"{expanduser('~')}/logging.config")
