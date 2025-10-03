@@ -8,10 +8,9 @@ from dataclasses import dataclass, field
 from logging import Logger, getLogger
 from typing import Callable, Any, Optional, Coroutine, Tuple
 
-from .error import (StateError, StateHasPendingReactions)
+from .error import StateError
+from .field import BoundField, Field
 
-
-#from .field import BoundField, Field
 __all__ = ['ReactorBase']
 
 

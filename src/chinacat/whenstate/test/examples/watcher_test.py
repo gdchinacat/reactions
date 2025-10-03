@@ -37,6 +37,9 @@ class Watcher(ReactorBase):
     watched: Watched
     ticks_seen: List[int] = field(default_factory=list)
 
+    # TODO - property(_reaction_executor) needs to go away as part of work to
+    #        properly define how reaction execution works (and maybe how to
+    #        manage instances).
     @property
     def _reaction_executor(self):
         return self.watched._reaction_executor

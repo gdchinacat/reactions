@@ -5,14 +5,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from functools import wraps, partial
+from functools import partial
 import logging
 import operator
 from typing import (Any, Callable, Generator, Sequence, Type, TypeAlias,
                     Optional)
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
-from .executor import ReactionExecutor
 
 
 __all__ = ['Predicate', 'Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
