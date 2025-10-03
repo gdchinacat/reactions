@@ -29,21 +29,21 @@ class MustNotBeCalled(RuntimeError):
 
 class ReactionMustNotBeCalled(MustNotBeCalled):
     '''
-    Exception raised if a @when decorated function is called directly. These
-    functions should only be called by the predicate.
+    Exception raised if a function decorated with a predicate is called
+    directly, they should only be called from the ReactionExecutor.
 
     The removal of the method from a class definition is very intentional.
-        - readers may reasonably but incorrectly think the @when() is a guard
-          that skips calls if the predicate is false. Avoiding confusion is a
-          good thing.
+        - readers may reasonably but incorrectly think the @Predicate decorator
+          is a guard that skips calls if the predicate is false. Avoiding
+          confusion is a good thing.
         - it would be possible to return a function that does that. Calls that
           are ignored in this way are likely to hurt performance and suggest
-          the state model is not well , designed, or understood. Encouraging
+          the state model is not well designed, or understood. Encouraging
           good design and understanding is a good thing.
         - there is a trivial workaround...invoke the decorator manually on a
           function definition that will be included and is very explicit about
           what the function semantics are:
-              def react(self: C, bound_field: BoundField[C, T], old, new): ...
+              def reaction(self: C, bound_field: BoundField[C, T], old, new): ...
               State.when(foo==1)(react)
     '''
     def __init__(self, func: Callable, *args, **kwargs):

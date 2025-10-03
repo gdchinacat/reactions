@@ -26,14 +26,14 @@ class _State(State):
     def _start(self) -> None:
         pass
 
-    @State.when(exception != None)
+    @ exception != None
     async def _exception(self,
              field: Field[_State, int],
              old: int, new:int) -> None:  # @UnusedVariable
         '''raise an exception'''
         raise self.exception
 
-    @State.when(infinite_loop == True)
+    @ infinite_loop == True
     async def _infinite_interuptable_loop(self,
              field: Field[_State, int],
              old: int, new:int) -> None:  # @UnusedVariable

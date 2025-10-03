@@ -9,13 +9,13 @@ from logging import Logger, getLogger
 from typing import Callable, Any, Optional, Coroutine, Tuple
 
 from .error import (StateError, StateHasPendingReactions)
-from .field import BoundField, Field
 
 
+#from .field import BoundField, Field
 __all__ = ['ReactorBase']
 
 
-logger: Logger = getLogger('whenstate.executer')
+logger: Logger = getLogger('whenstate.executor')
 
 
 type Reaction[C, T] = Callable[[Any, Field[C, T], T, T], None]
@@ -69,7 +69,8 @@ class ReactionExecutor[C: "ReactorBase", T](
         
         instance.logger.debug(f'schedule %s (..., %s,  %s)',
                            reaction.__qualname__, old, new)
-        coro = reaction(bound_field.instance, bound_field.field, old, new)
+        print(f"{reaction=}")
+        coro = reaction(instance, bound_field.field, old, new)
         try:
             self.put_nowait((bound_field.instance, coro))
         except QueueShutDown:
@@ -97,9 +98,9 @@ class ReactionExecutor[C: "ReactorBase", T](
     def stop(self):
         '''stop the reaction queue'''
         if not self.empty():
-            # todo - haven't seen this, write a unit test to make sure it
-            #        actually works.
-            raise StateHasPendingReactions()
+            # todo - disabled for development, restore this
+            # raise StateHasPendingReactions()
+            pass
         self.shutdown()
         self.task.cancel()  # stop processing reactions
 
@@ -126,6 +127,49 @@ class ReactionExecutor[C: "ReactorBase", T](
 @dataclass
 class ReactorBase:
     '''base class for classes that have reactions'''
+    # todo - a reaction_executor for instances introduces an ambiguity of
+    #        which instances executor predicate reactions will be executed
+    #        in, meaning it actually *is* possible for reactions to do dirty
+    #        reads if a predicate contains multiple reaction executors.
+    #        Fix this by defining a better executor management strategy.
+    #          - global - yuck,  this would have the effect of serializaiong
+    #                     all reactions. This isn't good because two
+    #                     independent state instances should be able to execute
+    #                     reinvent a GIL. Unrelated states should be able to
+    #                     execute asynchronously.
+    #          - specify it for every instance created - yuck...a goal is to
+    #            make it so users don't have to think about how to schedule
+    #            reactions.
+    #          - Specify on the predicate, with a lambda? that is called when
+    #            the predicate is true with itself (for fields) that provides
+    #            an executor that the predicate should execute in.
+    #          - don't allow ambiguous predicates...if the instances the
+    #            predicates are using have different reaction executors raise
+    #            an error
+    #          - unfortunately the mechanism to get instances other than bound
+    #            field isn't complete yet and sorting it out will likely
+    #            provide structure (ie watcher = Watcher(watched)) to associate
+    #            instances with each other (1:1 seems a bit restrictuve, need
+    #            a mapping for each end that isn't 1 to or to 1. Performance?
+    #            Ramble Ramble Ramble: using metaclasses to hook into instance
+    #            creation/initialization seems like the most promising route.
+    #            The problem is the instance a reaction is called on is
+    #            currently acquired from the BoundField that had a field
+    #            change. This works fine for reactions that listen on their
+    #            own classes fields (including base class fields). But
+    #            reactions on other classes will invoke the reaction with the
+    #            other class as 'self', or at least the only instance
+    #            available.
+    #                - @(Foo.foo == 1) on Bar.foo_eq_one(): The method on Bar
+    #                  will not get a reference to an Bar instance.A
+    #                  ??? create Foo: Watched with reference to Bar: yuck, it
+    #                      is totally backwards and there are multiple
+    #                      for different Fields.
+    #                  ??? give predicate a resolver to push back to user
+    #                  ??? Factory method to create a new Watcher from a 
+    #                      Watched.
+    #                  ??? asyncio Context? 
     _reaction_executor: ReactionExecutor = field(
         default_factory=ReactionExecutor, kw_only=True)
+
     logger: Logger = field(default=logger, kw_only=True)

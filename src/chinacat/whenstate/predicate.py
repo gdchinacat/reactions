@@ -5,14 +5,14 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from functools import wraps, partial
 import logging
 import operator
 from typing import (Any, Callable, Generator, Sequence, Type, TypeAlias,
                     Optional)
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
-from functools import partial, wraps
-
+from .executor import ReactionExecutor
 
 
 __all__ = ['Predicate', 'Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
@@ -85,7 +85,11 @@ class Predicate[C, T](ABC):
                      old, new)
 
         if self.evaluate(bound_field.instance):
-            reaction(bound_field.instance, bound_field, old, new)
+            reaction_executor = bound_field.instance._reaction_executor
+            reaction_executor.react(reaction,
+                                    bound_field.instance,
+                                    bound_field,
+                                    old, new)
 
 
     def __call__(self, func: Reaction[C, T]
@@ -100,14 +104,47 @@ class Predicate[C, T](ABC):
         In contrast to:
             @State.when(State.a != State.b)
             async def ....
+
+        TODO - these comments are most likely stale and refer to state, but the
+        general notions are correct. Update them to reflect the shift from
+        State.when to @(predicate).
+        Decorate a function to register it for execution when the predicate
+        becomes true. The function is *not* called by the decorator, but rather
+        the predicate when a field change causes it to become true. A dummy
+        function is returned so that directly calling it on instances will
+        raise ReactionMustNotBeCalled.
+
+        The set of fields the predicate uses are reaction()ed to have the
+        predicate react() by calling the method being decorated.
+
+        The reaction is called asynchronously in the event loop. It can rely on
+        the semantics of coroutine cooperative scheduling to make atomic
+        updates to the state by only yielding to the event loop when the state
+        is consistent. Failure to yield for "long" periods of time will block
+        execution of other asynchronous tasks, including reactions (don't
+        time.sleep()).
+
+        Reaction execution start order is implementation specific. It is too
+        premature to define it well. It is currently determined by the order
+        of the reactions on the field which is the order the predicate decorator
+        was applied to the fields in the predicate. It is therefore sensitive
+        to which side a field is placed in a predicate, the method definition
+        order, and the import order. This should be better defined, but at this
+        time it is not. TODO
+
+        TODO - remove ReactionMustNotBeCalled to allow stacking predicate
+               decorators?
+
+        TODO - And() is ugly...but if we could do it by stacking predicate
+               decorators it's a lot less ugly.
+               @ field1 == 1
+               @ field2 == 2
+               Attempting this currently raises ReactionMustNotBeCalled.
         '''
         # Add a reaction on all the fields to call self.react() with
         # func as the reaction function.
         for field in set(self.fields):
-            @wraps(func)
-            def react(field: BoundField[C, T], old: T, new: T):
-                self.react(field, old, new, reaction=func)
-            field.reaction(react)
+            field.reaction(partial(self.react, reaction=func))
         return ReactionMustNotBeCalled(func)
 
 
@@ -232,9 +269,9 @@ class BinaryPredicate[C](OperatorPredicate["BinaryPredicate", C], ABC):
 
 
 Not: Type[UnaryPredicate[Any]] = UnaryPredicate.factory(
-    'Not', 'not', operator.not_)
+    'Not', '!not!', operator.not_)
 And: Type[BinaryPredicate[Any]] = BinaryPredicate.factory(
-    'And', 'and', lambda _, a, b: a and b)
+    'And', '!and!', lambda _, a, b: a and b)
 Or: Type[BinaryPredicate[Any]] = BinaryPredicate.factory(
     'Or', 'or', lambda _, a, b: a or b)
 Eq: Type[BinaryPredicate[Any]] = BinaryPredicate.factory(

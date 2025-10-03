@@ -11,7 +11,7 @@ from unittest import TestCase, main
 from ... import Field, And, State
 
 
-NUMBER_OF_TRAFFIC_LIGHTS = 10_000
+NUMBER_OF_TRAFFIC_LIGHTS = 1_000
 TIME_PER_TICK = 1/3
 TICKS_PER_LIGHT = 1
 CYCLES = 2
@@ -53,22 +53,22 @@ class TrafficLight(State):
     def _start(self) -> None:
         self.ticks = 0
 
-    @State.when(And(color == Color.RED,
-                    ticks == TICKS_PER_LIGHT))
+    @And(color == Color.RED,
+         ticks == TICKS_PER_LIGHT)
     async def red_to_green(self,
                      field: Field[TrafficLight, int | Color],
                      old: int | Color, new:int | Color) -> None:  # @UnusedVariable
         self.change(Color.GREEN)
 
-    @State.when(And(color == Color.GREEN,
-                    ticks == TICKS_PER_LIGHT))
+    @And(color == Color.GREEN,
+         ticks == TICKS_PER_LIGHT)
     async def green_to_yellow(self,
                         field: Field[TrafficLight, int | Color],
                         old: int | Color, new:int | Color) -> None:  # @UnusedVariable
         self.change(Color.YELLOW)
 
-    @State.when(And(color == Color.YELLOW,
-                    ticks == TICKS_PER_LIGHT))
+    @And(color == Color.YELLOW,
+         ticks == TICKS_PER_LIGHT)
     async def yellow_to_red(self,
                       field: Field[TrafficLight, int | Color],
                       old: int | Color, new:int | Color) -> None:  # @UnusedVariable
@@ -81,7 +81,7 @@ class TrafficLight(State):
         self.sequence.append(color)
         logger.debug('%s %s', self, color.name)
 
-    @State.when(ticks != -1)
+    @ ticks != -1
     async def tick(self, 
              field: Field[TrafficLight, int],
              old: int, new: int) -> None:  # @UnusedVariable

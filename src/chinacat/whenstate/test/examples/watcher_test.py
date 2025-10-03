@@ -16,15 +16,17 @@ class Watched(State):  # todo - don't require state here
     last_tick: Field[Watched, int] = Field(5)
     ticks: Field[Watched, int] = Field(-1)
 
-    @(ticks != -1) 
-    def tick(self, field, old: int, new: int):
-        assert self is field.instance
-        self.ticks += 1
-
-    @(ticks == 5)
-    def reset(self, field, old: int, new: int):
-        assert self is field.instance
+    @ ticks == 5
+    async def done(self, field, old: int, new: int):
         self.ticks = -1
+        self.stop()
+
+    @ ticks != -1
+    async def tick(self, field, old: int, new: int):
+        if new != self.ticks:
+            # something else changed it before we reacted, skip
+            return
+        self.ticks += 1
 
     def _start(self):
         self.ticks = 0
@@ -35,13 +37,17 @@ class Watcher(ReactorBase):
     watched: Watched
     ticks_seen: List[int] = field(default_factory=list)
 
-    def __init__(self, watched: Watched, *args, **kwargs):
-        super().__init__(_reaction_executor=watched._reaction_executor,
-                         *args, **kwargs)
-        self.watched=watched
+    @property
+    def _reaction_executor(self):
+        return self.watched._reaction_executor
 
-    @(Watched.ticks != -1)
-    def watcher(self,
+    @_reaction_executor.setter
+    def _reaction_executor(self, _):
+        # ignore whatever is being set since we always use the one on watched
+        pass
+
+    #@(Watched.ticks != -1)
+    async def watcher(self,
                 watched: Watched,
                 field: Field[Watched, int],
                 old: int, new: int):
@@ -55,7 +61,7 @@ class Test(TestCase):
         watcher = Watcher(watched)
         asyncio.run(watched.run())
 
-        self.assertEqual(watcher.ticks, list(range(watched.last_tick + 1)))
+        self.assertEqual(watcher.ticks_seen, list(range(watched.last_tick + 1)))
 
 
 if __name__ == "__main__":

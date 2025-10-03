@@ -21,7 +21,7 @@ class Counter(State):
     def _start(self) -> None:
         self.count = 0
 
-    @State.when(0 <= count)
+    @ count >= 0
     async def loop(self,
                    field: Field[Counter, int],
                    old: int, new:int) -> None:  # @UnusedVariable
