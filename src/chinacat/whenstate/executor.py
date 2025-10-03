@@ -126,7 +126,7 @@ class ReactionExecutor[C: "ReactorBase", T](
         '''stop the reaction queue'''
         if not self.queue.empty():
             logger.error(f'stoping {self} with pending reactions.')
-        self.queue.shutdown(immediate=True)
+        self.queue.shutdown(immediate=False)
         self.task.cancel()  # stop processing reactions
 
     async def execute_reactions(self):
