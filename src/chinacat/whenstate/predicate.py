@@ -10,7 +10,9 @@ import operator
 from typing import (Any, Callable, Generator, Sequence, Type, TypeAlias,
                     Optional)
 
-from .error import InvalidPredicateExpression
+from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
+from functools import partial, wraps
+
 
 
 __all__ = ['Predicate', 'Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
@@ -49,8 +51,12 @@ class Predicate[C, T](ABC):
 
     Created through Field and Predicate comparison methods:
         State.field == 'value'
-    '''
 
+    Predicates can be used to decorate a function to schedule it to be run
+    when the Predicate becomes True. The callback is synchronous. state.State
+    provides asyncronous execution.
+    TODO - should the async move into predicate?
+    '''
     @property
     @abstractmethod
     def fields(self) -> Generator[_Field[C, Any], None, None] | \
@@ -59,18 +65,18 @@ class Predicate[C, T](ABC):
         yield all fields that are part of the predicate
         '''
 
-    def __and__(self, other) -> Predicate[C, Any]:
-        return And(self, other)  # pylint: disable=abstract-class-instantiated
+    #def __and__(self, other) -> Predicate[C, Any]:
+    #    return And(self, other)  # pylint: disable=abstract-class-instantiated
 
-    def __or__(self, other) -> Predicate[C, Any]:
-        return Or(self, other)  # pylint: disable=abstract-class-instantiated
+    #def __or__(self, other) -> Predicate[C, Any]:
+    #    return Or(self, other)  # pylint: disable=abstract-class-instantiated
 
     @abstractmethod
     def evaluate(self, instance: C) -> Optional[T]:
         '''evaluate the predicate against the given model'''
 
     def react(self,
-              bound_field: BoundField,
+              bound_field: BoundField[C, Any],
               old: Any,
               new: Any,
               *,
@@ -80,6 +86,29 @@ class Predicate[C, T](ABC):
 
         if self.evaluate(bound_field.instance):
             reaction(bound_field.instance, bound_field, old, new)
+
+
+    def __call__(self, func: Reaction[C, T]
+                )->ReactionMustNotBeCalled:
+        '''
+        Call the decorated method when the predicate becomes True.
+
+        For example:
+            @(State.a != State.b)
+            async def ...
+            
+        In contrast to:
+            @State.when(State.a != State.b)
+            async def ....
+        '''
+        # Add a reaction on all the fields to call self.react() with
+        # func as the reaction function.
+        for field in set(self.fields):
+            @wraps(func)
+            def react(field: BoundField[C, T], old: T, new: T):
+                self.react(field, old, new, reaction=func)
+            field.reaction(react)
+        return ReactionMustNotBeCalled(func)
 
 
 @dataclass

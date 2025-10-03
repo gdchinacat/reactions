@@ -29,20 +29,20 @@ TODO - come up with guidelines for how to safely implement state
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from asyncio import Future, Queue, Task, create_task, QueueShutDown
+from asyncio import Future
 from dataclasses import dataclass, field
 from functools import partial, wraps
 from logging import Logger, getLogger
-from typing import Callable, Any, Optional, Coroutine, Type, Tuple
+from typing import Callable, Any, Optional, Coroutine
 
-from .error import (ReactionMustNotBeCalled, StateNotStarted, StateError,
-                    StateAlreadyComplete, StateHasPendingReactions,
-                    StateAlreadyStarted)
-from .field import BoundField, Field
+from .error import (ReactionMustNotBeCalled, StateNotStarted,
+                    StateAlreadyComplete, StateAlreadyStarted)
+from .executor import ReactionExecutor, ReactorBase
+from .field import Field
 from .predicate import Predicate
 
 
-__all__ = ['State', 'ReactionMustNotBeCalled', ]
+__all__ = ['State']
 
 
 config_logger: Logger = getLogger('whenstate.state.config')
@@ -78,99 +78,6 @@ def trace(func: Callable[..., Any]) -> Callable[..., Any]:
                 f'!!{func}({args=}, {kwargs=}) raised {exc=}')
             raise
     return _trace
-            
-
-class ReactionExecutor[C: "State", T](
-        Queue[Tuple[C, Coroutine[None, None, T]]]
-        ):
-    '''
-    ReactionExecutor is created by State.start() to execute the states
-    reactions asynchronously.
-
-    It is an asyncio.Queue with a coroutine that executes elements of the queue
-    as it is drained.
-    '''
-
-    task: Optional[Task] = None
-    '''the task that is processing the queue to execute reactions'''
-
-    @staticmethod
-    def react(reaction: AsyncReaction[C, T],
-              state: C,
-              bound_field: BoundField[C, T],
-              old: T, new: T) -> None:
-        '''reaction that asynchronously executes the reaction'''
-        # The weirdness of this being a @staticmethod that gets its self from
-        # the state is so this method can be used as a @partial wrapped
-        # predicate reaction rather than having an extra method do this before
-        # calling # this method. While a @partial wraps this to pass the
-        # reaction arg, it is created from a @classmethod that doesn't have the
-        # actual state to get the _reaction_executor from.
-        # Microbenchmarking on stock Mac OS build of python 3.13.7 shows
-        # partial is significantly faster (22%) than an intermediate function:
-        #     def foo(a): ...
-        #     def foo_func(): return foo(1)  # 43.3 ns
-        #     foo_partial = partial(foo, 1)  # 33.8 ns
-
-        # Get self and assert state is acceptable.
-        self = state._reaction_executor
-        assert self.task, "ReactionExecutor not start()'ed"
-        
-        state.logger.debug(f'schedule %s (..., %s,  %s)',
-                           reaction.__qualname__, old, new)
-        coro = reaction(bound_field.instance, bound_field.field, old, new)
-        try:
-            self.put_nowait((bound_field.instance, coro))
-        except QueueShutDown:
-            # TODO - this can happen for a bunch of reasons that need
-            #        to be locked down. Once that has stabilized it may
-            #        still be possible, so this may need to be removed.
-            #        For now, I want to know when state updates are
-            #        happening after the state has entered terminal
-            #        state.
-            #        1) are queued tasks generating these? Why do we
-            #           have queued tasks for terminal state? (yes)
-            #        2) is the state continuing to execute after
-            #           completing its future? (only without sleep(0))
-            #        3) does state completion need to be moved into a
-            #           task? (don't think so)
-            #        4) are tasks waiting unexpectedly causing out of
-            #           order execution? (don't think so)
-            raise StateError(f'reaction {reaction.__qualname__} called '
-                             f'after {state} completed.')
-
-
-    def start(self):
-        self.task = create_task(self.execute_reactions())
-
-    def stop(self):
-        '''stop the reaction queue'''
-        if not self.empty():
-            # todo - haven't seen this, write a unit test to make sure it
-            #        actually works.
-            raise StateHasPendingReactions()
-        self.shutdown()
-        self.task.cancel()  # stop processing reactions
-
-    async def execute_reactions(self):
-        '''
-        Queue worker that gets pending tasks from the queue and executes
-        them.
-
-        The pending tasks are processed synchronously.
-        '''
-        while True:
-            try:
-                (instance, coro) = await self.get()
-            except QueueShutDown:
-                break
-            try:
-                instance.logger.debug(f'calling {coro}')
-                await coro
-            except Exception as exc:
-                instance.error(exc)
-            finally:
-                self.task_done()
 
 
 class FieldNamingDict(dict[str, Any]):
@@ -209,7 +116,7 @@ class StateMeta(ABCMeta, type):
 
 
 @dataclass
-class State(metaclass=StateMeta):
+class State(ReactorBase, metaclass=StateMeta):
     '''
     State implements an event driven state machine.
 
@@ -238,11 +145,8 @@ class State(metaclass=StateMeta):
     support for that may be added to enable asyncio.sleep() to allow reactions
     to introduce delays.
     '''
-
     _complete: Optional[Future[None]] = field(init=False, default=None)
-    _reaction_executor: ReactionExecutor = field(
-        init=False, default_factory=ReactionExecutor)
-    logger: Logger = field(default=execute_logger, kw_only=True)
+
     '''
     Each state can have its own logger, for example to identify instance
     that logged. Defaults to execute_logger.

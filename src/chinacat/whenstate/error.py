@@ -47,7 +47,7 @@ class ReactionMustNotBeCalled(MustNotBeCalled):
               State.when(foo==1)(react)
     '''
     def __init__(self, func: Callable, *args, **kwargs):
-        super().__init__(None, f"{func.__qualname__} is a State reaction method and "
+        super().__init__(None, f"{func.__qualname__} is a reaction method and "
                          "can not be called directly.", *args, **kwargs)
 
 
