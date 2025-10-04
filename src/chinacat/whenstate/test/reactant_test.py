@@ -3,10 +3,9 @@ State machine test.
 '''
 from __future__ import annotations
 
-from asyncio import Future
-import asyncio
+from asyncio import Future, CancelledError, sleep
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, AsyncIterator, Tuple
 from unittest import TestCase, main
 
@@ -23,7 +22,7 @@ class State(Reactant):
 
     exception: Field[State, Optional[Exception]] = Field()
     infinite_loop: Field[State, bool] = Field(False)
-    infinite_loop_running: Optional[Future[None]] = None
+    infinite_loop_running: Future[None] = field(default_factory=Future)
     
     def _start(self) -> None:
         pass
@@ -43,7 +42,7 @@ class State(Reactant):
         assert self.infinite_loop_running is not None
         self.infinite_loop_running.set_result(None)
         while True:
-            await asyncio.sleep(1)
+            await sleep(1)
 
 
 @asynccontextmanager
@@ -67,7 +66,7 @@ async def running_state(skip_stop=False,
             await future
 
 
-class ReactorBaseTest(TestCase):
+class ReactantTest(TestCase):
 
     @asynctest
     async def test_reaction_exception_terminates_reactor(self):
@@ -91,8 +90,12 @@ class ReactorBaseTest(TestCase):
         async with running_state(skip_stop=True,
                                  skip_await=True) as (state, future):
             state.stop()
+            state.stop()  # a second is fine since it hasn't stopped yet
 
-            # trying to stop it a second time raises error
+            # Wait for the future to actually complete.
+            await future
+
+            # Stopping it now results in an already complete error.
             with self.assertRaises(ExecutorAlreadyComplete):
                 state.stop()
             await future
@@ -105,19 +108,23 @@ class ReactorBaseTest(TestCase):
 
     @asynctest
     async def test_reaction_infinite_interruptable_loop(self):
-        async with running_state(skip_stop=True) as (state, complete):
-            state.infinite_loop_running = Future()
+        async with running_state(skip_stop=True,
+                                 skip_await=True) as (state, complete):
             state.infinite_loop = True
-            await asyncio.sleep(0)  # yield so reaction can run
+            await sleep(0)
             await state.infinite_loop_running
-            state.stop()
-            await complete
+            state.stop(.1)
+            with self.assertRaises(CancelledError):
+                # todo - the CancelledError comes from the asynctest timeout,
+                #        which is not what we want.
+                await complete
 
     def test_defined_state_fields_are_named(self):
         self.assertEqual('State', State.exception.classname)
         self.assertEqual('exception', State.exception.attr)
 
-    def test_added_fields_are_named(self):
+    @asynctest  # not really necessary but for State.inifinite_loop needing it
+    async def test_added_fields_are_named(self):
         '''fields added to a Reactant subclass after definition are named'''
         obj = object()
         State.foo = Field(obj)

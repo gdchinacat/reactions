@@ -6,7 +6,7 @@ reaction predicate checks this flag and stops processing.
 '''
 from __future__ import annotations
 
-from unittest.case import TestCase
+from unittest import TestCase, main
 
 from ... import Reactant, Field, And
 from ..async_helpers import asynctest
@@ -54,3 +54,6 @@ class ExternalStopTest(TestCase):
         #        reactions. Instance reactions take precedence of class
         #        reactions?
         assert counter.count == count_to + 1
+
+if __name__ == '__main__':
+    main()
