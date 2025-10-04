@@ -12,6 +12,7 @@ from typing import (Any, Callable, Generator, Sequence, Type, TypeAlias,
                     Optional, Coroutine)
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
+from .logging_config import VERBOSE
 
 
 __all__ = ['Predicate', 'Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
@@ -51,11 +52,11 @@ class Predicate[C, T](ABC):
     T - the type the predicate evaluate()s to
 
     Created through Field and Predicate comparison methods:
-        State.field == 'value'
+        field = Field(None)
+        field == 'value'  # creates a predicate
 
     Predicates can be used to decorate a function to schedule it to be run
-    when the Predicate becomes True. The callback is synchronous. state.State
-    provides asyncronous execution.
+    when the Predicate becomes True.
     TODO - should the async move into predicate?
     '''
     @property
@@ -82,13 +83,17 @@ class Predicate[C, T](ABC):
               new: Any,
               *,
               reaction: BoundReaction) -> None:
-        logger.debug('%s notified that %s %s -> %s', self, bound_field,
-                     old, new)
+        logger.log(VERBOSE, 
+                   '%s notified that %s %s -> %s',
+                   self, bound_field, old, new)
 
         if self.evaluate(bound_field.instance):
+            logger.debug('%s TRUE for %s %s -> %s',
+                         self, bound_field, old, new)
+            # todo - don't use bound_field for reaction instance (below too)
             reaction_executor = bound_field.instance._reaction_executor
             reaction_executor.react(reaction,
-                                    bound_field.instance,  # todo - don't use bound_field for reaction instance
+                                    bound_field.instance,
                                     bound_field,
                                     old, new)
 
@@ -99,16 +104,10 @@ class Predicate[C, T](ABC):
         Call the decorated method when the predicate becomes True.
 
         For example:
-            @(State.a != State.b)
+            # State is a class with Field a and b.
+            @ State.a != State.b
             async def ...
             
-        In contrast to:
-            @State.when(State.a != State.b)
-            async def ....
-
-        TODO - these comments are most likely stale and refer to state, but the
-        general notions are correct. Update them to reflect the shift from
-        State.when to @(predicate).
         Decorate a function to register it for execution when the predicate
         becomes true. The function is *not* called by the decorator, but rather
         the predicate when a field change causes it to become true. A dummy
@@ -116,22 +115,21 @@ class Predicate[C, T](ABC):
         raise ReactionMustNotBeCalled.
 
         The set of fields the predicate uses are reaction()ed to have the
-        predicate react() by calling the method being decorated.
+        predicate react() by scheduling the reaction method to be executed
+        asynchronously by the reaction executor (semantics TBD).
 
-        The reaction is called asynchronously in the event loop. It can rely on
-        the semantics of coroutine cooperative scheduling to make atomic
-        updates to the state by only yielding to the event loop when the state
-        is consistent. Failure to yield for "long" periods of time will block
-        execution of other asynchronous tasks, including reactions (don't
-        time.sleep()).
+        The reaction is executed by the reaction executor in order of
+        submission. Reactions are synchronous with respect to the other
+        reactions submitted to the reaction executor. The synchronous execution
+        model provides atomic semantics between the reactions in the executor.
 
-        Reaction execution start order is implementation specific. It is too
+        Reaction execution start order is undefined (but consistent). It is too
         premature to define it well. It is currently determined by the order
-        of the reactions on the field which is the order the predicate decorator
-        was applied to the fields in the predicate. It is therefore sensitive
-        to which side a field is placed in a predicate, the method definition
-        order, and the import order. This should be better defined, but at this
-        time it is not. TODO
+        of the reactions on the field which is the order the predicate
+        decorator was applied to the fields in the predicate. It is therefore
+        sensitive to which side a field is placed in a predicate, the method
+        definition order, and the import order. This should be better defined,
+        but at this time it is not. TODO
 
         TODO - remove ReactionMustNotBeCalled to allow stacking predicate
                decorators?

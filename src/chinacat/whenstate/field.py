@@ -42,7 +42,7 @@ class ReactionMixin[C, T](ABC):
 
 class Field[C, T](ReactionMixin, _Field):
     '''
-    An instrumented field of a State.
+    An instrumented field.
     - C: is the type of the object the field is a member of
     - T: is the type of object the field references
 
@@ -77,8 +77,8 @@ class Field[C, T](ReactionMixin, _Field):
         classname and attr are optional and will have values provided. However,
         They will not be very meaningful so it is encouraged that they be set.
         They aren't required to keep field definitions simple and not repeat
-        the class and name in the definition. State populates these as part of
-        its subclass initialization.
+        the class and name in the definition. The NameFieldsMeta populates
+        these as part of class definition.
         '''
         super().__init__(*args, **kwargs)
         self.classname: str = classname or '<no class associated>'
@@ -245,7 +245,7 @@ class BoundField[C, T](ReactionMixin):
 
 class FieldNamingDict(dict[str, Any]):
     '''
-    A dict that is used by FieldNamer for State class creation to provide
+    A dict that is used by FieldNamer for class creation to provide
     members that are instances of Field with the class and attribute name.
     '''
 

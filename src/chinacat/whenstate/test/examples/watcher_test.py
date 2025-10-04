@@ -4,31 +4,29 @@ An example showing how a class can watch a state for changes.
 from __future__ import annotations
 
 import asyncio
-from typing import List, Any
+from typing import List, Any, Optional
 from unittest import TestCase, main
 
-from ... import Field, ReactorBase
+from ... import Field, Reactant
 from ...executor import ReactionExecutor
 from ...logging_config import VERBOSE
 from dataclasses import dataclass, field
 
 
 @dataclass
-class Watched(ReactorBase):
+class Watched(Reactant):
     last_tick: Field[Watched, int] = Field(5)
-    ticks: Field[Watched, int] = Field(-1)
+    ticks: Field[Watched, Optional[int]] = Field(None)
 
     @ ticks == 5
     async def done(self, field: Field[Any, bool], old: int, new: int):
-        self.ticks = -1
+        self.ticks = None
         self.stop()
 
     @ ticks != -1
     async def tick(self, field, old: int, new: int):
-        if new != self.ticks:
-            # something else changed it before we reacted, skip
-            return
-        self.ticks += 1
+        if self.ticks is not None:
+            self.ticks += 1
 
     def _start(self):
         self.ticks = 0
@@ -40,7 +38,7 @@ ticks_seen: List[int] = []
 
 
 @dataclass
-class Watcher(ReactorBase):
+class Watcher(Reactant):
     watched: Watched
     ticks_seen: List[int] = field(default_factory=list[int])
 
@@ -58,7 +56,7 @@ class Watcher(ReactorBase):
 
     def _start(self): ...
 
-    @(Watched.ticks != -1)
+    @ (Watched.ticks != None)
     @staticmethod
     async def watcher(watched: Watched,
                 field: Field[Watched, int],
@@ -79,6 +77,10 @@ class Test(TestCase):
         asyncio.run(watched.run())
 
         # todo - use watcher.ticks_seen
+        # todo - last_tick is not included because the Watched.done(() reaction
+        # happens first and it stops the executor with the final watcher()
+        # reaction still queue). TODO - need to either complete execution of
+        # pending reactions or move these before the reaction that calls done()
         self.assertEqual(ticks_seen, list(range(watched.last_tick + 1)))
 
 

@@ -11,12 +11,12 @@ from typing import Optional, AsyncIterator, Tuple
 from unittest import TestCase, main
 
 from .. import (ReactionMustNotBeCalled, ExecutorAlreadyComplete,
-                 ExecutorAlreadyStarted, Field, ReactorBase)
+                 ExecutorAlreadyStarted, Field, Reactant)
 from .async_helpers import asynctest
 
 
 @dataclass
-class State(ReactorBase):
+class State(Reactant):
     '''
     Kitchen sink state machine for testing various aspects of State.
     '''
@@ -118,7 +118,7 @@ class ReactorBaseTest(TestCase):
         self.assertEqual('exception', State.exception.attr)
 
     def test_added_fields_are_named(self):
-        '''fields added to a ReactorBase subclass after definition are named'''
+        '''fields added to a Reactant subclass after definition are named'''
         obj = object()
         State.foo = Field(obj)
         try:

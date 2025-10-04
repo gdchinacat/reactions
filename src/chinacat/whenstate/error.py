@@ -44,7 +44,7 @@ class ReactionMustNotBeCalled(MustNotBeCalled):
           function definition that will be included and is very explicit about
           what the function semantics are:
               def reaction(self: C, bound_field: BoundField[C, T], old, new): ...
-              State.when(foo==1)(react)
+              (foo==1)(react)
     '''
     def __init__(self, func: Callable, *args, **kwargs):
         super().__init__(None, f"{func.__qualname__} is a reaction method and "
@@ -65,9 +65,9 @@ class ExecutorAlreadyStarted(ExecutorError):
     '''
     Error indicating the state has already been started.
 
-    The State may have already terminated, which, as the name implies, is
-    terminal and can't be restarted. This error does not imply the state is
-    running, only that the request to start it failed.
+    The ReactionExecutor may have already terminated, which, as the name
+    implies, is terminal and can't be restarted. This error does not imply the
+    state is running, only that the request to start it failed.
     '''
 
 class ExecutorAlreadyComplete(ExecutorError):
@@ -85,7 +85,7 @@ class ExecutorHasPendingReactions(ExecutorError):
     counts by incrementing the same field it uses as a predicate. In this case
     the reaction will always be both executing and pending since the executing
     calls task will be pending and will enqueue another execution. There is
-    never a time when there isn't one pending reaction. States that are self
+    never a time when there isn't one pending reaction. Models that are self
     driven must always have at least one pending reaction or they will cease to
     be self driven.
     '''

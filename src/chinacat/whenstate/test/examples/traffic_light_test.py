@@ -8,7 +8,7 @@ from time import time
 from typing import List, Coroutine
 from unittest import TestCase, main
 
-from ... import Field, And, ReactorBase
+from ... import Field, And, Reactant
 
 
 NUMBER_OF_TRAFFIC_LIGHTS = 1_000
@@ -28,7 +28,7 @@ class Color(Enum):
 
 
 @dataclass
-class TrafficLight(ReactorBase):
+class TrafficLight(Reactant):
     '''
     simple model that implements a traffic light:
     '''

@@ -4,7 +4,7 @@ Asynchronous reaction executor.
 from __future__ import annotations
 
 from abc import abstractmethod
-from asyncio import Queue, Task, create_task, QueueShutDown, Future
+from asyncio import Queue, Task, create_task, QueueShutDown, Future, sleep
 from dataclasses import dataclass, field
 from itertools import count
 from logging import Logger, getLogger
@@ -16,7 +16,7 @@ from .field import BoundField, Field, NameFieldsMeta
 from .logging_config import VERBOSE
 
 
-__all__ = ['ReactorBase']
+__all__ = ['Reactant']
 
 
 logger: Logger = getLogger('whenstate.executor')
@@ -30,9 +30,9 @@ AsyncReaction is the type for functions that implement reactions.
 
 
 
-class ReactionExecutor[C: "ReactorBase", T]():
+class ReactionExecutor[C: "Reactant", T]():
     '''
-    ReactionExecutor executes reactions for sublcasses of ReactorBase.
+    ReactionExecutor executes reactions for sublcasses of Reactant.
 
     It is an asyncio.Queue with a coroutine that executes elements of the queue
     as it is drained.
@@ -114,7 +114,7 @@ class ReactionExecutor[C: "ReactorBase", T]():
                                    coro,
                                    (bound_field, old, new)))
             instance.logger.log(VERBOSE,
-                '%d scheduled %s (..., %s,  %s)',
+                '%d scheduled %s(..., %s,  %s)',
                 id_, reaction.__qualname__, old, new)
         except Exception:
             instance.logger.exception(
@@ -129,7 +129,7 @@ class ReactionExecutor[C: "ReactorBase", T]():
     def stop(self):
         '''stop the reaction queue'''
         if not self.queue.empty():
-            logger.error(f'stoping {self} with pending reactions.')
+            logger.error(f'stopping {self} with pending reactions.')
         self.queue.shutdown(immediate=False)
         self.task.cancel()  # stop processing reactions
 
@@ -150,19 +150,21 @@ class ReactionExecutor[C: "ReactorBase", T]():
                 instance.logger.debug(f'%s calling %s(%s)',
                     id_, coro.__qualname__, str(args))
                 await coro
+                await sleep(0)
             except Exception as exc:
                 instance.error(exc)
             finally:
                 self.queue.task_done()
 
 @dataclass
-class ReactorBase(metaclass=NameFieldsMeta
+class Reactant(metaclass=NameFieldsMeta
                   ): # todo - ReactorBase isn't a good name...fix it
     '''
-    Base class that provides mechanism to execute reactions asynchronously.
+    Base class that allows classes to react asynchronously to predicates that
+    become true.
 
     Usage:
-    class Counter(ReactorBase):
+    class Counter(Reactant):
         """A counter that spins until stopped"""
         count: Field[Counter, int] = Field(-1)
 
@@ -182,7 +184,7 @@ class ReactorBase(metaclass=NameFieldsMeta
         counter.stop()
         await counter_task
 
-    Reactions are called asynchronously.
+    Reactions are called asynchronously in the Reactant's reaction executor.
     '''
     # todo - a reaction_executor for instances introduces an ambiguity of
     #        which instances executor predicate reactions will be executed
@@ -279,6 +281,13 @@ class ReactorBase(metaclass=NameFieldsMeta
         self._reaction_executor.stop()
         self._complete.set_result(None)
         self.logger.debug(f'{self} stopped.')
+
+    async def astop(self, *args) -> None:
+        '''
+        Async stop:
+        (done == True)(Reactant.astop)
+        '''
+        self.stop()
 
     def error(self, exc_info: Exception) -> None:
         if self._complete is None:

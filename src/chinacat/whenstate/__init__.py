@@ -3,16 +3,23 @@ Weird sick can't sleep thoughts after seeing:
 https://www.reddit.com/r/Python/comments/1nmta0f/i_built_a_full_programming_language_interpreter/
 Right before going to bed and trying to sleep I thought...I bet a bunch of that
 can be done with standard python using descriptors and ....
-
 Then the dogs barked and woke me up early while still sick. Here goes nothing.
+This package is *not* the same thing as that post and does not aspire to be. It
+is only inspired by it.
 
-The basic language idea is that you specify conditions when code should
-execute based on a state model. But, rather than adding events to your model
-explicitly you write code that appears procedural, but it just sets up
-listeners for model change events. Under the covers the model has a complex
-graph of dependent conditions that are evaluated when the condition changes.
+The basic idea is that you implement reaction methods that are called when
+predicates become true. For example, this class counts upwards forever.
 
-TODO - example
+class Counter(Reactant):
+    count: Field[Counter, int] = Field(-1)
+
+    @ count >= 0
+    async def _count(self, field, old, new):
+        self.count += 1
+
+    def _start(self):
+        self.count = 0
+
 '''
 
 from . import error
