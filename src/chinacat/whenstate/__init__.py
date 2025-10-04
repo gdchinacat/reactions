@@ -20,19 +20,13 @@ from . import executor
 from . import field
 from . import logging_config  # todo - libraries shouldn't configure logging.
 from . import predicate
-from . import state
 from .error import *
 from .executor import *
 from .field import *
 from .predicate import *
-from .state import *
 
 
 __all__ = (error.__all__ +
            executor.__all__ +
            field.__all__ +
-           predicate.__all__ +
-           state.__all__)
-
-assert 'ReactorBase' in __all__
-assert ReactorBase is not None
+           predicate.__all__)

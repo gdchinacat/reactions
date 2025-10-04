@@ -8,7 +8,7 @@ from time import time
 from typing import List, Coroutine
 from unittest import TestCase, main
 
-from ... import Field, And, State
+from ... import Field, And, ReactorBase
 
 
 NUMBER_OF_TRAFFIC_LIGHTS = 1_000
@@ -28,7 +28,7 @@ class Color(Enum):
 
 
 @dataclass
-class TrafficLight(State):
+class TrafficLight(ReactorBase):
     '''
     simple model that implements a traffic light:
     '''
@@ -120,7 +120,7 @@ class TrafficLight(State):
                 self._next_tick_time += TIME_PER_TICK
             else:
                 # Missed time at which to tick.
-                # TODO - move constant rate into State mixin.
+                # TODO - move constant rate into mixin?
                 # TODO - make missed tick behavior customizable.
                 # TODO - metric on delay time?
                 logger.error(f'{self} delayed tick')

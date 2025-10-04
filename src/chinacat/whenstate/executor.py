@@ -3,14 +3,18 @@ Asynchronous reaction executor.
 '''
 from __future__ import annotations
 
-from asyncio import Queue, Task, create_task, QueueShutDown
+from abc import abstractmethod
+from asyncio import Queue, Task, create_task, QueueShutDown, Future
 from dataclasses import dataclass, field
+from itertools import count
 from logging import Logger, getLogger
 from typing import Callable, Any, Optional, Coroutine, Tuple
 
-from .field import BoundField, Field
+from .error import (ExecutorAlreadyStarted, ExecutorNotStarted,
+                    ExecutorAlreadyComplete)
+from .field import BoundField, Field, NameFieldsMeta
 from .logging_config import VERBOSE
-from itertools import count
+
 
 __all__ = ['ReactorBase']
 
@@ -25,8 +29,8 @@ AsyncReaction is the type for functions that implement reactions.
 '''
 
 
-class ReactionExecutor[C: "ReactorBase", T](
-        ):
+
+class ReactionExecutor[C: "ReactorBase", T]():
     '''
     ReactionExecutor executes reactions for sublcasses of ReactorBase.
 
@@ -152,8 +156,34 @@ class ReactionExecutor[C: "ReactorBase", T](
                 self.queue.task_done()
 
 @dataclass
-class ReactorBase:
-    '''base class for classes that have reactions'''
+class ReactorBase(metaclass=NameFieldsMeta
+                  ): # todo - ReactorBase isn't a good name...fix it
+    '''
+    Base class that provides mechanism to execute reactions asynchronously.
+
+    Usage:
+    class Counter(ReactorBase):
+        """A counter that spins until stopped"""
+        count: Field[Counter, int] = Field(-1)
+
+        @ count != -1
+        async defcounter(self, bound_field: BoundField[Counter, int],
+                 old: int, new: int) -> None:
+            self.count += 1
+
+        def _start(self):
+            'transition from initial state, called during start()'
+            self.count = 0
+
+    async def run_counter_for_awhile():
+        counter = Counter()
+        counter_task = asyncio.create_task(counter.start())
+        ....
+        counter.stop()
+        await counter_task
+
+    Reactions are called asynchronously.
+    '''
     # todo - a reaction_executor for instances introduces an ambiguity of
     #        which instances executor predicate reactions will be executed
     #        in, meaning it actually *is* possible for reactions to do dirty
@@ -200,3 +230,66 @@ class ReactorBase:
         default_factory=ReactionExecutor, kw_only=True)
 
     logger: Logger = field(default=logger, kw_only=True)
+
+    _complete: Optional[Future[None]] = field(init=False, default=None)
+
+    '''
+    Each state can have its own logger, for example to identify instance
+    that logged. Defaults to execute_logger.
+    '''
+
+    def start(self) -> Future[None]:
+        '''
+         Start processing the state machine. Returns a future that indicates
+         when the state machine has entered a terminal state. If an exception
+         caused termination of the state it is available as the futures
+         exception.
+         '''
+        if self._complete is not None:
+            raise ExecutorAlreadyStarted()
+        complete = self._complete = Future()
+        self._reaction_executor.start()
+        self._start()
+        return complete
+
+    async def run(self) -> None:
+        '''
+        Run the state and wait for its completion.
+        If execution was terminated with an exception it is raised.
+        '''
+        self._complete = self.start()
+        await self._complete
+        if (exc := self._complete.exception()):
+            raise exc
+
+    @abstractmethod
+    def _start(self) -> None:
+        '''
+        Subclasses must implement this to start the state machine execution.
+        '''
+
+    def stop(self) -> None:
+        '''
+        stop the state processing.
+        '''
+        if self._complete is None:
+            raise ExecutorNotStarted()
+        elif self._complete.done():
+            raise ExecutorAlreadyComplete()
+        self._reaction_executor.stop()
+        self._complete.set_result(None)
+        self.logger.debug(f'{self} stopped.')
+
+    def error(self, exc_info: Exception) -> None:
+        if self._complete is None:
+            raise ExecutorNotStarted()
+        self.logger.exception(
+            exc_info, 'exception encountered processing reaction for %s', self)
+        self._reaction_executor.stop()
+        self._complete.set_exception(exc_info)
+
+    def cancel(self, *args) -> None:
+        if self._complete is None:
+            raise ExecutorNotStarted()
+        self._reaction_executor.stop()
+        self._complete.cancel(*args)

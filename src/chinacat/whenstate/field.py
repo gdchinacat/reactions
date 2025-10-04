@@ -3,16 +3,16 @@ Where most of the 'magic' happens.
 '''
 from __future__ import annotations
 
-from abc import ABC
+from abc import ABC, ABCMeta
+from itertools import count
 from typing import List, Any, Dict, Optional
 
 from .error import MustNotBeCalled
 from .predicate import (_Field, Reaction, BinaryPredicate,
                          Eq, Ne, Lt, Le, Gt, Ge, And, Or)
-from itertools import count
 
 
-__all__ = ['Field', ]
+__all__ = ['Field', 'NameFieldsMeta']
 
 class ReactionMixin[C, T](ABC):
     '''
@@ -241,3 +241,37 @@ class BoundField[C, T](ReactionMixin):
     def __str__(self):
         return f"{self.field.classname}({id(self.instance)}).{self.field}"
     __repr__ = __str__
+
+
+class FieldNamingDict(dict[str, Any]):
+    '''
+    A dict that is used by FieldNamer for State class creation to provide
+    members that are instances of Field with the class and attribute name.
+    '''
+
+    def __init__(self, classname: str):
+        self.classname = classname
+
+    def __setitem__(self, attr: str, value: Any)->None:
+        if isinstance(value, Field):
+            # Populate Field classname and attr fields.
+            value.set_names(self.classname, attr)
+        super().__setitem__(attr, value)
+
+
+class NameFieldsMeta(ABCMeta, type):
+    '''
+    Metaclass for types with Fields that should be named.
+    Modifies class definition to set the classname and attr on Field members.
+    '''
+    @classmethod
+    def __prepare__(cls, name, bases):
+        return FieldNamingDict(name)
+
+    def __setattr__(self, attr: str, value: Any):
+        '''
+        Intercept calls to set attributes on instances to name Field members.
+        '''
+        if isinstance(value, Field):
+            value.set_names(self.__qualname__, attr)
+        super().__setattr__(attr, value)

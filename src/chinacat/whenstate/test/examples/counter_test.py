@@ -4,11 +4,11 @@ import asyncio
 from dataclasses import dataclass
 from unittest import TestCase, main
 
-from ... import Field, State
+from ... import Field, ReactorBase
 
 
 @dataclass
-class Counter(State):
+class Counter(ReactorBase):
     '''
     Simple model that implements a counter. It has a loop() that increments
     a count and a done() that completes execution when the count reaches a

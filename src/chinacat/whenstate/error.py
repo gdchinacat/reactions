@@ -5,8 +5,8 @@ from typing import Any, Callable, Optional, NoReturn
 
 
 __all__ = ['MustNotBeCalled', 'ReactionMustNotBeCalled',
-           'StateError', 'StateNotStarted', 'StateAlreadyStarted',
-           'StateAlreadyComplete', 'StateHasPendingReactions',
+           'ExecutorError', 'ExecutorNotStarted', 'ExecutorAlreadyStarted',
+           'ExecutorAlreadyComplete', 'ExecutorHasPendingReactions',
            'PredicateError', 'InvalidPredicateExpression', ]
 
 
@@ -51,17 +51,17 @@ class ReactionMustNotBeCalled(MustNotBeCalled):
                          "can not be called directly.", *args, **kwargs)
 
 
-class StateError(RuntimeError):
-    '''base class for state errors'''
+class ExecutorError(RuntimeError):
+    '''base class for executor errors'''
 
 
-class StateNotStarted(StateError):
+class ExecutorNotStarted(ExecutorError):
     '''
     Error indicating an action was taken that requires the state event loop
     to have been started yet wasn't.
     '''
 
-class StateAlreadyStarted(StateError):
+class ExecutorAlreadyStarted(ExecutorError):
     '''
     Error indicating the state has already been started.
 
@@ -70,15 +70,15 @@ class StateAlreadyStarted(StateError):
     running, only that the request to start it failed.
     '''
 
-class StateAlreadyComplete(StateError):
+class ExecutorAlreadyComplete(ExecutorError):
     '''
     Error indicating the state has already been completed when an attempt
     to complete it was made.
     '''
 
-class StateHasPendingReactions(StateError):
+class ExecutorHasPendingReactions(ExecutorError):
     '''
-    StateHasPendingReactions is raised when a state is stop()'ed while it has
+    ExecutorHasPendingReactions is raised when a state is stop()'ed while it has
     reactions that have not yet executed.
     TODO - provide guidance on how to implement things so you *don't* have
     pending reactions. The problem is best illustrated by a state field that

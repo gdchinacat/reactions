@@ -7,14 +7,14 @@ import asyncio
 from typing import List, Any
 from unittest import TestCase, main
 
-from ... import Field, State, ReactorBase
+from ... import Field, ReactorBase
 from ...executor import ReactionExecutor
 from ...logging_config import VERBOSE
 from dataclasses import dataclass, field
 
 
 @dataclass
-class Watched(State):  # todo - don't require state here
+class Watched(ReactorBase):
     last_tick: Field[Watched, int] = Field(5)
     ticks: Field[Watched, int] = Field(-1)
 
@@ -55,6 +55,8 @@ class Watcher(ReactorBase):
     def _reaction_executor(self, _):
         # ignore whatever is being set since we always use the one on watched
         pass
+
+    def _start(self): ...
 
     @(Watched.ticks != -1)
     @staticmethod

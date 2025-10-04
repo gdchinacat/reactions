@@ -1,3 +1,6 @@
+'''
+State machine test.
+'''
 from __future__ import annotations
 
 from asyncio import Future
@@ -7,20 +10,19 @@ from dataclasses import dataclass
 from typing import Optional, AsyncIterator, Tuple
 from unittest import TestCase, main
 
-from .. import (ReactionMustNotBeCalled, StateAlreadyComplete,
-                 StateAlreadyStarted)
-from .. import Field, State
+from .. import (ReactionMustNotBeCalled, ExecutorAlreadyComplete,
+                 ExecutorAlreadyStarted, Field, ReactorBase)
 from .async_helpers import asynctest
 
 
 @dataclass
-class _State(State):
+class State(ReactorBase):
     '''
     Kitchen sink state machine for testing various aspects of State.
     '''
 
-    exception: Field[_State, Optional[Exception]] = Field()
-    infinite_loop: Field[_State, bool] = Field(False)
+    exception: Field[State, Optional[Exception]] = Field()
+    infinite_loop: Field[State, bool] = Field(False)
     infinite_loop_running: Optional[Future[None]] = None
     
     def _start(self) -> None:
@@ -28,14 +30,14 @@ class _State(State):
 
     @ exception != None
     async def _exception(self,
-             field: Field[_State, int],
+             field: Field[State, int],
              old: int, new:int) -> None:  # @UnusedVariable
         '''raise an exception'''
         raise self.exception
 
     @ infinite_loop == True
     async def _infinite_interuptable_loop(self,
-             field: Field[_State, int],
+             field: Field[State, int],
              old: int, new:int) -> None:  # @UnusedVariable
         '''enter an infinite loop. Currently no way to exit it.'''
         assert self.infinite_loop_running is not None
@@ -48,13 +50,13 @@ class _State(State):
 async def running_state(skip_stop=False,
                         skip_await=False,
                         *args, **kwargs
-                        ) -> AsyncIterator[Tuple[_State, Future]]:
+                        ) -> AsyncIterator[Tuple[State, Future]]:
     '''
     Async contexst manager to run the state before managed block and wait
     for it after the block. Context is the state.
     async with running_state() as state:
     '''
-    state = _State()
+    state = State()
     future = state.start()
     try:
         yield state, future
@@ -65,12 +67,12 @@ async def running_state(skip_stop=False,
             await future
 
 
-class StateTest(TestCase):
+class ReactorBaseTest(TestCase):
 
     @asynctest
-    async def test_reaction_exception_terminates_state(self):
+    async def test_reaction_exception_terminates_reactor(self):
         class _Exception(Exception): ...
-        state = _State()
+        state = State()
         future = state.start()
 
         state.exception = _Exception()
@@ -81,7 +83,7 @@ class StateTest(TestCase):
     async def test_already_started(self):
         async with running_state() as (state, _):
             # trying to start it a second time raises error
-            with self.assertRaises(StateAlreadyStarted):
+            with self.assertRaises(ExecutorAlreadyStarted):
                 state.start()
 
     @asynctest
@@ -91,7 +93,7 @@ class StateTest(TestCase):
             state.stop()
 
             # trying to stop it a second time raises error
-            with self.assertRaises(StateAlreadyComplete):
+            with self.assertRaises(ExecutorAlreadyComplete):
                 state.stop()
             await future
 
@@ -112,22 +114,23 @@ class StateTest(TestCase):
             await complete
 
     def test_defined_state_fields_are_named(self):
-        self.assertEqual('_State', _State.exception.classname)
-        self.assertEqual('exception', _State.exception.attr)
+        self.assertEqual('State', State.exception.classname)
+        self.assertEqual('exception', State.exception.attr)
 
-    def test_added_state_fields_are_named(self):
+    def test_added_fields_are_named(self):
+        '''fields added to a ReactorBase subclass after definition are named'''
         obj = object()
-        _State.foo = Field(obj)
+        State.foo = Field(obj)
         try:
             # test that it got named properly
-            self.assertEqual("_State", _State.foo.classname)
-            self.assertEqual("foo", _State.foo.attr)
+            self.assertEqual("State", State.foo.classname)
+            self.assertEqual("foo", State.foo.attr)
 
             # And that it functions as a field.
-            state = _State()
+            state = State()
             self.assertIs(obj, state.foo)
         finally:
-            del _State.foo
+            del State.foo
 
 
 if __name__ == "__main__":
