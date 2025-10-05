@@ -38,8 +38,7 @@ class ExternalStopTest(TestCase):
         async def stop(*args):
             counter.done = True
             
-        complete = counter.start()
-        await complete
+        await counter.start()
 
         counter._logger.info("Done waiting for count to complete, "
                             f"final count: {counter.count}")

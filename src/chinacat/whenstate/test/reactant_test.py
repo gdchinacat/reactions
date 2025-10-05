@@ -6,7 +6,7 @@ from __future__ import annotations
 from asyncio import Future, CancelledError, sleep
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Optional, AsyncIterator, Tuple
+from typing import Optional, AsyncIterator, Tuple, Awaitable
 from unittest import TestCase, main
 
 from .. import (ReactionMustNotBeCalled, ExecutorAlreadyComplete,
@@ -49,21 +49,21 @@ class State(Reactant):
 async def running_state(skip_stop=False,
                         skip_await=False,
                         *args, **kwargs
-                        ) -> AsyncIterator[Tuple[State, Future]]:
+                        ) -> AsyncIterator[Tuple[State, Awaitable]]:
     '''
     Async contexst manager to run the state before managed block and wait
-    for it after the block. Context is the state.
+    for it after the block. Context is (state, state_done_awaitable).
     async with running_state() as state:
     '''
     state = State()
-    future = state.start()
+    awaitable = state.start()
     try:
-        yield state, future
+        yield state, awaitable
     finally:
         if not skip_stop:
             state.stop()
         if not skip_await:
-            await future
+            await awaitable
 
 
 class ReactantTest(TestCase):
@@ -72,11 +72,11 @@ class ReactantTest(TestCase):
     async def test_reaction_exception_terminates_reactor(self):
         class _Exception(Exception): ...
         state = State()
-        future = state.start()
+        awaitable = state.start()
 
         state.exception = _Exception()
         with self.assertRaises(_Exception):
-            await future
+            await awaitable
 
     @asynctest
     async def test_already_started(self):

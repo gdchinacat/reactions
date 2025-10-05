@@ -140,11 +140,11 @@ class TrafficLightTest(TestCase):
             traffic_lights = [TrafficLight()
                               for _ in range(NUMBER_OF_TRAFFIC_LIGHTS)]
             logger.info(f'starting {len(traffic_lights)} traffic lights')
-            futures = [(traffic_light, traffic_light.start())
-                       for traffic_light in traffic_lights]
-            logger.info(f'awaiting {len(futures)} traffic lights')
-            for traffic_light, future in futures:
-                self.assertIsNone(await future)
+            awaitables = [(traffic_light, traffic_light.start())
+                          for traffic_light in traffic_lights]
+            logger.info(f'awaiting {len(awaitables)} traffic lights')
+            for traffic_light, awaitable in awaitables:
+                self.assertIsNone(await awaitable)
                 self.assertEqual(expected, traffic_light.sequence)
                 self.assertEqual(traffic_light.cycles, CYCLES)
             logger.info(f'done')

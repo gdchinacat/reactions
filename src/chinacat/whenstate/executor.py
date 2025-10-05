@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from functools import partial
 from itertools import count
 from logging import Logger, getLogger
-from typing import Callable, Any, Optional, Coroutine, Tuple
+from typing import Callable, Any, Optional, Coroutine, Tuple, Awaitable
 
 from .error import (ExecutorAlreadyStarted, ExecutorNotStarted,
                     ExecutorAlreadyComplete)
@@ -65,9 +65,6 @@ class ReactionExecutor[C: "Reactant", T]():
 
     task: Optional[Task] = None
     '''the task that is processing the queue to execute reactions'''
-
-    complete: Optional[Future] = None  # todo use the task as an awaitable?
-    '''the future to indicate task is complete'''
 
     queue: Queue[Tuple[int, C, Coroutine[None, None, T], Any]]
     '''
@@ -142,67 +139,47 @@ class ReactionExecutor[C: "Reactant", T]():
             raise
 
     ###########################################################################
+    # Task life cycle:
+    #
     # Task completion is asynchronous to allow scheduled reactions to execute.
     # A clean shutdown is performed by stop() calling the shutdown() method on
-    # the queue to stop accepting reactions. When the queue is drained the
-    # reaction_executor() loop receives a QueueShutDown error and returns,
-    # causing the done callback set by start() to complete the future.
+    # the queue to stop accepting reactions. When the queue is empty the
+    # reaction_executor() loop receives a QueueShutDown error and returns. The
+    # task is the awaitable provided for awaiting completion so tasks waiting
+    # will unblock.
     # However, to ensure a timely shutdown stop() has a default timeout= kwarg
     # that specifies the amount of time to wait for a clean shutdown. If the
     # task has not completed after that timeout a callback created by stop()
     # executes to call cancel() on the task, causing the coroutine being
-    # executed by the task to receive a CancelledError. This error is handled
-    # by replacing the task done callback with one that completes the future
-    # with an exception and then propagates the exception to the loop for
-    # handling. Waiters on the future will then receive the CancelledError to
-    # be notified the Reactant completed abnormally.
-    ###########################################################################
-    def _complete_callback(self, task_future: Future):
-        '''task done callback to complete successfully'''
-        assert self.complete  # keep mypy happy
-        self.complete.set_result(None)
-        logger.debug(f'{self} stopped.')
-
-    def _error_callback(self, exc: Exception, task_future: Future):
-        '''task done callback to complete with error'''
-        assert self.complete  # keep mypy happy
-        self.complete.set_exception(exc)
-        logger.exception(f'{self} stopped with error.', exc_info=exc)
-
-    def _set_error_callback(self, exc: Exception):
-        # This method is only be called from the task, but appease type
-        # checkers by asserting the task exists.
-        assert self.task is not None
-        self.task.add_done_callback(
-            partial(self._error_callback, exc))
-        self.task.remove_done_callback(self._complete_callback)
-    ###########################################################################
-    # end Task Completion Callbacks
+    # executed by the task to receive a CancelledError. This error is raised
+    # to the task and will be presented to waiters.
+    # For completeness, all other error raised by a reaction are also raised
+    # to the task and raised to waiters.
     ###########################################################################
 
-    def start(self):
-        if self.complete is not None:
+    def start(self) -> Awaitable:
+        if self.task is not None:
             raise ExecutorAlreadyStarted()
-        self.complete = Future()
         self.task = create_task(self.execute_reactions())
-        self.task.add_done_callback(self._complete_callback)
+        return self.task
 
 
-    def stop(self, timeout: float=2):
+    def stop(self, timeout: Optional[float]):
         '''stop the reaction queue with timeout (defaults to 2 seconds)'''
         self.queue.shutdown()
 
         # Create a callback to cancel the task if a timeout is specified.
         if timeout is not None:
             loop = get_event_loop()
-            def _cancel_task():
-                if not self.task.done():
-                    logger.error(f'{self} cancelled after shutdown '
-                                 f'took more than {timeout}s')
-                    self.task.cancel()
-            loop.call_later(timeout, _cancel_task)
+            if timeout is not None:
+                def _cancel_task():
+                    if not self.task.done():
+                        logger.error(f'{self} cancelled after shutdown '
+                                     f'took more than {timeout}s')
+                        self.task.cancel()
+                loop.call_later(timeout, _cancel_task)
 
-    async def execute_reactions(self):
+    async def execute_reactions(self) -> None:
         '''
         Queue worker that gets pending tasks from the queue and executes
         them.
@@ -213,6 +190,7 @@ class ReactionExecutor[C: "Reactant", T]():
             try:
                 (id_, instance, coro, args) = await self.queue.get()
             except QueueShutDown:
+                logger.info(f'{self} stopped')
                 break
 
             try:
@@ -221,14 +199,14 @@ class ReactionExecutor[C: "Reactant", T]():
                 await coro
                 await sleep(0)
             except CancelledError as ce:
-                self._set_error_callback(ce)
+                logger.exception(f'{self} stopped with error.', exc_info=ce)
                 raise  # CancelledError needs to be propagated
             except Exception as exc:
                 # A failure in a reaction means the state is inconsistent.
-                # replace the completion callback with one to complete with
-                # the exception.
-                self._set_error_callback(exc)
-                break
+                # Log the executor is stopped and raise the error to allow
+                # waiters to see it.
+                logger.exception(f'{self} stopped with error.', exc_info=exc)
+                raise
             finally:
                 self.queue.task_done()
 
@@ -313,20 +291,26 @@ class Reactant(metaclass=FieldManagerMeta):
     that logged. Defaults to execute_logger.
     '''
 
-    def start(self) -> Future[None]:
+    @abstractmethod
+    def _start(self) -> None:
+        '''
+        Subclasses must implement this to start the state machine execution.
+        '''
+
+    def start(self) -> Awaitable:
         '''
          Start processing the state machine. Returns a future that indicates
          when the state machine has entered a terminal state. If an exception
          caused termination of the state it is available as the futures
          exception.
          '''
-        get_event_loop()
         if self._reaction_executor.task is not None:
             raise ExecutorAlreadyStarted()
-        self._reaction_executor.start()
+        get_event_loop()
+
+        awaitable = self._reaction_executor.start()
         self._start()
-        assert self._reaction_executor.complete  # keep mypy happy
-        return self._reaction_executor.complete
+        return awaitable
 
     async def run(self) -> None:
         '''Run the Reactant and wait for completion.'''
@@ -337,21 +321,19 @@ class Reactant(metaclass=FieldManagerMeta):
         #        should wait for completion, again from either context.
         await self.start()
 
-    @abstractmethod
-    def _start(self) -> None:
-        '''
-        Subclasses must implement this to start the state machine execution.
-        '''
-
-    def stop(self, timeout=None) -> None:
+    def stop(self, timeout: Optional[float]=2) -> None:
         '''
         stop the state processing.
+        Args:
+            timeout - time in seconds to wait for the shutdown to complete
+                      normally before canceling the task.
         '''
-        assert self._reaction_executor.complete  # keep mypy happy
-        if self._reaction_executor.complete.done():
+        if not self._reaction_executor.task:
+            raise ExecutorNotStarted()
+        if self._reaction_executor.task.done():
             raise ExecutorAlreadyComplete()
-        kwargs = {} if timeout is None else {'timeout': timeout}
-        self._reaction_executor.stop(**kwargs)
+
+        self._reaction_executor.stop(timeout)
         self._logger.debug(f'{self} stopping.')
 
     async def astop(self, *args) -> None:
@@ -361,8 +343,5 @@ class Reactant(metaclass=FieldManagerMeta):
         '''
         self.stop()
 
-    def cancel(self, *args) -> None:
-        assert self._reaction_executor.complete  # keep mypy happy
-        if self._reaction_executor.complete.done():
-            raise ExecutorAlreadyComplete()
-        self._reaction_executor.stop()
+    def cancel(self) -> None:
+        self.stop(0)
