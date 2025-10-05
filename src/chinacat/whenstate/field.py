@@ -111,9 +111,6 @@ class Field[C, T](ReactionMixin, _Field):
         setattr(instance, self._attr_bound, bound_field)
 
     def evaluate(self, instance: C) -> Optional[T]:
-        return self._get_with_initialize(instance)
-
-    def _get_with_initialize(self, instance: C) -> Optional[T]:
         try:
             return getattr(instance, self._attr)
         except AttributeError:
@@ -133,7 +130,7 @@ class Field[C, T](ReactionMixin, _Field):
         to create predicates.
         '''
         if instance is not None:
-            return self._get_with_initialize(instance)
+            return self.evaluate(instance)
 
         # Getting the field on the class. There are two cases that need to be
         # handled.
@@ -153,7 +150,7 @@ class Field[C, T](ReactionMixin, _Field):
         # if value is self.
         if value is self:
             return
-        old: Optional[T] = self._get_with_initialize(instance)
+        old: Optional[T] = self.evaluate(instance)
         if value != old:
             setattr(instance, self._attr, value)
             bound_field = getattr(instance, self._attr_bound)
