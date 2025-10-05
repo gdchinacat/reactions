@@ -97,7 +97,7 @@ class Field[C, T](ReactionMixin, _Field):
         '''
         return id(self)
 
-    def bound_field(self, instance: C) -> BoundField[C, T]:
+    def _create_bound_field(self, instance: C):
         '''
         Get or create the BoundField for this field on the given instance.
 
@@ -105,12 +105,10 @@ class Field[C, T](ReactionMixin, _Field):
         initialization should create a field the descriptor can use without
         the need for this method.
         '''
-        bound_field = getattr(instance, self._attr_bound, None)
-        if bound_field is None:
-            bound_field = BoundField[C, T](instance, self)
-            setattr(instance, self._attr_bound, bound_field)
-        assert bound_field.instance is instance
-        return bound_field
+        assert not hasattr(instance, self._attr_bound), \
+            f'{self} already bound to {instance}'
+        bound_field = BoundField[C, T](instance, self)
+        setattr(instance, self._attr_bound, bound_field)
 
     def evaluate(self, instance: C) -> Optional[T]:
         return self._get_with_initialize(instance)
@@ -307,5 +305,5 @@ class BoundFieldCreatorMixin:
     def __new__(cls, *args):
         self = super().__new__(cls)
         for field in self._fields:
-            field.bound_field(self)
+            field._create_bound_field(self)
         return self

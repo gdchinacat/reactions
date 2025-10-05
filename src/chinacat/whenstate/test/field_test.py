@@ -71,7 +71,7 @@ class TestField(TestCase):
             changes.append((old, new))
 
         c: type[Base] = C()
-        C.field_a.bound_field(c).reaction(collect)
+        C.field_a.reaction(collect)
 
         for value in (True, False, False, True, True):
             c.field_a = value
