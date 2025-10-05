@@ -62,7 +62,7 @@ class Watcher(Reactant):
                 field: Field[Watched, int],
                 old: int, new: int):
         # todo - use self.logger, once self is provided
-        watched.logger.log(VERBOSE,
+        watched._logger.log(VERBOSE,
                            'static watcher got notice that '
                            f'{watched} changed {old} -> {new})')
 

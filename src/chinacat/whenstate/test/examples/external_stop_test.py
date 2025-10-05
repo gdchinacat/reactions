@@ -41,7 +41,7 @@ class ExternalStopTest(TestCase):
         complete = counter.start()
         await complete
 
-        counter.logger.info("Done waiting for count to complete, "
+        counter._logger.info("Done waiting for count to complete, "
                             f"final count: {counter.count}")
 
         # TODO - the change that makes stop predicate true has two reactions

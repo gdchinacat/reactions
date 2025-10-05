@@ -28,8 +28,6 @@ class ReactionMixin[C, T](ABC):
         Decorator to indicate the reaction should be called when the field's
         value changes.
         '''
-        # todo - allow transaction-like semantics?
-        #        - remove spurious calls for intermediate value changes
         self.reactions.append(reaction)
 
     def react(self, old: T, new: T):

@@ -132,11 +132,11 @@ class ReactionExecutor[C: "Reactant", T]():
                                    bound_field.instance,
                                    coro,
                                    (bound_field, old, new)))
-            instance.logger.log(VERBOSE,
+            instance._logger.log(VERBOSE,
                 '%d scheduled %s(..., %s,  %s)',
                 id_, reaction.__qualname__, old, new)
         except Exception:
-            instance.logger.exception(
+            instance._logger.exception(
                 '%d failed to schedule %s (..., %s,  %s)',
                 id_, reaction.__qualname__, old, new)
             raise
@@ -216,7 +216,7 @@ class ReactionExecutor[C: "Reactant", T]():
                 break
 
             try:
-                instance.logger.debug(f'%s calling %s(%s)',
+                instance._logger.debug(f'%s calling %s(%s)',
                     id_, coro.__qualname__, str(args))
                 await coro
                 await sleep(0)
@@ -307,7 +307,7 @@ class Reactant(metaclass=NameFieldsMeta
     _reaction_executor: ReactionExecutor = field(
         default_factory=ReactionExecutor, kw_only=True)
 
-    logger: Logger = field(default=logger, kw_only=True)
+    _logger: Logger = field(default=logger, kw_only=True)
 
     '''
     Each state can have its own logger, for example to identify instance
@@ -353,7 +353,7 @@ class Reactant(metaclass=NameFieldsMeta
             raise ExecutorAlreadyComplete()
         kwargs = {} if timeout is None else {'timeout': timeout}
         self._reaction_executor.stop(**kwargs)
-        self.logger.debug(f'{self} stopping.')
+        self._logger.debug(f'{self} stopping.')
 
     async def astop(self, *args) -> None:
         '''
@@ -363,6 +363,7 @@ class Reactant(metaclass=NameFieldsMeta
         self.stop()
 
     def cancel(self, *args) -> None:
+        assert self._reaction_executor.complete  # keep mypy happy
         if self._reaction_executor.complete.done():
             raise ExecutorAlreadyComplete()
         self._reaction_executor.stop()
