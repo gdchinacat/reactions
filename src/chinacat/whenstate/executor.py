@@ -14,7 +14,7 @@ from typing import Callable, Any, Optional, Coroutine, Tuple
 
 from .error import (ExecutorAlreadyStarted, ExecutorNotStarted,
                     ExecutorAlreadyComplete)
-from .field import BoundField, Field, NameFieldsMeta
+from .field import BoundField, Field, FieldManagerMeta
 from .logging_config import VERBOSE
 from asyncio.exceptions import CancelledError
 
@@ -233,7 +233,7 @@ class ReactionExecutor[C: "Reactant", T]():
                 self.queue.task_done()
 
 @dataclass
-class Reactant(metaclass=NameFieldsMeta
+class Reactant(metaclass=FieldManagerMeta
                   ): # todo - ReactorBase isn't a good name...fix it
     '''
     Base class that allows classes to react asynchronously to predicates that

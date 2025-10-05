@@ -12,7 +12,7 @@ from .predicate import (_Field, Reaction, BinaryPredicate,
                          Eq, Ne, Lt, Le, Gt, Ge, And, Or)
 
 
-__all__ = ['Field', 'NameFieldsMeta']
+__all__ = ['Field', 'FieldManagerMeta']
 
 class ReactionMixin[C, T](ABC):
     '''
@@ -75,7 +75,7 @@ class Field[C, T](ReactionMixin, _Field):
         classname and attr are optional and will have values provided. However,
         They will not be very meaningful so it is encouraged that they be set.
         They aren't required to keep field definitions simple and not repeat
-        the class and name in the definition. The NameFieldsMeta populates
+        the class and name in the definition. The FieldManagerMeta populates
         these as part of class definition.
         '''
         super().__init__(*args, **kwargs)
@@ -100,14 +100,16 @@ class Field[C, T](ReactionMixin, _Field):
     def bound_field(self, instance: C) -> BoundField[C, T]:
         '''
         Get or create the BoundField for this field on the given instance.
-        todo - (metaclass) for thread safety it is probably better to create
-               the BoundField when the instance is created rather than doing it
-               here lazily.
+
+        TODO - this is in critical path and shouldn't exist...instance
+        initialization should create a field the descriptor can use without
+        the need for this method.
         '''
         bound_field = getattr(instance, self._attr_bound, None)
         if bound_field is None:
             bound_field = BoundField[C, T](instance, self)
             setattr(instance, self._attr_bound, bound_field)
+        assert bound_field.instance is instance
         return bound_field
 
     def evaluate(self, instance: C) -> Optional[T]:
@@ -241,30 +243,48 @@ class BoundField[C, T](ReactionMixin):
     __repr__ = __str__
 
 
-class FieldNamingDict(dict[str, Any]):
+class FieldManagerMetaDict(dict[str, Any]):
     '''
-    A dict that is used by FieldNamer for class creation to provide
-    members that are instances of Field with the class and attribute name.
+    A dict that is used by FieldManagerMeta for class creation. It names Field
+    members and tracks them in a list of the class.
+
+    The list of fields is unused. It was part of work that was abandoned but it
+    seems useful and low cost so it has been left in. It can be used, or not,
+    and if not long term should probably be removed.
     '''
 
     def __init__(self, classname: str):
         self.classname = classname
+        self['_fields'] = list[Field]()
 
     def __setitem__(self, attr: str, value: Any)->None:
         if isinstance(value, Field):
-            # Populate Field classname and attr fields.
             value.set_names(self.classname, attr)
+            self['_fields'].append(value)
         super().__setitem__(attr, value)
 
 
-class NameFieldsMeta(ABCMeta, type):
+class FieldManagerMeta(ABCMeta, type):
     '''
-    Metaclass for types with Fields that should be named.
-    Modifies class definition to set the classname and attr on Field members.
+    Metaclass to manage the Field members of classes.
+
+    Field naming:
+    Class members that are Fields will be named during class definition. This
+    makes the Field definition much more concise as it doesn't need to take the
+    class and attr names. (__prepare__)
+    When a Field attribute is set on the class after definition it will be
+    named. (__setattr__)
+
+    Class creation:
+    BoundFields will be created for Fields during class creation. (__new__)
     '''
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     @classmethod
     def __prepare__(cls, name, bases):
-        return FieldNamingDict(name)
+        return FieldManagerMetaDict(name)
 
     def __setattr__(self, attr: str, value: Any):
         '''
