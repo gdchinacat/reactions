@@ -5,11 +5,11 @@ from typing import Tuple, List, Any, Optional, NoReturn
 from unittest import TestCase, main
 
 from ..error import MustNotBeCalled
-from ..field import Field, BoundField
+from ..field import Field, BoundField, FieldManagerMeta
 from ..predicate import Predicate, Contains, Not, Or, And
 
 
-class Base:
+class Base(metaclass=FieldManagerMeta):
     '''
     exists solely to give create_class() a base class for type annotations
     '''

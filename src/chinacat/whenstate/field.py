@@ -79,16 +79,16 @@ class Field[C, T](ReactionMixin, _Field):
         these as part of class definition.
         '''
         super().__init__(*args, **kwargs)
-        self.classname: str = classname or '<no class associated>'
-        self.attr = attr or f'field_{next(self._field_count)}'
-        self._attr: str = '_' + self.attr                    # private
-        self._attr_bound: str = self._attr + '_bound'   # bound field
+        self.set_names(classname or '<no class associated>',
+                       attr or f'field_{next(self._field_count)}')
         self.initial_value: Optional[T] = initial_value
 
     def set_names(self, classname: str, attr: str):
         '''Update the field with classname and attr.'''
         self.classname = classname
         self.attr = attr
+        self._attr: str = '_' + self.attr               # private
+        self._attr_bound: str = self._attr + '_bound'   # bound field
 
     def __hash__(self):
         '''
@@ -158,7 +158,7 @@ class Field[C, T](ReactionMixin, _Field):
         old: Optional[T] = self._get_with_initialize(instance)
         if value != old:
             setattr(instance, self._attr, value)
-            bound_field = self.bound_field(instance)
+            bound_field = getattr(instance, self._attr_bound)
             bound_field.react(old , value)
 
     __delete__ = MustNotBeCalled(
@@ -279,9 +279,6 @@ class FieldManagerMeta(ABCMeta, type):
     BoundFields will be created for Fields during class creation. (__new__)
     '''
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     @classmethod
     def __prepare__(cls, name, bases):
         return FieldManagerMetaDict(name)
@@ -293,3 +290,22 @@ class FieldManagerMeta(ABCMeta, type):
         if isinstance(value, Field):
             value.set_names(self.__qualname__, attr)
         super().__setattr__(attr, value)
+
+    def __new__(cls, name, bases, namespace):
+        if BoundFieldCreatorMixin not in bases:
+            bases = bases + (BoundFieldCreatorMixin,)
+        ret = super().__new__(cls, name, bases, namespace)
+        return ret
+
+class BoundFieldCreatorMixin:
+    '''
+    Mixin to create bound fields during class initialization.
+
+    Not intended to be used directly. Classes should use the FieldManagerMeta
+    which will insert this into the bases if needed.
+    '''
+    def __new__(cls, *args):
+        self = super().__new__(cls)
+        for field in self._fields:
+            field.bound_field(self)
+        return self

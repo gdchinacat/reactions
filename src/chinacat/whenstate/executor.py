@@ -233,8 +233,7 @@ class ReactionExecutor[C: "Reactant", T]():
                 self.queue.task_done()
 
 @dataclass
-class Reactant(metaclass=FieldManagerMeta
-                  ): # todo - ReactorBase isn't a good name...fix it
+class Reactant(metaclass=FieldManagerMeta):
     '''
     Base class that allows classes to react asynchronously to predicates that
     become true.
