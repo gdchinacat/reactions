@@ -90,6 +90,8 @@ class Predicate[C, T](ABC):
             logger.debug('%s TRUE for %s %s -> %s',
                          self, bound_field, old, new)
             # todo - don't use bound_field for reaction instance (below too)
+            #        bound field will likely start tracking reactant and
+            #        instane independently. Soon.
             reaction_executor = bound_field.instance._reaction_executor
             reaction_executor.react(reaction,
                                     bound_field.instance,

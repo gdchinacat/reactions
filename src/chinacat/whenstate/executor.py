@@ -43,8 +43,10 @@ class ReactionExecutor[C: "Reactant", T]():
     ReactionExecutor executes reactions submitted by Reactants. It is separate
     from Reactant to allow multiple reactants to share the same executor to
     allow the executor to act as a means of providing other reactions
-    consistent views of the fields managed by the executor. (todo figure out
-    exactly how this management happens)
+    consistent views of the fields managed by the executor.
+    todo - figure out exactly how this management happens). 
+    todo - move start/stop from Reactant? Force users to manage
+           ReactionExecutors? Part of cleaning up the tight coupling.
 
     ReactionExecutor has a queue and a task. The queue contains the coroutines
     for the reactions to execute, while the task drains the queue and executes
