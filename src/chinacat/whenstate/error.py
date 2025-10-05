@@ -6,8 +6,8 @@ from typing import Any, Callable, Optional, NoReturn
 
 __all__ = ['MustNotBeCalled', 'ReactionMustNotBeCalled',
            'ExecutorError', 'ExecutorNotStarted', 'ExecutorAlreadyStarted',
-           'ExecutorAlreadyComplete', 'ExecutorHasPendingReactions',
-           'PredicateError', 'InvalidPredicateExpression', ]
+           'ExecutorAlreadyComplete', 'PredicateError',
+           'InvalidPredicateExpression', ]
 
 
 class MustNotBeCalled(RuntimeError):
@@ -74,20 +74,6 @@ class ExecutorAlreadyComplete(ExecutorError):
     '''
     Error indicating the state has already been completed when an attempt
     to complete it was made.
-    '''
-
-class ExecutorHasPendingReactions(ExecutorError):
-    '''
-    ExecutorHasPendingReactions is raised when a state is stop()'ed while it has
-    reactions that have not yet executed.
-    TODO - provide guidance on how to implement things so you *don't* have
-    pending reactions. The problem is best illustrated by a state field that
-    counts by incrementing the same field it uses as a predicate. In this case
-    the reaction will always be both executing and pending since the executing
-    calls task will be pending and will enqueue another execution. There is
-    never a time when there isn't one pending reaction. Models that are self
-    driven must always have at least one pending reaction or they will cease to
-    be self driven.
     '''
 
 class FieldConfigurationError(RuntimeError):
