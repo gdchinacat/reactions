@@ -19,7 +19,10 @@ class Watched(Reactant):
     ticks: Field[Watched, Optional[int]] = Field(None)
 
     @ ticks == 5
-    async def done(self, *_):
+    # todo - Field[..., bool] is wrong...why aren't type checkers detecting it
+    async def done(self, field_: Field[Watched, bool], old: int, new:int):
+        assert field_
+        assert old != new
         self.ticks = None
         self.stop()
 
