@@ -77,10 +77,6 @@ class Test(TestCase):
         asyncio.run(watched.run())
 
         # todo - use watcher.ticks_seen
-        # todo - last_tick is not included because the Watched.done(() reaction
-        # happens first and it stops the executor with the final watcher()
-        # reaction still queue). TODO - need to either complete execution of
-        # pending reactions or move these before the reaction that calls done()
         self.assertEqual(ticks_seen, list(range(watched.last_tick + 1)))
 
 
