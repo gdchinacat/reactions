@@ -57,7 +57,6 @@ class Predicate[C, T](ABC):
 
     Predicates can be used to decorate a function to schedule it to be run
     when the Predicate becomes True.
-    TODO - should the async move into predicate?
     '''
     @property
     @abstractmethod
