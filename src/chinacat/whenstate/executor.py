@@ -190,6 +190,17 @@ class ReactionExecutor[C: "Reactant", T]():
         '''
         while True:
             try:
+                # TODO - get rid of everything but the coro:
+                #        id_ and args are only for "calling" log
+                #            replace with fmt string that the various logs for
+                #            a specific reaction pass around and things fill
+                #            in the action pertaining to the reaction:
+                #        instance only used to get the logger
+                #    Maybe the solution is to enable a debug mode that passes
+                #    the details for logging and when not in debug it passes
+                #    the coro instead of everything. Maye have different
+                #    executor classes that can be chosen (i.e. "give me speed"
+                #    vs "give me insight").
                 (id_, instance, coro, args) = await self.queue.get()
             except QueueShutDown:
                 logger.info(f'{self} stopped')
