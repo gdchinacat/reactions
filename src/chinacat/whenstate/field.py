@@ -234,7 +234,9 @@ class BoundField[C, T](ReactionMixin):
     it is collected along with the instance. The Field should have no
     references to any instance specific information.
 
-    The reactions for BoundFields are a reference to the unbound Field.
+    The reactions for BoundFields is a reference to the unbound Field
+    reactions. Adding class reactions through a bound field would be bad, so
+    an exception is raised if reaction() is called.
     TODO - if there is a need for instance specific reactions this can be made
            more complex, but for now, simple is better.
     '''
