@@ -102,11 +102,11 @@ class Predicate[C, T](ABC):
     def __call__(self, func: AsyncReaction[C, T]
                 )->ReactionMustNotBeCalled:
         '''
-        Call the decorated method when the predicate becomes True.
+        Predicates are decorators that arrange for the decorated method to be
+        called when the predicate becomes True.
 
         For example:
-            # State is a class with Field a and b.
-            @ State.a != State.b
+            @ State.a != State.b  # State.a, .b are Field, != creates predicate
             async def ...
             
         Decorate a function to register it for execution when the predicate
