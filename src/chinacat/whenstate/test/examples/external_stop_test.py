@@ -34,7 +34,17 @@ class ExternalStopTest(TestCase):
         counter = Counter()
         
         count_to = 5
-        @ Counter.count == count_to  # todo - should be on counter.count BoundField
+
+        # todo - Counter.count will apply the reaction any Counter instance
+        #        that reaches count_to. Not a problem with just one Counter
+        #        but if another Counter was being used concurrently (tests in
+        #        parallel) it could confuse this. Essentially the same problem
+        #        with globals because Couner.count is essentially a global.
+        #        Need a way to apply it to only counter.
+        #        @ Counter.count[counter] == count_to
+        #            - create a bound predicate where Counter instance is
+        #              the bound field and predicate is bound to counter?
+        @ Counter.count == count_to
         async def stop(*args):
             counter.done = True
             

@@ -115,8 +115,6 @@ class ReactantTest(TestCase):
             await state.infinite_loop_running
             state.stop(.1)
             with self.assertRaises(CancelledError):
-                # todo - the CancelledError comes from the asynctest timeout,
-                #        which is not what we want.
                 await complete
 
     def test_defined_state_fields_are_named(self):
