@@ -127,17 +127,21 @@ class ReactantTest(TestCase):
     async def test_added_fields_are_named(self):
         '''fields added to a Reactant subclass after definition are named'''
         obj = object()
-        State.foo = Field(obj)
-        try:
-            # test that it got named properly
-            self.assertEqual("State", State.foo.classname)
-            self.assertEqual("foo", State.foo.attr)
+        class _State(State): ...
+        _State.foo = Field(obj)
 
-            # And that it functions as a field.
-            state = State()
-            self.assertIs(obj, state.foo)
-        finally:
-            del State.foo
+        # Verify that it got named and tracked properly.
+        self.assertEqual(_State.__qualname__, _State.foo.classname)
+        self.assertEqual("foo", _State.foo.attr)
+
+        # assertIn() creates an In predicate and fails, check the new field
+        # is in the classes list of fields.
+        self.assertTrue(any(state is _State.foo
+                            for state in  _State._fields))
+
+        # And that it functions as a field.
+        state = _State()
+        self.assertIs(obj, state.foo)
 
 
 if __name__ == "__main__":

@@ -89,6 +89,16 @@ class ExecutorHasPendingReactions(ExecutorError):
     driven must always have at least one pending reaction or they will cease to
     be self driven.
     '''
+
+class FieldConfigurationError(RuntimeError):
+    '''Error indicating a field definition or management is improper.'''
+
+class FieldAlreadyBound(FieldConfigurationError):
+    '''
+    Internal error indicating an instance already has a binding for a Field.
+    Users aren't responsible and shouldn't need to bind fields directly. It
+    indicates the FieldBinder has a fault.
+    '''
     
 
 class PredicateError(RuntimeError): ...

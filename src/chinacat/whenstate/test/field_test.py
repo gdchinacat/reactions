@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from typing import Tuple, List, Any, Optional, NoReturn
 from unittest import TestCase, main
 
-from ..error import MustNotBeCalled
+
+from ..error import (MustNotBeCalled , FieldAlreadyBound,
+                     FieldConfigurationError)
 from ..field import Field, BoundField, FieldManagerMeta
 from ..predicate import Predicate, Contains, Not, Or, And
 
@@ -112,6 +114,18 @@ class TestField(TestCase):
             # how the predicate can be used directly.
             _ = C.field_a in C.field_b
         self.assertTrue(Contains(C.field_b, C.field_a).evaluate(c))
+
+    def test_field_already_bound(self) -> None:
+        C = create_class()
+        with self.assertRaises(FieldAlreadyBound):
+            assert C.field_a
+            C.field_a._bind(C())
+
+    def test_bound_field_specific_reactions_not_permitted(self) -> None:
+        C = create_class()
+        with self.assertRaises(FieldConfigurationError):
+            async def reaction(*args): ...
+            C()._field_a_bound.reaction(reaction)
 
 
 if __name__ == '__main__':

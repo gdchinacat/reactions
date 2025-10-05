@@ -5,9 +5,10 @@ from __future__ import annotations
 
 from abc import ABC, ABCMeta
 from itertools import count
-from typing import List, Any, Dict, Optional
+from typing import List, Any, Dict, Optional, Tuple
 
-from .error import MustNotBeCalled
+from .error import (MustNotBeCalled, FieldAlreadyBound,
+                    FieldConfigurationError)
 from .predicate import (_Field, Reaction, BinaryPredicate,
                          Eq, Ne, Lt, Le, Gt, Ge, And, Or)
 
@@ -97,18 +98,31 @@ class Field[C, T](ReactionMixin, _Field):
         '''
         return id(self)
 
-    def _create_bound_field(self, instance: C):
+    def _bind(self, nascent_instance: C):
         '''
-        Get or create the BoundField for this field on the given instance.
+        Create a BoundField on instance.
+        nascent_instance:
+            the Reactant that reactions are called on (reaction(self, ...))
+            todo - saying it this way makes me realize the instance I've
+            been struggling with figuring out how to identify is an
+            aspect of the field. Specifically, the bound field. It needs
+            to associate (field, attribute, old, new) with what object
+            is the self for reaction(self, (field, attr,. ..)).
 
-        TODO - this is in critical path and shouldn't exist...instance
-        initialization should create a field the descriptor can use without
-        the need for this method.
+            Beware: field._bind(nascent_instance) called during __new__()
+            before it has been initialized (hence its name). While it goes
+            without saying that instance attributes not managed by Field,
+            FieldManagerMixin, etc should not be acessed since they may not
+            exist and if they do the values have not been initialized, what
+            isn't so obvious is *do not* call str() or repr() on instance
+            as they are likely to fail before the object is initialized.
         '''
-        assert not hasattr(instance, self._attr_bound), \
-            f'{self} already bound to {instance}'
-        bound_field = BoundField[C, T](instance, self)
-        setattr(instance, self._attr_bound, bound_field)
+        if (hasattr(nascent_instance, self._attr_bound)):
+            raise FieldAlreadyBound(
+                f'{self} already bound to object '
+                f'id(instance)={id(nascent_instance)}')
+        bound_field = BoundField[C, T](nascent_instance, self)
+        setattr(nascent_instance, self._attr_bound, bound_field)
 
     def evaluate(self, instance: C) -> Optional[T]:
         try:
@@ -220,21 +234,26 @@ class BoundField[C, T](ReactionMixin):
     it is collected along with the instance. The Field should have no
     references to any instance specific information.
 
-    The reactions for BoundFields are the *same* as for the unbound Field.
+    The reactions for BoundFields are a reference to the unbound Field.
     TODO - if there is a need for instance specific reactions this can be made
            more complex, but for now, simple is better.
     '''
 
     def __init__(self,
-                 instance: C,
+                 nascent_instance: C,
                  field: Field[C, T], *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.field: Field[C, T] = field
-        self.instance: C = instance
+        self.instance: C = nascent_instance
         self.reactions = field.reactions
 
+    def reaction(self, reaction:Reaction[C, T]):
+        raise FieldConfigurationError(
+            'BoundField specific reactions are not supported, but could be.')
+
     def __str__(self):
-        return f"{self.field.classname}({id(self.instance)}).{self.field}"
+        return (f'{self.field.classname}({id(self.instance)})'
+                f'.{self.field}')
     __repr__ = __str__
 
 
@@ -243,19 +262,19 @@ class FieldManagerMetaDict(dict[str, Any]):
     A dict that is used by FieldManagerMeta for class creation. It names Field
     members and tracks them in a list of the class.
 
-    The list of fields is unused. It was part of work that was abandoned but it
-    seems useful and low cost so it has been left in. It can be used, or not,
-    and if not long term should probably be removed.
+    A _fields member is added to the class. It is a tuple of Field attributes
+    the class has. It is used to track which fields need to be bound on
+    instance creation. It is a tuple to discourage modification.
     '''
 
     def __init__(self, classname: str):
         self.classname = classname
-        self['_fields'] = list[Field]()
+        self['_fields'] = tuple[Field]()
 
     def __setitem__(self, attr: str, value: Any)->None:
         if isinstance(value, Field):
             value.set_names(self.classname, attr)
-            self['_fields'].append(value)
+            self['_fields'] = self['_fields'] + (value,)
         super().__setitem__(attr, value)
 
 
@@ -274,16 +293,19 @@ class FieldManagerMeta(ABCMeta, type):
     BoundFields will be created for Fields during class creation. (__new__)
     '''
 
+    _fields: Tuple[Field, ...]
+
     @classmethod
     def __prepare__(cls, name, bases):
         return FieldManagerMetaDict(name)
 
     def __setattr__(self, attr: str, value: Any):
         '''
-        Intercept calls to set attributes on instances to name Field members.
+        Intercept calls to name Field attributes that are set on the class.
         '''
         if isinstance(value, Field):
             value.set_names(self.__qualname__, attr)
+            self._fields = self._fields + (value,)
         super().__setattr__(attr, value)
 
     def __new__(cls, name, bases, namespace):
@@ -300,7 +322,7 @@ class BoundFieldCreatorMixin:
     which will insert this into the bases if needed.
     '''
     def __new__(cls, *args):
-        self = super().__new__(cls)
-        for field in self._fields:
-            field._create_bound_field(self)
-        return self
+        nascent = super().__new__(cls)
+        for field in nascent._fields:
+            field._bind(nascent)
+        return nascent
