@@ -23,7 +23,7 @@ class Counter(Reactant):
 
     @ count >= 0
     async def loop(self,
-                   field: Field[Counter, int],
+                   _: Field[Counter, int],
                    old: int, new:int) -> None:  # @UnusedVariable
         assert old + 1 == new, f"count error {old} + 1 != {new}"
         if self.count == self.count_to:

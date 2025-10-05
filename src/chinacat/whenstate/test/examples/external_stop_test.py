@@ -20,7 +20,7 @@ class Counter(Reactant):
     
     @ And(count >= 0,
           done == False)
-    async def _count(self, field, old, new):
+    async def _count(self, *_):
         if not self.done:
             self.count += 1
 
@@ -45,7 +45,8 @@ class ExternalStopTest(TestCase):
         #            - create a bound predicate where Counter instance is
         #              the bound field and predicate is bound to counter?
         @ Counter.count == count_to
-        async def stop(*args):
+        @staticmethod
+        async def stop(*_):
             counter.done = True
             
         await counter.start()

@@ -23,11 +23,11 @@ logger = logging.getLogger("whenstate.predicate")
 EMPTY_ITERATOR = () # singleton iterator that contains nothing
 type BoundField[C, T] = TypeAlias
 type Reaction[C, T] = Callable[[BoundField[C, T], T, T], None]
-type BoundReaction[C, R] = Callable[[C,                   # cls
-                                  BoundField[C, Any],     # bound_field
-                                  Any,                    # old
-                                  Any],                   # new
-                                 R]                       # return None
+type BoundReaction[C, R] = Callable[[C,                      # cls
+                                     BoundField[C, Any],     # bound_field
+                                     Any,                    # old
+                                     Any],                   # new
+                                    R]                       # return None
 type AsyncReaction[C, T] = Callable[[C, BoundField[C, T], T, T],
                                     Coroutine[None, None, None]]
 
@@ -171,7 +171,13 @@ class Constant[C, T](Predicate[C, T]):
 
 
 class OperatorPredicate[P, C](Predicate[C, bool], ABC):
-    '''predicate that uses an operator for its logic'''
+    '''
+    Predicate that uses an operator for its logic.
+
+    Generic Types:
+        P - the type of the predicate
+        C - the type of class the predicate is for
+    '''
 
     operator: Callable[..., bool]
 

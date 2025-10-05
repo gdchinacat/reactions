@@ -4,7 +4,7 @@ An example showing how a class can watch a state for changes.
 from __future__ import annotations
 
 import asyncio
-from typing import List, Any, Optional
+from typing import List, Optional
 from unittest import TestCase, main
 
 from ... import Field, Reactant
@@ -19,12 +19,12 @@ class Watched(Reactant):
     ticks: Field[Watched, Optional[int]] = Field(None)
 
     @ ticks == 5
-    async def done(self, field: Field[Any, bool], old: int, new: int):
+    async def done(self, *_):
         self.ticks = None
         self.stop()
 
     @ ticks != -1
-    async def tick(self, field, old: int, new: int):
+    async def tick(self, *_):
         if self.ticks is not None:
             self.ticks += 1
 
@@ -59,7 +59,7 @@ class Watcher(Reactant):
     @ (Watched.ticks != None)
     @staticmethod
     async def watcher(watched: Watched,
-                field: Field[Watched, int],
+                _: Field[Watched, int],
                 old: int, new: int):
         # todo - use self.logger, once self is provided
         watched._logger.log(VERBOSE,

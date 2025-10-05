@@ -4,10 +4,9 @@ Asynchronous reaction executor.
 from __future__ import annotations
 
 from abc import abstractmethod
-from asyncio import (Queue, Task, create_task, QueueShutDown, Future, sleep,
+from asyncio import (Queue, Task, create_task, QueueShutDown, sleep,
                      get_event_loop)
 from dataclasses import dataclass, field
-from functools import partial
 from itertools import count
 from logging import Logger, getLogger
 from typing import Callable, Any, Optional, Coroutine, Tuple, Awaitable
