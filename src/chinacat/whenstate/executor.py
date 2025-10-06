@@ -6,24 +6,23 @@ from __future__ import annotations
 from abc import abstractmethod
 from asyncio import (Queue, Task, create_task, QueueShutDown, sleep,
                      get_event_loop)
+from asyncio.exceptions import CancelledError
 from dataclasses import dataclass, field
 from itertools import count
 from logging import Logger, getLogger
 from typing import Any, Optional, Tuple, Awaitable
 
-from .annotations import ReactionCoroutine, PredicateReaction
+from .base_field import BaseField, FieldManagerMeta
 from .error import (ExecutorAlreadyStarted, ExecutorNotStarted,
                     ExecutorAlreadyComplete)
-from .field import Field, FieldManagerMeta
 from .logging_config import VERBOSE
-from asyncio.exceptions import CancelledError
+from .predicate import ReactionCoroutine, PredicateReaction
 
 
 __all__ = ['Reactant']
 
 
 logger: Logger = getLogger('whenstate.executor')
-
 
 # TODO - ReactionExecutor and Reactant are very tightly coupled and should be
 #        better encapsulated. The done-ness of the Reactant is entirely
@@ -97,7 +96,7 @@ class ReactionExecutor():
     def react[T](reaction: PredicateReaction,
               instance,
               # TODO - should be the instance of the class that defined the reaction, not the instance of the class that field change triggered reaction
-              field: Field[T],
+              field: BaseField[T],
               old: T, new: T) -> None:
         '''reaction that asynchronously executes the reaction'''
         # The weirdness of this being a @staticmethod that gets its self from

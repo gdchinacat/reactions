@@ -6,8 +6,10 @@ from unittest import TestCase, main
 
 from ..error import (MustNotBeCalled, FieldAlreadyBound,
                      FieldConfigurationError)
-from ..field import Field, BoundField, FieldManagerMeta
-from ..predicate import Predicate, Contains, Not, Or, And
+from ..base_field import BoundField, FieldManagerMeta
+from ..field import Field
+from ..predicate import Predicate
+from ..predicate_types import Contains, Not, Or, And
 
 
 class Base(metaclass=FieldManagerMeta):

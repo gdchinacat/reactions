@@ -7,27 +7,38 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import partial
 import logging
-import operator
-from typing import Any, Callable, Type, Iterable
+from typing import Any, Callable, Type, Iterable, Coroutine, Optional, List
 
-from chinacat.whenstate.annotations import _Evaluatable, HasNoFields
-
-from .annotations import PredicateReaction, _Field, _Predicate, _Reactant
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
+from .base_field import BaseField, HasNoFields, Evaluatable
 from .logging_config import VERBOSE
 
 
-__all__ = ['Predicate', 'Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
-           'Contains', 'BinaryAnd', 'BinaryOr', 'Constant']
+__all__ = ['Constant']
 
 
 logger = logging.getLogger("whenstate.predicate")
 
 
+type ReactionCoroutine = Coroutine[None, None, None]
+type PredicateReaction[T] = Callable[[Any, BaseField[T], T, T],
+                                     ReactionCoroutine]
+
+'''
+A _Reactant method that is called asynchronously when a _Predicate value
+changes.
+
+Predicate reactions are processed asynchronously and require the type that
+defines them be a _Reactant so the reaction can be scheduled with the
+_ReactionExecutor for the _Reactant.
+'''
+
+
 @dataclass
-class Predicate(_Predicate, ABC):
+class Predicate(Evaluatable[bool], ABC):
     '''
     Predicate evaluates expressions.
+    T - the type the predicate evaluates to
     TODO - give Predicate a type for the fields they use. Complicated by the
            fact that a predicate can use fields of different type:
                And(str_field == 'foo',
@@ -44,26 +55,21 @@ class Predicate(_Predicate, ABC):
     '''
 
     #####################
-    # Abstract methods defined on HasFields and _Evaluatable. Not sure why
+    # Abstract methods defined on HasFields and Evaluatable. Not sure why
     # they need to be redeclared here since this derives from them.
     # todo - figure out why they are required and remove them?
     #####################
-    @property
-    @abstractmethod
-    def fields(self) -> Iterable[_Field]:
-        raise NotImplementedError()
-
-    @abstractmethod
-    def evaluate(self, instance: Any) -> bool:
-        '''evaluate the predicate against the given model'''
-        raise NotImplementedError()
+#    @abstractmethod
+#    def evaluate(self, instance: Any) -> bool:
+#        '''evaluate the predicate against the given model'''
+#        raise NotImplementedError()
     #####################
     # End abstract protocol field redeclarations.
     #####################
 
     def react(self,
-              instance: _Reactant,
-              field: _Field,
+              instance: Any,
+              field: BaseField,
               old: Any,
               new: Any,
               *,
@@ -139,8 +145,8 @@ class Predicate(_Predicate, ABC):
 
 
 @dataclass
-class Constant[T](_Evaluatable[T], HasNoFields):
-    '''An _Evaluatable that always evaluates to it's value.'''
+class Constant[T](HasNoFields, Evaluatable[T]):
+    '''An Evaluatable that always evaluates to it's value.'''
     value: T
 
     def __eq__(self, other) -> bool:
@@ -171,34 +177,37 @@ class OperatorPredicate(Predicate, ABC):
     def factory[T](cls: Type[T],
                    name: str,
                    token: str,
-                   op: Callable[..., bool]
+                   op: Callable[..., bool],
+                   module_all: Optional[List[str]] = None,
                   ) -> Type[T]:
         '''
         Create a Predicate class using the given op. token is for str/repr
         and has no other use.
-        The generated class is exported from the module through __all__.
+        The generated class name is appended to module_all to export it from
+        the module.
         '''
 
         ret = type(name,
                    (cls, ),
                    {'token': token,
                     'operator': op})
-        __all__.append(name)
+        if module_all is not None:
+            module_all.append(name)
         return ret
 
 
 @dataclass
 class UnaryPredicate(OperatorPredicate, ABC):
     '''Predicate that has a single operand.'''
-    expression: _Evaluatable
+    expression: Evaluatable
 
-    def __init__(self, expression: _Evaluatable | Any):
-        if not isinstance(expression, _Evaluatable):
+    def __init__(self, expression: Evaluatable | Any):
+        if not isinstance(expression, Evaluatable):
             expression = Constant(expression)
         self.expression = expression
 
     @property
-    def fields(self) -> Iterable[_Field]:
+    def fields(self) -> Iterable[BaseField]:
         yield from self.expression.fields
 
     def evaluate(self, instance):
@@ -210,22 +219,23 @@ class UnaryPredicate(OperatorPredicate, ABC):
 
 class BinaryPredicate(OperatorPredicate, ABC):
     '''Predicate that has two operands.'''
-    left: _Evaluatable
-    right: _Evaluatable
+    left: Evaluatable
+    right: Evaluatable
 
     def __init__(self,
-                 left: _Evaluatable | Any,
-                 right: _Evaluatable | Any):
-        # Everything that isn't an _Evaluatable is treated as a constant.
+                 left: Evaluatable | Any,
+                 right: Evaluatable | Any):
+        # Everything that isn't an Evaluatable is treated as a constant.
         # This may need to be reevaluated, but it helps with the fields()
         # logic for now.
         super().__init__()
-        self.left = left if isinstance(left, _Evaluatable) else Constant(left)
-        self.right = right if isinstance(right, _Evaluatable) else Constant(right)
-
+        self.left = (left if isinstance(left, Evaluatable) 
+                          else Constant(left))
+        self.right = (right if isinstance(right, Evaluatable)
+                            else Constant(right))
 
     @property
-    def fields(self) -> Iterable[_Field]:
+    def fields(self) -> Iterable[BaseField]:
         yield from self.left.fields
         yield from self.right.fields
 
@@ -240,21 +250,3 @@ class BinaryPredicate(OperatorPredicate, ABC):
         None, 
         "'Predicate and Predicate' not supported, use "
         "'And(Predicate, Predicate)' instead")
-
-
-Not = UnaryPredicate.factory('Not', '!not!', operator.not_)
-And = BinaryPredicate.factory('And', '!and!', lambda _, a, b: a and b)
-Or = BinaryPredicate.factory('Or', 'or', lambda _, a, b: a or b)
-Eq: Type[BinaryPredicate] = BinaryPredicate.factory('Eq', '==', operator.eq)
-Ne = BinaryPredicate.factory('Ne', '!=', operator.ne)
-Lt = BinaryPredicate.factory('Lt', '<', operator.lt)
-Le = BinaryPredicate.factory('Le', '<=', operator.le)
-Gt = BinaryPredicate.factory('Gt', '>', operator.gt)
-Ge = BinaryPredicate.factory('Ge', '>=', operator.ge)
-Contains = BinaryPredicate.factory('Contains','contains', operator.contains)
-
-# BinaryAnd and BinaryOr aren't strictly predicates since they don't evaluate
-# to a bool. Still useful, so included.
-BinaryAnd = BinaryPredicate.factory('BinaryAnd', '&', operator.and_)
-BinaryOr = BinaryPredicate.factory('BinaryOr', '|', operator.or_)
-

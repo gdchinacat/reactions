@@ -22,32 +22,26 @@ class Counter(Reactant):
 
 '''
 
-# Import order is:
-# __init__
-#    -> everything to republish it
-#    -> executor
-#        -> annotations, error, logging_config
-#        -> field
-#            -> annotations, error
-#            -> predicate
-#                -> annotations, error, logging_config
-
-
-from . import annotations
+from . import base_field
 from . import error
 from . import executor
 from . import field
 from . import logging_config  # todo - libraries shouldn't configure logging.
 from . import predicate
-from .annotations import *
+from . import predicate_types
+from .base_field import *
 from .error import *
 from .executor import *
 from .field import *
 from .predicate import *
+from .predicate_types import *
 
 
-__all__ = (annotations.__all__ +
+__all__ = (
+           base_field.__all__ +
            error.__all__ +
            executor.__all__ +
            field.__all__ +
-           predicate.__all__)
+           predicate.__all__ +
+           predicate_types.__all__ +
+          [])
