@@ -2,6 +2,10 @@
 Annotation types. Defines the interfaces for the entities.
 
 Everything can import this.
+
+It's not strictly type annotations. There is some basic functionality here such
+as HasNoFields returns EMPTY_ITERATOR, and _Field returns itself as the only
+field.
 '''
 from __future__ import annotations
 
@@ -19,8 +23,6 @@ EMPTY_ITERATOR = () # singleton empty sequence
 type ReactionCoroutine = Coroutine[None, None, None]
 
 
-# todo - verify that all of these protocols are still needed now that things
-#        have been cleaned up a bunch.
 class FieldReaction[T](Protocol):
     '''A method that is called when a _Field value changes.'''
     def __call__(self,

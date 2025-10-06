@@ -7,7 +7,7 @@ from abc import ABC, ABCMeta
 from itertools import count
 from typing import List, Any, Dict, Optional, Tuple
 
-from .annotations import _Field, FieldReaction
+from .annotations import FieldReaction
 from .error import (MustNotBeCalled, FieldAlreadyBound,
                     FieldConfigurationError)
 from .predicate import (Predicate, Eq, Ne, Lt, Le, Gt, Ge, And, Or)
@@ -33,7 +33,7 @@ class ReactionMixin(ABC):
         '''
         self._reactions.append(reaction)
 
-    def react[T](self, instance: Any, field: _Field[T], old: T, new: T):
+    def react[T](self, instance: Any, field: Field[T], old: T, new: T):
         '''
         Notify the reactions that the value changed from old to new.
         '''
@@ -41,7 +41,7 @@ class ReactionMixin(ABC):
             reaction(instance, field, old, new)
 
 
-class Field[T](ReactionMixin, _Field[T]):
+class Field[T](ReactionMixin):
     '''
     An instrumented field.
     - C: is the type of the object the field is a member of
