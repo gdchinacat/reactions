@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from typing import Any
 from unittest import TestCase, main
 
 from ... import Field, Reactant
@@ -15,15 +16,15 @@ class Counter(Reactant):
     specified value.
     '''
 
-    count_to: Field[Counter, int] = Field(0)
-    count: Field[Counter, int] = Field(-1)
+    count_to: Field[int] = Field(0)
+    count: Field[int] = Field(-1)
     
     def _start(self) -> None:
         self.count = 0
 
     @ count >= 0
     async def loop(self,
-                   _: Field[Counter, int],
+                   _: Field[int],
                    old: int, new:int) -> None:  # @UnusedVariable
         assert old + 1 == new, f"count error {old} + 1 != {new}"
         if self.count == self.count_to:

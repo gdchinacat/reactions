@@ -13,8 +13,8 @@ from ..async_helpers import asynctest
 
 
 class Counter(Reactant):
-    done: Field[Counter, bool] = Field(False)
-    count: Field[Counter, int] = Field(-1)
+    done = Field[bool](False)
+    count = Field[int](-1)
 
     (done == True)(Reactant.astop)  # stop the executor when done
     

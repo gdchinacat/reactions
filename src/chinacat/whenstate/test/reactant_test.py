@@ -6,11 +6,12 @@ from __future__ import annotations
 from asyncio import Future, CancelledError, sleep
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Optional, AsyncIterator, Tuple, Awaitable
+from typing import Optional, AsyncIterator, Tuple, Awaitable, Coroutine
 from unittest import TestCase, main
 
 from .. import (ReactionMustNotBeCalled, ExecutorAlreadyComplete,
                  ExecutorAlreadyStarted, Field, Reactant)
+from ..annotations import _Field, ReactionCoroutine
 from .async_helpers import asynctest
 
 
@@ -20,8 +21,8 @@ class State(Reactant):
     Kitchen sink state machine for testing various aspects of State.
     '''
 
-    exception: Field[State, Optional[Exception]] = Field()
-    infinite_loop: Field[State, bool] = Field(False)
+    exception = Field[Optional[Exception]]()
+    infinite_loop  = Field[bool](False)
     infinite_loop_running: Future[None] = field(default_factory=Future)
     
     def _start(self) -> None:
@@ -29,14 +30,14 @@ class State(Reactant):
 
     @ exception != None
     async def _exception(self,
-             field: Field[State, int],
+             field: _Field[int],
              old: int, new:int) -> None:  # @UnusedVariable
         '''raise an exception'''
         raise self.exception
 
     @ infinite_loop == True
     async def _infinite_interuptable_loop(self,
-             field: Field[State, int],
+             field: _Field[int],
              old: int, new:int) -> None:  # @UnusedVariable
         '''enter an infinite loop. Currently no way to exit it.'''
         assert self.infinite_loop_running is not None

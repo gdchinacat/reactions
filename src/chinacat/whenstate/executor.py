@@ -9,11 +9,12 @@ from asyncio import (Queue, Task, create_task, QueueShutDown, sleep,
 from dataclasses import dataclass, field
 from itertools import count
 from logging import Logger, getLogger
-from typing import Callable, Any, Optional, Coroutine, Tuple, Awaitable
+from typing import Any, Optional, Tuple, Awaitable
 
+from .annotations import ReactionCoroutine, PredicateReaction
 from .error import (ExecutorAlreadyStarted, ExecutorNotStarted,
                     ExecutorAlreadyComplete)
-from .field import BoundField, Field, FieldManagerMeta
+from .field import Field, FieldManagerMeta
 from .logging_config import VERBOSE
 from asyncio.exceptions import CancelledError
 
@@ -24,20 +25,13 @@ __all__ = ['Reactant']
 logger: Logger = getLogger('whenstate.executor')
 
 
-type AsyncReaction[C, T] = Callable[[C, Field[C, T], T, T],
-                                    Coroutine[None, None, None]]
-'''
-AsyncReaction is the type for functions that implement reactions.
-'''
-
-
 # TODO - ReactionExecutor and Reactant are very tightly coupled and should be
 #        better encapsulated. The done-ness of the Reactant is entirely
 #        controlled by ReactionExecutor.complete, which shadows the task
 #        future and may be able to be cleaned up. This may remove the need for
 #        the task done callbacks. Executor and Reactant are separate entities
 #        to allow reactants to share executors to provide concurrency control.
-class ReactionExecutor[C: "Reactant", T]():
+class ReactionExecutor():
     '''
     ReactionExecutor executes reactions submitted by Reactants. It is separate
     from Reactant to allow multiple reactants to share the same executor to
@@ -67,7 +61,7 @@ class ReactionExecutor[C: "Reactant", T]():
     task: Optional[Task] = None
     '''the task that is processing the queue to execute reactions'''
 
-    queue: Queue[Tuple[int, C, Coroutine[None, None, T], Any]]
+    queue: Queue[Tuple[int, Any, ReactionCoroutine, Any]]
     '''
     The queue of reactions to execute.
     TODO - The Tuple has grown to the point an actual class makes sense.
@@ -100,10 +94,10 @@ class ReactionExecutor[C: "Reactant", T]():
         self.queue = Queue()
 
     @staticmethod
-    def react(reaction: AsyncReaction[C, T],
-              instance: C,
+    def react[T](reaction: PredicateReaction,
+              instance,
               # TODO - should be the instance of the class that defined the reaction, not the instance of the class that field change triggered reaction
-              bound_field: BoundField[C, T],
+              field: Field[T],
               old: T, new: T) -> None:
         '''reaction that asynchronously executes the reaction'''
         # The weirdness of this being a @staticmethod that gets its self from
@@ -125,11 +119,11 @@ class ReactionExecutor[C: "Reactant", T]():
         id_ = next(self._ids)
 
         try:
-            coro = reaction(instance, bound_field.field, old, new)
+            coro = reaction(instance, field, old, new)
             self.queue.put_nowait((id_,
-                                   bound_field.instance,
+                                   instance,
                                    coro,
-                                   (bound_field, old, new)))
+                                   (field, old, new)))
             instance._logger.log(VERBOSE,
                 '%d scheduled %s(..., %s,  %s)',
                 id_, reaction.__qualname__, old, new)
@@ -348,7 +342,7 @@ class Reactant(metaclass=FieldManagerMeta):
         self._reaction_executor.stop(timeout)
         self._logger.debug(f'{self} stopping.')
 
-    async def astop(self, *args) -> None:
+    async def astop(self, *_) -> None:
         '''
         Async stop:
         (done == True)(Reactant.astop)

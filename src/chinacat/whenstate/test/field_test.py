@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple, List, Any, Optional, NoReturn
+from typing import Tuple, List, Optional, NoReturn
 from unittest import TestCase, main
 
-
-from ..error import (MustNotBeCalled , FieldAlreadyBound,
+from ..error import (MustNotBeCalled, FieldAlreadyBound,
                      FieldConfigurationError)
 from ..field import Field, BoundField, FieldManagerMeta
 from ..predicate import Predicate, Contains, Not, Or, And
@@ -15,8 +14,8 @@ class Base(metaclass=FieldManagerMeta):
     '''
     exists solely to give create_class() a base class for type annotations
     '''
-    field_a: Optional[Field[Any, Optional[bool | int]]] = None
-    field_b: Optional[Field[Any, Optional[bool | int]]] = None
+    field_a: Optional[Field[Optional[bool | int]]] = None
+    field_b: Optional[Field[Optional[bool | int]]] = None
     def __init__(self,
                  a: Optional[bool | int] = None,
                  b: Optional[bool | int] = None) -> NoReturn:
@@ -25,8 +24,8 @@ class Base(metaclass=FieldManagerMeta):
 def create_class() -> type[Base]:
     @dataclass
     class C(Base):
-        field_a: Field[C, Optional[bool | int]] = Field(None, 'C', 'field_a')
-        field_b: Field[C, Optional[bool | int]] = Field(None, 'C', 'field_b')
+        field_a: Field[Optional[bool | int]] = Field(None, 'C', 'field_a')
+        field_b: Field[Optional[bool | int]] = Field(None, 'C', 'field_b')
     return C
 
 class TestField(TestCase):
@@ -51,11 +50,11 @@ class TestField(TestCase):
 
         # set a notification on c.field_a to call print
         reaction_called = False
-        def reaction(field: BoundField[C, bool],
+        def reaction(instance: C, field: BoundField[C, bool],
                      old: bool, new: bool):
             nonlocal reaction_called
             reaction_called = True  # @UnusedVariable - it really is used
-            self.assertEqual((field.instance, field.field, old, new),
+            self.assertEqual((instance, field, old, new),
                              (c, C.field_a, True, False))
             pass
         C.field_a.reaction(reaction)
@@ -69,7 +68,7 @@ class TestField(TestCase):
     def test_edge_triggered_notify(self) -> None:
         C = create_class()
         changes: List[Tuple[bool, bool]] = list[Tuple[bool, bool]]()
-        def collect(_: BoundField[Any, bool], old: bool, new: bool):
+        def collect(instance, field: Field[bool], old: bool, new: bool):
             changes.append((old, new))
 
         c: type[Base] = C()

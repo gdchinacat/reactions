@@ -4,7 +4,7 @@ An example showing how a class can watch a state for changes.
 from __future__ import annotations
 
 import asyncio
-from typing import List, Optional
+from typing import List
 from unittest import TestCase, main
 
 from ... import Field, Reactant
@@ -15,12 +15,13 @@ from dataclasses import dataclass, field
 
 @dataclass
 class Watched(Reactant):
-    last_tick: Field[Watched, int] = Field(5)
-    ticks: Field[Watched, Optional[int]] = Field(None)
+    last_tick = Field[int](5)
+    ticks = Field[int](-1)
 
     @ ticks == 5
     # todo - Field[..., bool] is wrong...why aren't type checkers detecting it
-    async def done(self, field_: Field[Watched, bool], old: int, new:int):
+    #    right now because it takes *args and *kwargs 
+    async def done(self, field_: Field[bool], old: int, new:int):
         assert field_
         assert old != new
         self.ticks = None
@@ -62,7 +63,7 @@ class Watcher(Reactant):
     @ (Watched.ticks != None)
     @staticmethod
     async def watcher(watched: Watched,
-                _: Field[Watched, int],
+                _: Field[int],
                 old: int, new: int):
         # todo - use self.logger, once self is provided
         watched._logger.log(VERBOSE,

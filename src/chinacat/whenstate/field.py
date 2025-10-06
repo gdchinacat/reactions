@@ -7,39 +7,41 @@ from abc import ABC, ABCMeta
 from itertools import count
 from typing import List, Any, Dict, Optional, Tuple
 
+from .annotations import _Field, FieldReaction
 from .error import (MustNotBeCalled, FieldAlreadyBound,
                     FieldConfigurationError)
-from .predicate import (_Field, Reaction, BinaryPredicate,
-                         Eq, Ne, Lt, Le, Gt, Ge, And, Or)
+from .predicate import (Predicate, Eq, Ne, Lt, Le, Gt, Ge, And, Or)
 
 
 __all__ = ['Field', 'FieldManagerMeta']
 
-class ReactionMixin[C, T](ABC):
+
+class ReactionMixin(ABC):
     '''
     Implements the Reaction members and methods for Field and BoundField.
     '''
+    _reactions: List[FieldReaction]
 
     def __init__(self, *args: List[Any], **kwargs: Dict[str, Any]):
         super().__init__(*args, **kwargs)
-        self.reactions: List[Reaction[C, T]] = []
+        self._reactions = []
 
-    def reaction(self, reaction: Reaction[C, T]):
+    def reaction(self, reaction: FieldReaction):
         '''
         Decorator to indicate the reaction should be called when the field's
         value changes.
         '''
-        self.reactions.append(reaction)
+        self._reactions.append(reaction)
 
-    def react(self, old: T, new: T):
+    def react[T](self, instance: Any, field: _Field[T], old: T, new: T):
         '''
         Notify the reactions that the value changed from old to new.
         '''
-        for reaction in self.reactions:
-            reaction(self, old, new)
+        for reaction in self._reactions:
+            reaction(instance, field, old, new)
 
 
-class Field[C, T](ReactionMixin, _Field):
+class Field[T](ReactionMixin, _Field[T]):
     '''
     An instrumented field.
     - C: is the type of the object the field is a member of
@@ -98,7 +100,7 @@ class Field[C, T](ReactionMixin, _Field):
         '''
         return id(self)
 
-    def _bind(self, nascent_instance: C):
+    def _bind(self, nascent_instance):
         '''
         Create a BoundField on instance.
         nascent_instance:
@@ -121,10 +123,10 @@ class Field[C, T](ReactionMixin, _Field):
             raise FieldAlreadyBound(
                 f'{self} already bound to object '
                 f'id(instance)={id(nascent_instance)}')
-        bound_field = BoundField[C, T](nascent_instance, self)
+        bound_field = BoundField[T](nascent_instance, self)
         setattr(nascent_instance, self._attr_bound, bound_field)
 
-    def evaluate(self, instance: C) -> Optional[T]:
+    def evaluate(self, instance) -> Optional[T]:
         try:
             return getattr(instance, self._attr)
         except AttributeError:
@@ -159,7 +161,7 @@ class Field[C, T](ReactionMixin, _Field):
         assert owner is not None
         return self
 
-    def __set__(self, instance: C, value: T):
+    def __set__(self, instance, value: Optional[T]):
         # See comment in __get__ for handling field access. Ignore this call
         # if value is self.
         if value is self:
@@ -168,7 +170,7 @@ class Field[C, T](ReactionMixin, _Field):
         if value != old:
             setattr(instance, self._attr, value)
             bound_field = getattr(instance, self._attr_bound)
-            bound_field.react(old , value)
+            bound_field.react(instance, self, old, value)
 
     __delete__ = MustNotBeCalled(
         None, "removal of state attributes is not permitted")
@@ -177,42 +179,50 @@ class Field[C, T](ReactionMixin, _Field):
 
     ###########################################################################
     # Predicate creation operators
+    #
+    # todo - pylint too-many-function-args is disabled because it doesn't seem
+    #        to understand that they are classes.
+    # type: ignore[override]
+    #       suppress override errors on on __eq__ and __ne__ because the
+    #       builtin being overridden returns bool and these do not, so the
+    #       error is valid. However, this is what the implementation needs to
+    #       so so silence the error.
     ###########################################################################
     def __contains__(self, other) -> None:
         '''not implemented'''
         raise NotImplementedError('use Contains(self, other) instead')
 
-    def __and__(self, other) -> BinaryPredicate[C]:  # type: ignore[override]
+    def __and__(self, other) -> Predicate:
         '''create an And (&) predicate for the field'''
-        return And(self, other)  # pylint: disable=abstract-class-instantiated
+        return And(self, other)  # pylint: disable=too-many-function-args
 
-    def __or__(self, other) -> BinaryPredicate[C]:  # type: ignore[override]
+    def __or__(self, other) -> Predicate:
         '''create an Or (|) predicate for the field'''
-        return Or(self, other)  # pylint: disable=abstract-class-instantiated
+        return Or(self, other)  # pylint: disable=too-many-function-args
 
-    def __eq__(self, other) -> BinaryPredicate[C]:  # type: ignore[override]
+    def __eq__(self, other) -> Predicate:  # type: ignore[override]
         '''create an Eq (==) predicate for the field'''
-        return Eq(self, other)  # pylint: disable=abstract-class-instantiated
+        return Eq(self, other)  # pylint: disable=too-many-function-args
 
-    def __ne__(self, other) -> BinaryPredicate[C]:  # type: ignore[override]
+    def __ne__(self, other) -> Predicate:  # type: ignore[override]
         '''create an Eq predicate for the field'''
-        return Ne(self, other)  # pylint: disable=abstract-class-instantiated
+        return Ne(self, other)  # pylint: disable=too-many-function-args
 
-    def __lt__(self, other) -> BinaryPredicate[C]:  # type: ignore[override]
+    def __lt__(self, other) -> Predicate:
         '''create an Lt (<) predicate for the field'''
-        return Lt(self, other)  # pylint: disable=abstract-class-instantiated
+        return Lt(self, other)  # pylint: disable=too-many-function-args
 
-    def __le__(self, other) -> BinaryPredicate[C]:  # type: ignore[override]
+    def __le__(self, other) -> Predicate:
         '''create an Le (<=) predicate for the field'''
-        return Le(self, other)  # pylint: disable=abstract-class-instantiated
+        return Le(self, other)  # pylint: disable=too-many-function-args
 
-    def __gt__(self, other) -> BinaryPredicate[C]:  # type: ignore[override]
+    def __gt__(self, other) -> Predicate:
         '''create an Gt (>) predicate for the field'''
-        return Gt(self, other)  # pylint: disable=abstract-class-instantiated
+        return Gt(self, other)  # pylint: disable=too-many-function-args
 
-    def __ge__(self, other) -> BinaryPredicate[C]:  # type: ignore[override]
+    def __ge__(self, other) -> Predicate:
         '''create an Ge (>=) predicate for the field'''
-        return Ge(self, other)  # pylint: disable=abstract-class-instantiated
+        return Ge(self, other)  # pylint: disable=too-many-function-args
 
     # end Predicate creation operators
     ###########################################################################
@@ -226,7 +236,7 @@ class Field[C, T](ReactionMixin, _Field):
     __repr__ = __str__
 
 
-class BoundField[C, T](ReactionMixin):
+class BoundField[T](ReactionMixin):
     '''
     A field bound to a specific instance.
 
@@ -242,14 +252,14 @@ class BoundField[C, T](ReactionMixin):
     '''
 
     def __init__(self,
-                 nascent_instance: C,
-                 field: Field[C, T], *args, **kwargs) -> None:
+                 nascent_instance: Any,
+                 field: Field[T], *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.field: Field[C, T] = field
-        self.instance: C = nascent_instance
-        self.reactions = field.reactions
+        self.field: Field[T] = field
+        self.instance = nascent_instance
+        self._reactions = field._reactions
 
-    def reaction(self, reaction:Reaction[C, T]):
+    def reaction(self, reaction: FieldReaction):
         raise FieldConfigurationError(
             'BoundField specific reactions are not supported, but could be.')
 
@@ -295,6 +305,9 @@ class FieldManagerMeta(ABCMeta, type):
     BoundFields will be created for Fields during class creation. (__new__)
     '''
 
+    # _fields is initialized by FieldManagerMetaDict.__init__() since it needs
+    # to be present during the nascent stages before __init__ is called to
+    # initialize the instance.
     _fields: Tuple[Field, ...]
 
     @classmethod
@@ -311,6 +324,7 @@ class FieldManagerMeta(ABCMeta, type):
         super().__setattr__(attr, value)
 
     def __new__(cls, name, bases, namespace):
+        '''Create a new instance of a class managed by FieldManagerMeta.'''
         if BoundFieldCreatorMixin not in bases:
             bases = bases + (BoundFieldCreatorMixin,)
         ret = super().__new__(cls, name, bases, namespace)
@@ -323,7 +337,7 @@ class BoundFieldCreatorMixin:
     Not intended to be used directly. Classes should use the FieldManagerMeta
     which will insert this into the bases if needed.
     '''
-    def __new__(cls, *args):
+    def __new__(cls, *_):
         nascent = super().__new__(cls)
         for field in nascent._fields:
             field._bind(nascent)

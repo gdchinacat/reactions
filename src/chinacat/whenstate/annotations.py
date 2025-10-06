@@ -6,7 +6,8 @@ Everything can import this.
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import (Any, Coroutine, Protocol, Self, runtime_checkable,
+from logging import Logger
+from typing import (Any, Coroutine, Protocol, runtime_checkable,
                     Iterable, Optional)
 
 
@@ -17,6 +18,9 @@ EMPTY_ITERATOR = () # singleton empty sequence
     
 type ReactionCoroutine = Coroutine[None, None, None]
 
+
+# todo - verify that all of these protocols are still needed now that things
+#        have been cleaned up a bunch.
 class FieldReaction[T](Protocol):
     '''A method that is called when a _Field value changes.'''
     def __call__(self,
@@ -32,8 +36,20 @@ class _ReactionExecutor(Protocol):
     _ReactionExecutor is able to schedule PredicateReactions for asynchronous
     execution.
     '''
+    _logger: Logger
 
-class PredicateReaction[T](Protocol):
+    @abstractmethod
+    def react[T](self,
+                 reaction: PredicateReaction,
+                 instance: _Reactant,
+                 # TODO - should be the instance of the class that defined the
+                 # reaction, not the instance of the class that field change
+                 #triggered reaction
+                 field: _Field[T],
+                 old: T, new: T) -> None:
+        raise NotImplementedError()
+
+class PredicateReaction(Protocol):
     '''
     A _Reactant method that is called asynchronously when a _Predicate value
     changes.
@@ -45,20 +61,28 @@ class PredicateReaction[T](Protocol):
 
     __qualname__: str
 
-    def __call__(self: _Reactant,
-                 field: _Field[T], 
-                 instance: Any, 
-                 old: T, 
-                 new: T
-            )->Coroutine[None, None, None]:
-        pass
+    # todo for some reason adding instance causes a an error with the instance
+    #      not matching and the types in the error look right to me....
+    #      work around for now.
+    async def __call__(self, *args) -> None: pass
+#    async def __call__[T](self,
+#                 instance: Any,
+#                 field: _Field[T],
+#                 old: T,
+#                 new: T
+#            ) -> None:
+#        pass
 
 
-class _Reactant[C](Protocol):
+# TODO - rename _Reactant to FieldClass?
+class _Reactant(Protocol):
     '''Reactant is able to schedule reactions.'''
 
+    _reaction_executor: _ReactionExecutor
+    _logger: Logger
+
     @abstractmethod
-    def reaction[T](self: Self, reaction: PredicateReaction[T]) -> None:
+    def reaction[T](self, reaction: PredicateReaction) -> None:
         '''
         Schedule a reaction to be called back at some point in the future.
         The conditions for when it is called are determined by the type of
@@ -97,7 +121,7 @@ class _Evaluatable[T](HasFields, Protocol):
         T is the type the evaluate() returns.
         '''
         raise NotImplementedError()
-    
+
 class _Field[T](_Evaluatable[T], HasFields, Protocol):
     '''Protocol for Field.'''
 

@@ -33,13 +33,13 @@ class TrafficLight(Reactant):
     simple model that implements a traffic light:
     '''
 
-    color: Field[TrafficLight, Color] = Field(Color.RED)
+    color: Field[Color] = Field(Color.RED)
     '''color: the current color of the light'''
 
-    ticks: Field[TrafficLight, int] = Field(-1)
+    ticks = Field[int](-1)
     '''tick: the number of ticks for the current color'''
 
-    cycles: Field[TrafficLight, int] = Field(0)
+    cycles = Field[int](0)
     ''' cycles: the number of times the light has gone through a full cycle '''
 
     _next_tick_time: float = 0
@@ -56,21 +56,21 @@ class TrafficLight(Reactant):
     @And(color == Color.RED,
          ticks == TICKS_PER_LIGHT)
     async def red_to_green(self,
-                     field: Field[TrafficLight, int | Color],
+                     field: Field[int | Color],
                      old: int | Color, new:int | Color) -> None:  # @UnusedVariable
         self.change(Color.GREEN)
 
     @And(color == Color.GREEN,
          ticks == TICKS_PER_LIGHT)
     async def green_to_yellow(self,
-                        field: Field[TrafficLight, int | Color],
+                        field: Field[int | Color],
                         old: int | Color, new:int | Color) -> None:  # @UnusedVariable
         self.change(Color.YELLOW)
 
     @And(color == Color.YELLOW,
          ticks == TICKS_PER_LIGHT)
     async def yellow_to_red(self,
-                      field: Field[TrafficLight, int | Color],
+                      field: Field[int | Color],
                       old: int | Color, new:int | Color) -> None:  # @UnusedVariable
         self.cycles += 1
         self.change(Color.RED)
@@ -83,7 +83,7 @@ class TrafficLight(Reactant):
 
     @ ticks != -1
     async def tick(self, 
-             field: Field[TrafficLight, int],
+             field: Field[int],
              old: int, new: int) -> None:  # @UnusedVariable
         
         if self.ticks != new:
