@@ -24,8 +24,7 @@ The salient points:
   - increment: the reaction when count changes and is greater than or equal
     to zero. While '@ count >= 0' is an unusual statement in python, it applies
     the predicate (@) created by the field comparisong (count >= 0).
-  - old: the value the field contained before it was changed.
-  - new: the value of the field that caused the predicate to become true.
+  - old, new: the value of the field before and after it was changed.
 
 There is more to it (initial state, starting) but this illustrates the basic
 usage.
@@ -36,7 +35,7 @@ See the examples in the sr/test/examples directory for working examples.
 There are three high level components, field instrumentation to detect changes,
 predicates to detect when conditions on the state become true, and an asyncio
 executor to execute the reactions asynchronously.
-### Field Instrumentation
+### Fields
 The *field* module provides a *Field* descriptor that intercepts changes to
 fields it implements. Consumers can register reactions with fields in order to
 receive a callback when the fields value changes.
@@ -44,6 +43,14 @@ Field reactions are invoked synchronously and execute as part of setting the
 new value on the field.
 Fields are used to create predicates using rich comparison functions (i.e
 'field == 1' will create a Predicate for this condition.
+*Note* that because reactions are executed asynchronously it is possible that
+the value of a field may be different when the reaction is executed than the
+predicate that triggered the execution. This happens when another reaction
+updates the field while the reaction is scheduled for execution. State machines
+and reactions should be designed and implemented to take this into account.
+In other words, predicates are evaluated when field values change, not when
+the reaction is executed. Reactions execution indicates the state *was* true,
+not that it *is still* true.
 ### Predicates
 The *predicate* module provides predicates for evaluating whether conditions
 on fields are true. The predicates are typically created through the Field
