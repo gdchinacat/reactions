@@ -8,23 +8,26 @@ from __future__ import annotations
 
 from unittest import TestCase, main
 
-from ... import Reactant, Field, And
+from ... import Reactant, Field
 from ..async_helpers import asynctest
 
 
 class Counter(Reactant):
-    done = Field[bool](False)
-    count = Field[int](-1)
+    done = Field[bool](False) # field to  indicate state should stop
+    count = Field[int](-1)    # start in a quiescent state
 
-    (done == True)(Reactant.astop)  # stop the executor when done
+    # Manual application of predicate decorator to stop the state machine when
+    # done.
+    (done == True)(Reactant.astop)
     
-    @ And(count >= 0,
-          done == False)
+    @ count >= 0
     async def _count(self, *_):
+        '''keep counting until done'''
         if not self.done:
             self.count += 1
 
     def _start(self):
+        '''start the counter by transitioning from quiescent state'''
         self.count = 0
 
 class ExternalStopTest(TestCase):
