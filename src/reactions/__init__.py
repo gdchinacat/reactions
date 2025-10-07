@@ -25,7 +25,7 @@ The basic idea is that you implement reaction methods that are called when
 predicates become true. For example, this class counts upwards forever.
 
 class Counter(Reactant):
-    count: Field[Counter, int] = Field(-1)
+    count = Field(-1)
 
     @ count >= 0
     async def _count(self, field, old, new):
