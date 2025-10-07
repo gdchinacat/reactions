@@ -27,6 +27,9 @@ class Color(Enum):
     YELLOW = 3
 
 
+type IntOrColor = Field[int] | Field[Color]
+
+
 @dataclass
 class TrafficLight(Reactant):
     '''
@@ -36,10 +39,10 @@ class TrafficLight(Reactant):
     color: Field[Color] = Field(Color.RED)
     '''color: the current color of the light'''
 
-    ticks = Field[int](-1)
+    ticks = Field(-1)
     '''tick: the number of ticks for the current color'''
 
-    cycles = Field[int](0)
+    cycles = Field(0)
     ''' cycles: the number of times the light has gone through a full cycle '''
 
     _next_tick_time: float = 0
@@ -56,7 +59,7 @@ class TrafficLight(Reactant):
     @And(color == Color.RED,
          ticks == TICKS_PER_LIGHT)
     async def red_to_green(self,
-                     field: Field[int | Color],
+                     field: IntOrColor,
                      old: int | Color, new:int | Color) -> None:  # @UnusedVariable
         self.change(Color.GREEN)
 

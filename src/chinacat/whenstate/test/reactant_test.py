@@ -6,7 +6,7 @@ from __future__ import annotations
 from asyncio import Future, CancelledError, sleep
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Optional, AsyncIterator, Tuple, Awaitable
+from typing import Optional, AsyncIterator, Tuple, Awaitable, Callable
 from unittest import TestCase, main
 
 from .. import (ReactionMustNotBeCalled, ExecutorAlreadyComplete,
@@ -27,7 +27,7 @@ class State(Reactant):
     def _start(self) -> None:
         pass
 
-    @ exception != None
+    @ exception != None  # todo testing
     async def _exception(self,
              field: Field[int],
              old: int, new:int) -> None:  # @UnusedVariable

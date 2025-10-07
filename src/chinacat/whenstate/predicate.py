@@ -20,7 +20,14 @@ __all__ = ['Constant']
 logger = logging.getLogger("whenstate.predicate")
 
 
-type ReactionCoroutine = Coroutine[None, None, None]
+type ReactionCoroutine = Coroutine[Any, Any, None]
+# Callable arguments behavior is contravariant to ensure type safety.
+# todo  - make BaseField[T] arg covariant so client code can declare
+#         reactions as taking Field[T] rather than BaseField[T].
+#         -- or --
+#         Is there someway to make the predicates created by Field take a
+#         PredicateReaction that takes Field? This is probably better from
+#         a type safety perspective since it doesn't violate type safety :)
 type PredicateReaction[T] = Callable[[Any, BaseField[T], T, T],
                                      ReactionCoroutine]
 
