@@ -26,7 +26,6 @@ from . import base_field
 from . import error
 from . import executor
 from . import field
-from . import logging_config  # todo - libraries shouldn't configure logging.
 from . import predicate
 from . import predicate_types
 from .base_field import *

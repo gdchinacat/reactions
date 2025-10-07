@@ -22,7 +22,7 @@ from .predicate import ReactionCoroutine, PredicateReaction
 __all__ = ['Reactant']
 
 
-logger: Logger = getLogger('whenstate.executor')
+logger: Logger = getLogger('reactions.executor')
 
 # TODO - ReactionExecutor and Reactant are very tightly coupled and should be
 #        better encapsulated. The done-ness of the Reactant is entirely

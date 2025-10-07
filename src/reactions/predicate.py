@@ -18,7 +18,7 @@ from .logging_config import VERBOSE
 __all__ = ['Constant']
 
 
-logger = logging.getLogger("whenstate.predicate")
+logger = logging.getLogger("reactions.predicate")
 
 
 type ReactionCoroutine = Coroutine[Any, Any, None]
