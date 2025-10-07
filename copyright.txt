@@ -12,24 +12,3 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-'''
-Helpers for async testing.
-'''
-from __future__ import annotations
-
-import asyncio
-from functools import wraps
-
-
-def asynctest(func):
-    '''decorator to execute async test functions'''
-    @wraps(func)
-    def _asynctest(*args, **kwargs):
-        @wraps(func)
-        async def async_test_runner():
-            async with asyncio.timeout(1):
-                await func(*args, **kwargs)
-        asyncio.run(async_test_runner())
-    return _asynctest
-
-

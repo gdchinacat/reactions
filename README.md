@@ -143,3 +143,27 @@ but doing so would mean predicate operators behave differently than everywhere
 else and was deemed a bad idea. 'And(field_a == 1, field_b == 2)' will have to
 do. (I believe python doesn't provide these operators as dunders for
 performance reasons, which is valid).
+
+
+# Licensed under GPL v3
+See the COPYING file for complete details.
+Copyright (C) 2025 Anthony (Lonnie) Hutchinson <chinacat@chinacat.org>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# Credits
+
+The idea for this started as a sleepless sick night after reading
+https://www.reddit.com/r/Python/comments/1nmta0f/i_built_a_full_programming_language_interpreter/ . Thanks to u/HearMeOut-13 for
+the post that got my mind going down this path.
