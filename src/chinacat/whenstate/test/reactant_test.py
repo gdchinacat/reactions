@@ -27,7 +27,7 @@ class State(Reactant):
     def _start(self) -> None:
         pass
 
-    @ exception != None  # todo testing
+    @ exception != None
     async def _exception(self,
              field: Field[int],
              old: int, new:int) -> None:  # @UnusedVariable

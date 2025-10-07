@@ -7,7 +7,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import partial
 import logging
-from typing import Any, Callable, Type, Iterable, Coroutine, Optional, List
+from typing import (Any, Callable, Type, Iterable, Coroutine, Optional, List,
+                    TypeVar)
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
 from .base_field import BaseField, HasNoFields, Evaluatable
@@ -28,6 +29,17 @@ type ReactionCoroutine = Coroutine[Any, Any, None]
 #         Is there someway to make the predicates created by Field take a
 #         PredicateReaction that takes Field? This is probably better from
 #         a type safety perspective since it doesn't violate type safety :)
+# TODO - this _T, B, etc makes errors go away, but specifying different types
+#        for T on the reaction (Field[T], T, T) don't show as errors either,
+#        is kinda the whole point. The reactions should be type checked against
+#        the fields that generated the predicates. Probably need a whole lot
+#        more plumbing to get that to work. For now, the errors on the
+#        reaction decoration is preferable, so commented out to leave a trace
+#        for maybe how to do this.
+#type _T = Any
+#type B = BaseField[_T]
+#type PredicateReaction[_T, F: B] = Callable[[Any, F, _T, _T],
+#                                     ReactionCoroutine]
 type PredicateReaction[T] = Callable[[Any, BaseField[T], T, T],
                                      ReactionCoroutine]
 
