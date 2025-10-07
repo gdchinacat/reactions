@@ -6,6 +6,7 @@ from __future__ import annotations
 from .base_field import BaseField
 from .predicate import Predicate
 from .predicate_types import And, Or, Eq, Ne, Lt, Le, Gt, Ge
+from typing import NoReturn
 
 __all__ = ['Field']
 
@@ -30,7 +31,10 @@ class Field[T](BaseField[T]):
     #       error is valid. However, this is what the implementation needs to
     #       so so silence the error.
     ###########################################################################
-    def __contains__(self, other) -> None:
+    # TODO - the returned predicates need to have the type of the field that
+    #        created them in their type so that when they are called the type
+    #        of field the PredicateReaction accepts will match.
+    def __contains__(self, other) -> NoReturn:
         '''not implemented'''
         raise NotImplementedError('use Contains(self, other) instead')
 

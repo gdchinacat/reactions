@@ -6,7 +6,8 @@ from __future__ import annotations
 from asyncio import Future, CancelledError, sleep
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Optional, AsyncIterator, Tuple, Awaitable, Callable
+from typing import Optional, AsyncIterator, Tuple, Awaitable, Callable,\
+    NoReturn
 from unittest import TestCase, main
 
 from .. import (ReactionMustNotBeCalled, ExecutorAlreadyComplete,
@@ -37,7 +38,7 @@ class State(Reactant):
     @ infinite_loop == True
     async def _infinite_interuptable_loop(self,
              field: Field[int],
-             old: int, new:int) -> None:  # @UnusedVariable
+             old: int, new:int) -> NoReturn:  # @UnusedVariable
         '''enter an infinite loop. Currently no way to exit it.'''
         assert self.infinite_loop_running is not None
         self.infinite_loop_running.set_result(None)
