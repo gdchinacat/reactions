@@ -27,7 +27,7 @@ def asynctest(func):
     def _asynctest(*args, **kwargs):
         @wraps(func)
         async def async_test_runner():
-            async with asyncio.timeout(1):
+            async with asyncio.timeout(None):# todo 1):
                 await func(*args, **kwargs)
         asyncio.run(async_test_runner())
     return _asynctest

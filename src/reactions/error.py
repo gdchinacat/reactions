@@ -20,8 +20,7 @@ from typing import Any, Callable, Optional, NoReturn
 
 __all__ = ['MustNotBeCalled', 'ReactionMustNotBeCalled',
            'ExecutorError', 'ExecutorNotStarted', 'ExecutorAlreadyStarted',
-           'ExecutorAlreadyComplete', 'PredicateError',
-           'InvalidPredicateExpression', ]
+           'PredicateError', 'InvalidPredicateExpression']
 
 
 class MustNotBeCalled(RuntimeError):
@@ -82,12 +81,6 @@ class ExecutorAlreadyStarted(ExecutorError):
     The ReactionExecutor may have already terminated, which, as the name
     implies, is terminal and can't be restarted. This error does not imply the
     state is running, only that the request to start it failed.
-    '''
-
-class ExecutorAlreadyComplete(ExecutorError):
-    '''
-    Error indicating the state has already been completed when an attempt
-    to complete it was made.
     '''
 
 class FieldConfigurationError(RuntimeError):

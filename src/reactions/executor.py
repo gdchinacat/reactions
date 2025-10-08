@@ -17,23 +17,19 @@ Asynchronous reaction executor.
 '''
 from __future__ import annotations
 
-from abc import abstractmethod
 from asyncio import (Queue, Task, create_task, QueueShutDown, sleep,
-                     get_event_loop)
-from asyncio.exceptions import CancelledError
-from dataclasses import dataclass, field
+                     get_event_loop, CancelledError)
 from itertools import count
 from logging import Logger, getLogger
 from typing import Any, Optional, Tuple, Awaitable
 
-from .base_field import BaseField, FieldManagerMeta
-from .error import (ExecutorAlreadyStarted, ExecutorNotStarted,
-                    ExecutorAlreadyComplete)
+from .error import ExecutorAlreadyStarted, ExecutorNotStarted
+from .field_descriptor import FieldDescriptor
 from .logging_config import VERBOSE
 from .predicate import ReactionCoroutine, PredicateReaction
 
 
-__all__ = ['Reactant']
+__all__ = ['ReactionExecutor']
 
 
 logger: Logger = getLogger('reactions.executor')
@@ -44,7 +40,7 @@ logger: Logger = getLogger('reactions.executor')
 #        future and may be able to be cleaned up. This may remove the need for
 #        the task done callbacks. Executor and Reactant are separate entities
 #        to allow reactants to share executors to provide concurrency control.
-class ReactionExecutor():
+class ReactionExecutor:
     '''
     ReactionExecutor executes reactions submitted by Reactants. It is separate
     from Reactant to allow multiple reactants to share the same executor to
@@ -106,27 +102,14 @@ class ReactionExecutor():
         super().__init__(*args, **kwargs)
         self.queue = Queue()
 
-    @staticmethod
-    def react[T](reaction: PredicateReaction,
-              instance,
-              # TODO - should be the instance of the class that defined the reaction, not the instance of the class that field change triggered reaction
-              field: BaseField[T],
-              old: T, new: T) -> None:
+    def react[T](self,
+                 reaction: PredicateReaction,
+                 instance,
+                 # TODO - should be the instance of the class that defined the reaction, not the instance of the class that field change triggered reaction
+                 field: FieldDescriptor[T],
+                 old: T, new: T) -> None:
         '''reaction that asynchronously executes the reaction'''
-        # The weirdness of this being a @staticmethod that gets its self from
-        # the instance is so this method can be used as a @partial wrapped
-        # predicate reaction rather than having an extra method do this before
-        # calling # this method. While a @partial wraps this to pass the
-        # reaction arg, it is created from a @classmethod that doesn't have the
-        # actual state to get the _reaction_executor from.
-        # Microbenchmarking on stock Mac OS build of python 3.13.7 shows
-        # partial is significantly faster (22%) than an intermediate function:
-        #     def foo(a): ...
-        #     def foo_func(): return foo(1)  # 43.3 ns
-        #     foo_partial = partial(foo, 1)  # 33.8 ns
 
-        # Get self and assert state is acceptable.
-        self = instance._reaction_executor
         assert self.task, "ReactionExecutor not start()'ed"
 
         id_ = next(self._ids)
@@ -137,11 +120,11 @@ class ReactionExecutor():
                                    instance,
                                    coro,
                                    (field, old, new)))
-            instance._logger.log(VERBOSE,
+            logger.log(VERBOSE,
                 '%d scheduled %s(..., %s,  %s)',
                 id_, reaction.__qualname__, old, new)
         except Exception:
-            instance._logger.exception(
+            logger.exception(
                 '%d failed to schedule %s (..., %s,  %s)',
                 id_, reaction.__qualname__, old, new)
             raise
@@ -166,14 +149,27 @@ class ReactionExecutor():
     ###########################################################################
 
     def start(self) -> Awaitable:
+        ## todo major hack till reaction executors are plumbed where they needed
+        from . import predicate
+        predicate.reaction_executor = self
+        ##
         if self.task is not None:
             raise ExecutorAlreadyStarted()
         self.task = create_task(self.execute_reactions())
         return self.task
 
-
-    def stop(self, timeout: Optional[float]):
+    def stop(self, timeout: Optional[float] = 2):
         '''stop the reaction queue with timeout (defaults to 2 seconds)'''
+        if not self.task:
+            raise ExecutorNotStarted()
+
+        logger.debug(f'{self} stopping.')
+
+        ## todo major hack till reaction executors are plumbed where they needed
+        from . import predicate
+        predicate.reaction_executor = None
+        ##
+
         self.queue.shutdown()
 
         # Create a callback to cancel the task if a timeout is specified.
@@ -213,7 +209,7 @@ class ReactionExecutor():
                 break
 
             try:
-                instance._logger.debug(f'%s calling %s(%s)',
+                logger.debug(f'%s calling %s(%s)',
                     id_, coro.__qualname__, str(args))
                 await coro
                 await sleep(0)
@@ -229,138 +225,8 @@ class ReactionExecutor():
             finally:
                 self.queue.task_done()
 
-@dataclass
-class Reactant(metaclass=FieldManagerMeta):
-    '''
-    Base class that allows classes to react asynchronously to predicates that
-    become true.
-
-    Usage:
-    class Counter(Reactant):
-        """A counter that spins until stopped"""
-        count: Field[Counter, int] = Field(-1)
-
-        @ count != -1
-        async defcounter(self, bound_field: BoundField[Counter, int],
-                 old: int, new: int) -> None:
-            self.count += 1
-
-        def _start(self):
-            'transition from initial state, called during start()'
-            self.count = 0
-
-    async def run_counter_for_awhile():
-        counter = Counter()
-        counter_task = asyncio.create_task(counter.start())
-        ....
-        counter.stop()
-        await counter_task
-
-    Reactions are called asynchronously in the Reactant's reaction executor.
-    '''
-    # todo - a reaction_executor for instances introduces an ambiguity of
-    #        which instances executor predicate reactions will be executed
-    #        in, meaning it actually *is* possible for reactions to do dirty
-    #        reads if a predicate contains multiple reaction executors.
-    #        Fix this by defining a better executor management strategy.
-    #          - global - yuck,  this would have the effect of serializaiong
-    #                     all reactions. This isn't good because two
-    #                     independent state instances should be able to execute
-    #                     reinvent a GIL. Unrelated states should be able to
-    #                     execute asynchronously.
-    #          - specify it for every instance created - yuck...a goal is to
-    #            make it so users don't have to think about how to schedule
-    #            reactions.
-    #          - Specify on the predicate, with a lambda? that is called when
-    #            the predicate is true with itself (for fields) that provides
-    #            an executor that the predicate should execute in.
-    #          - don't allow ambiguous predicates...if the instances the
-    #            predicates are using have different reaction executors raise
-    #            an error
-    #          - unfortunately the mechanism to get instances other than bound
-    #            field isn't complete yet and sorting it out will likely
-    #            provide structure (ie watcher = Watcher(watched)) to associate
-    #            instances with each other (1:1 seems a bit restrictuve, need
-    #            a mapping for each end that isn't 1 to or to 1. Performance?
-    #            Ramble Ramble Ramble: using metaclasses to hook into instance
-    #            creation/initialization seems like the most promising route.
-    #            The problem is the instance a reaction is called on is
-    #            currently acquired from the BoundField that had a field
-    #            change. This works fine for reactions that listen on their
-    #            own classes fields (including base class fields). But
-    #            reactions on other classes will invoke the reaction with the
-    #            other class as 'self', or at least the only instance
-    #            available.
-    #                - @(Foo.foo == 1) on Bar.foo_eq_one(): The method on Bar
-    #                  will not get a reference to an Bar instance.A
-    #                  ??? create Foo: Watched with reference to Bar: yuck, it
-    #                      is totally backwards and there are multiple
-    #                      for different Fields.
-    #                  ??? give predicate a resolver to push back to user
-    #                  ??? Factory method to create a new Watcher from a 
-    #                      Watched.
-    #                  ??? asyncio Context? 
-    _reaction_executor: ReactionExecutor = field(
-        default_factory=ReactionExecutor, kw_only=True)
-
-    _logger: Logger = field(default=logger, kw_only=True)
-
-    '''
-    Each state can have its own logger, for example to identify instance
-    that logged. Defaults to execute_logger.
-    '''
-
-    @abstractmethod
-    def _start(self) -> None:
-        '''
-        Subclasses must implement this to start the state machine execution.
-        '''
-
-    def start(self) -> Awaitable:
-        '''
-         Start processing the state machine. Returns a future that indicates
-         when the state machine has entered a terminal state. If an exception
-         caused termination of the state it is available as the futures
-         exception.
-         '''
-        if self._reaction_executor.task is not None:
-            raise ExecutorAlreadyStarted()
-        get_event_loop()
-
-        awaitable = self._reaction_executor.start()
-        self._start()
-        return awaitable
-
-    async def run(self) -> None:
-        '''Run the Reactant and wait for completion.'''
-        # TODO - start and run responsibilities and how and when to use which
-        #        is not clear and not documented. Add a way to start a Reactant
-        #        with or without an event loop, and a way to start and wait.
-        #        start() should work in and outside an async context, and run
-        #        should wait for completion, again from either context.
-        await self.start()
-
-    def stop(self, timeout: Optional[float]=2) -> None:
-        '''
-        stop the state processing.
-        Args:
-            timeout - time in seconds to wait for the shutdown to complete
-                      normally before canceling the task.
-        '''
-        if not self._reaction_executor.task:
+    def __await__(self):
+        '''wait for the task kto complete'''
+        if not self.task:
             raise ExecutorNotStarted()
-        if self._reaction_executor.task.done():
-            raise ExecutorAlreadyComplete()
-
-        self._reaction_executor.stop(timeout)
-        self._logger.debug(f'{self} stopping.')
-
-    async def astop(self, *_) -> None:
-        '''
-        Async stop:
-        (done == True)(Reactant.astop)
-        '''
-        self.stop()
-
-    def cancel(self) -> None:
-        self.stop(0)
+        yield from self.task

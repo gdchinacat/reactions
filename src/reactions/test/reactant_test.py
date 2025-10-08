@@ -20,17 +20,16 @@ from __future__ import annotations
 from asyncio import Future, CancelledError, sleep
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Optional, AsyncIterator, Tuple, Awaitable, Callable,\
-    NoReturn
+from typing import Optional, AsyncIterator, Tuple, NoReturn
 from unittest import TestCase, main
 
-from .. import (ReactionMustNotBeCalled, ExecutorAlreadyComplete,
-                 ExecutorAlreadyStarted, Field, Reactant)
+from .. import (ReactionMustNotBeCalled, ExecutorAlreadyStarted, Field,
+                ReactionExecutor, FieldManager)
 from .async_helpers import asynctest
 
 
 @dataclass
-class State(Reactant):
+class State(FieldManager):
     '''
     Kitchen sink state machine for testing various aspects of State.
     '''
@@ -64,21 +63,23 @@ class State(Reactant):
 async def running_state(skip_stop=False,
                         skip_await=False,
                         *args, **kwargs
-                        ) -> AsyncIterator[Tuple[State, Awaitable]]:
+                        ) -> AsyncIterator[Tuple[State, ReactionExecutor]]:
     '''
     Async contexst manager to run the state before managed block and wait
     for it after the block. Context is (state, state_done_awaitable).
     async with running_state() as state:
     '''
     state = State()
-    awaitable = state.start()
+    executor = ReactionExecutor()
+    executor.start()
     try:
-        yield state, awaitable
+        yield state, executor
     finally:
         if not skip_stop:
-            state.stop()
+            executor.stop()
         if not skip_await:
-            await awaitable
+            await executor
+        
 
 
 class ReactantTest(TestCase):
@@ -87,33 +88,32 @@ class ReactantTest(TestCase):
     async def test_reaction_exception_terminates_reactor(self):
         class _Exception(Exception): ...
         state = State()
-        awaitable = state.start()
 
-        state.exception = _Exception()
-        with self.assertRaises(_Exception):
-            await awaitable
+        async with running_state(skip_await=True) as (_, executor):
+            state.exception = _Exception()
+            with self.assertRaises(_Exception):
+                await executor
 
     @asynctest
     async def test_already_started(self):
-        async with running_state() as (state, _):
+        async with running_state() as (_, executor):
             # trying to start it a second time raises error
             with self.assertRaises(ExecutorAlreadyStarted):
-                state.start()
+                executor.start()
 
     @asynctest
     async def test_stop(self):
+        '''test that stop can be called multiple times in various states'''
         async with running_state(skip_stop=True,
-                                 skip_await=True) as (state, future):
-            state.stop()
-            state.stop()  # a second is fine since it hasn't stopped yet
+                                 skip_await=True) as (_, executor):
+            executor.stop()
+            executor.stop()  # a second is fine since it hasn't stopped yet
 
             # Wait for the future to actually complete.
-            await future
+            await executor
 
-            # Stopping it now results in an already complete error.
-            with self.assertRaises(ExecutorAlreadyComplete):
-                state.stop()
-            await future
+            # It is still ok to call stop()
+            executor.stop()
 
     @asynctest
     async def test_calling_reaction_not_allowed(self):
@@ -124,13 +124,13 @@ class ReactantTest(TestCase):
     @asynctest
     async def test_reaction_infinite_interruptable_loop(self):
         async with running_state(skip_stop=True,
-                                 skip_await=True) as (state, complete):
+                                 skip_await=True) as (state, executor):
             state.infinite_loop = True
             await sleep(0)
             await state.infinite_loop_running
-            state.stop(.1)
+            executor.stop(.1)
             with self.assertRaises(CancelledError):
-                await complete
+                await executor
 
     def test_defined_state_fields_are_named(self):
         self.assertEqual('State', State.exception.classname)

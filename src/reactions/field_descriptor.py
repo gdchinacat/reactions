@@ -17,17 +17,17 @@ Where most of the 'magic' happens.
 '''
 from __future__ import annotations
 
-from abc import ABC, ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from itertools import count
-from typing import List, Any, Dict, Optional, Tuple, Callable, Iterable
+from typing import List, Any, Dict, Optional, Callable, Iterable
 
 from .error import (MustNotBeCalled, FieldAlreadyBound,
                     FieldConfigurationError)
 
 
-__all__ = ['FieldManagerMeta']
+__all__ = []
 
-type FieldReaction[T] = Callable[[Any, "BaseField[T]", T, T], None]
+type FieldReaction[T] = Callable[[Any, "FieldDescriptor[T]", T, T], None]
 '''A method that is called when a field changes.'''
 
 
@@ -35,7 +35,7 @@ class HasFields(ABC):
     '''A class that has fields.'''
 
     @property
-    def fields(self) -> Iterable[BaseField]:
+    def fields(self) -> Iterable[FieldDescriptor]:
         raise NotImplementedError()
 
 
@@ -43,7 +43,7 @@ class HasNoFields:
     '''A Mixin that has no fields'''
 
     @property
-    def fields(self) -> Iterable[BaseField]:
+    def fields(self) -> Iterable[FieldDescriptor]:
         return ()
 
 
@@ -79,7 +79,7 @@ class ReactionMixin(ABC):
         '''
         self._reactions.append(reaction)
 
-    def react[T](self, instance: Any, field: "BaseField[T]", old: T, new: T):
+    def react[T](self, instance: Any, field: "FieldDescriptor[T]", old: T, new: T):
         '''
         Notify the reactions that the value changed from old to new.
         '''
@@ -87,7 +87,7 @@ class ReactionMixin(ABC):
             reaction(instance, field, old, new)
 
 
-class BaseField[T](Evaluatable[T], ReactionMixin):
+class FieldDescriptor[T](Evaluatable[T], ReactionMixin):
     '''
     An instrumented field.
     - T: is the type of object the field references
@@ -120,11 +120,11 @@ class BaseField[T](Evaluatable[T], ReactionMixin):
         attr: the name of the attribute
         *args, **kwargs: play nice with super()
 
-        classname and attr are optional and will have values provided. However,
-        They will not be very meaningful so it is encouraged that they be set.
-        They aren't required to keep field definitions simple and not repeat
-        the class and name in the definition. The FieldManagerMeta populates
-        these as part of class definition.
+        classname and attr are optional and will have meaningless values
+        provided if not specified. They aren't required in order to keep field
+        definitions simple and not repeat the class and name in the definition.
+        Typically they will be filled in by FieldManager(Meta) during class
+        definition.
         '''
         super().__init__(*args, **kwargs)
         self.set_names(classname or '<no class associated>',
@@ -248,9 +248,9 @@ class BoundField[T](ReactionMixin):
 
     def __init__(self,
                  nascent_instance: Any,
-                 field: BaseField[T], *args, **kwargs) -> None:
+                 field: FieldDescriptor[T], *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.field: BaseField[T] = field
+        self.field: FieldDescriptor[T] = field
         self.instance = nascent_instance
         self._reactions = field._reactions
 
@@ -263,77 +263,3 @@ class BoundField[T](ReactionMixin):
                 f'.{self.field}')
     __repr__ = __str__
 
-
-class FieldManagerMetaDict(dict[str, Any]):
-    '''
-    A dict that is used by FieldManagerMeta for class creation. It names Field
-    members and tracks them in a list of the class.
-
-    A _fields member is added to the class. It is a tuple of Field attributes
-    the class has. It is used to track which fields need to be bound on
-    instance creation. It is a tuple to discourage modification.
-    '''
-
-    def __init__(self, classname: str):
-        self.classname = classname
-        self['_fields'] = tuple[BaseField]()
-
-    def __setitem__(self, attr: str, value: Any)->None:
-        if isinstance(value, BaseField):
-            value.set_names(self.classname, attr)
-            self['_fields'] = self['_fields'] + (value,)
-        super().__setitem__(attr, value)
-
-
-class FieldManagerMeta(ABCMeta, type):
-    '''
-    Metaclass to manage the Field members of classes.
-
-    Field naming:
-    Class members that are Fields will be named during class definition. This
-    makes the Field definition much more concise as it doesn't need to take the
-    class and attr names. (__prepare__)
-    When a Field attribute is set on the class after definition it will be
-    named. (__setattr__)
-
-    Class creation:
-    BoundFields will be created for Fields during class creation. (__new__)
-    '''
-
-    # _fields is initialized by FieldManagerMetaDict.__init__() since it needs
-    # to be present during the nascent stages before __init__ is called to
-    # initialize the instance.
-    _fields: Tuple[BaseField, ...]
-
-    @classmethod
-    def __prepare__(cls, name, bases):
-        return FieldManagerMetaDict(name)
-
-    def __setattr__(self, attr: str, value: Any):
-        '''
-        Intercept calls to name Field attributes that are set on the class.
-        '''
-        if isinstance(value, BaseField):
-            value.set_names(self.__qualname__, attr)
-            self._fields = self._fields + (value,)
-        super().__setattr__(attr, value)
-
-    def __new__(cls, name, bases, namespace):
-        '''Create a new instance of a class managed by FieldManagerMeta.'''
-        if BoundFieldCreatorMixin not in bases:
-            bases = bases + (BoundFieldCreatorMixin,)
-        ret = super().__new__(cls, name, bases, namespace)
-        return ret
-
-class BoundFieldCreatorMixin:
-    '''
-    Mixin to create bound fields during class initialization.
-
-    Not intended to be used directly. Classes should use the FieldManagerMeta
-    which will insert this into the bases if needed.
-    '''
-    def __new__(cls, *_):
-        nascent = super().__new__(cls)
-        for field in nascent._fields:
-            field._bind(nascent)
-        return nascent

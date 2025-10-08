@@ -21,11 +21,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import partial
 import logging
-from typing import (Any, Callable, Type, Iterable, Coroutine, Optional, List,
-                    TypeVar)
+from typing import Any, Callable, Type, Iterable, Coroutine, Optional, List
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
-from .base_field import BaseField, HasNoFields, Evaluatable
+from .field_descriptor import FieldDescriptor, HasNoFields, Evaluatable
 from .logging_config import VERBOSE
 
 
@@ -35,10 +34,14 @@ __all__ = ['Constant']
 logger = logging.getLogger("reactions.predicate")
 
 
+# todo hack
+reaction_executor = None
+# end hack
+
 type ReactionCoroutine = Coroutine[Any, Any, None]
 # Callable arguments behavior is contravariant to ensure type safety.
-# todo  - make BaseField[T] arg covariant so client code can declare
-#         reactions as taking Field[T] rather than BaseField[T].
+# todo  - make FieldDescriptor[T] arg covariant so client code can declare
+#         reactions as taking Field[T] rather than FieldDescriptor[T].
 #         -- or --
 #         Is there someway to make the predicates created by Field take a
 #         PredicateReaction that takes Field? This is probably better from
@@ -51,10 +54,10 @@ type ReactionCoroutine = Coroutine[Any, Any, None]
 #        reaction decoration is preferable, so commented out to leave a trace
 #        for maybe how to do this.
 #type _T = Any
-#type B = BaseField[_T]
+#type B = FieldDescriptor[_T]
 #type PredicateReaction[_T, F: B] = Callable[[Any, F, _T, _T],
 #                                     ReactionCoroutine]
-type PredicateReaction[T] = Callable[[Any, BaseField[T], T, T],
+type PredicateReaction[T] = Callable[[Any, FieldDescriptor[T], T, T],
                                      ReactionCoroutine]
 
 '''
@@ -102,7 +105,7 @@ class Predicate(Evaluatable[bool], ABC):
 
     def react(self,
               instance: Any,
-              field: BaseField,
+              field: FieldDescriptor,
               old: Any,
               new: Any,
               *,
@@ -120,10 +123,21 @@ class Predicate(Evaluatable[bool], ABC):
         if self.evaluate(instance):
             logger.debug('%s TRUE for %s %s -> %s',
                          self, field, old, new)
-            # todo - don't (below too)
-            #        bound field will likely start tracking reactant and
-            #        instane independently. Soon.
-            reaction_executor = instance._reaction_executor
+            # TODO - where to get the executor from
+            #    self - execution is bound to the predicate
+            #        - most predicates are specified at class definition time.
+            #          how is the executor set?
+            #    instance - what currently exists, state objects provide the
+            #               executor. Doesn't work well for reactions on
+            #               things other than the instance that changed.
+            #    field - more closely aligned with reactions being used for
+            #            atomic state updates. Same issue as self...how is
+            #            a field associated with an executor, how are
+            #            executors shared between fields?
+            #    async context - require code set the executor to use...not
+            #                    sure this is scoped well enought...feels like
+            #                    it will devolve into a global since reactions
+            #                    are asynchronous.
             reaction_executor.react(reaction,
                                     instance,
                                     field,
@@ -240,7 +254,7 @@ class UnaryPredicate(OperatorPredicate, ABC):
         self.expression = expression
 
     @property
-    def fields(self) -> Iterable[BaseField]:
+    def fields(self) -> Iterable[FieldDescriptor]:
         yield from self.expression.fields
 
     def evaluate(self, instance):
@@ -268,7 +282,7 @@ class BinaryPredicate(OperatorPredicate, ABC):
                             else Constant(right))
 
     @property
-    def fields(self) -> Iterable[BaseField]:
+    def fields(self) -> Iterable[FieldDescriptor]:
         yield from self.left.fields
         yield from self.right.fields
 

@@ -12,6 +12,9 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+'''
+Test field functionality.
+'''
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -20,13 +23,14 @@ from unittest import TestCase, main
 
 from ..error import (MustNotBeCalled, FieldAlreadyBound,
                      FieldConfigurationError)
-from ..base_field import BoundField, FieldManagerMeta
 from ..field import Field
+from ..field import FieldManager
+from ..field_descriptor import BoundField
 from ..predicate import Predicate
 from ..predicate_types import Contains, Not, Or, And
 
 
-class Base(metaclass=FieldManagerMeta):
+class Base(FieldManager):
     '''
     exists solely to give create_class() a base class for type annotations
     '''

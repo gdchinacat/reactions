@@ -36,22 +36,22 @@ class Counter(Reactant):
 
 '''
 
-from . import base_field
 from . import error
 from . import executor
 from . import field
+from . import field_descriptor
 from . import predicate
 from . import predicate_types
-from .base_field import *
 from .error import *
 from .executor import *
 from .field import *
+from .field_descriptor import *
 from .predicate import *
 from .predicate_types import *
 
 
 __all__ = (
-           base_field.__all__ +
+           field_descriptor.__all__ +
            error.__all__ +
            executor.__all__ +
            field.__all__ +

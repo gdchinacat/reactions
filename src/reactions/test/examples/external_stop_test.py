@@ -22,17 +22,17 @@ from __future__ import annotations
 
 from unittest import TestCase, main
 
-from ... import Reactant, Field
+from ... import Field, FieldManager
 from ..async_helpers import asynctest
 
 
-class Counter(Reactant):
+class Counter(FieldManager):
     done = Field[bool](False) # field to  indicate state should stop
     count = Field[int](-1)    # start in a quiescent state
 
     # Manual application of predicate decorator to stop the state machine when
     # done.
-    (done == True)(Reactant.astop)
+    (done == True)(FieldManager.astop)
     
     @ count >= 0
     async def _count(self, *_):
@@ -46,8 +46,7 @@ class Counter(Reactant):
 
 class ExternalStopTest(TestCase):
     
-    @asynctest
-    async def test_external_stop(self):
+    def test_external_stop(self):
         counter = Counter()
         
         count_to = 5
@@ -66,10 +65,7 @@ class ExternalStopTest(TestCase):
         async def stop(*_):
             counter.done = True
             
-        await counter.start()
-
-        counter._logger.info("Done waiting for count to complete, "
-                            f"final count: {counter.count}")
+        counter.run()
 
         # TODO - the change that makes stop predicate true has two reactions
         #        on it, one to increment the count, one to set done=True. By

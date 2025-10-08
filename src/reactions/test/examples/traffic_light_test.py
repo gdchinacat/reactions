@@ -22,7 +22,7 @@ from time import time
 from typing import List, Coroutine
 from unittest import TestCase, main
 
-from ... import Field, And, Reactant
+from ... import Field, And, FieldManager
 
 
 NUMBER_OF_TRAFFIC_LIGHTS = 1_000
@@ -45,7 +45,7 @@ type IntOrColor = Field[int] | Field[Color]
 
 
 @dataclass
-class TrafficLight(Reactant):
+class TrafficLight(FieldManager):
     '''
     simple model that implements a traffic light:
     '''
@@ -156,9 +156,11 @@ class TrafficLightTest(TestCase):
             logger.info(f'Creating {NUMBER_OF_TRAFFIC_LIGHTS} traffic lights')
             traffic_lights = [TrafficLight()
                               for _ in range(NUMBER_OF_TRAFFIC_LIGHTS)]
+
             logger.info(f'starting {len(traffic_lights)} traffic lights')
-            awaitables = [(traffic_light, traffic_light.start())
+            awaitables = [(traffic_light, await traffic_light.start())
                           for traffic_light in traffic_lights]
+
             logger.info(f'awaiting {len(awaitables)} traffic lights')
             for traffic_light, awaitable in awaitables:
                 self.assertIsNone(await awaitable)
@@ -166,8 +168,7 @@ class TrafficLightTest(TestCase):
                 self.assertEqual(traffic_light.cycles, CYCLES)
             logger.info(f'done')
         asyncio.run(_run())
+
         
-
-
 if __name__ == "__main__":
     main()
