@@ -59,15 +59,13 @@ class Watcher(FieldWatcher):
                       #watched: Watched,
                       _: Field[int],
                       old: int, new: int):
-        pass
-        # todo assert isinstance(self, Watcher), f'got {type(self)=}'
-        #self.ticks_seen.append(new)  # move onto Watcher once self is provided
+        assert isinstance(self, Watcher), f'got {type(self)=}'
+        self.ticks_seen.append(new)
 
 
 class Test(TestCase):
 
-    # todo reenable test
-    def _test_watch_count(self):
+    def test_watch_count(self):
         watched = Watched()
         watcher = Watcher(watch=(watched,))
         watched.run()

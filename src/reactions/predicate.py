@@ -187,6 +187,7 @@ class Predicate(Evaluatable[bool], ABC):
         # Add a reaction on all the fields to call self.react() with
         # func as the reaction function.
         for field in set(self.fields):
+            logger.info(f'changes to {field} will call {func}')
             field.reaction(partial(self.react, reaction=func))
         return ReactionMustNotBeCalled(func)
 
