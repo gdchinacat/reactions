@@ -12,3 +12,13 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# For unit tests, configure the logging system to use a logging.confg in the
+# users home directory.
+from logging.config import fileConfig
+from os.path import expanduser
+
+from .. import logging_config
+
+
+fileConfig(f"{expanduser('~')}/logging.config")

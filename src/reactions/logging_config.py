@@ -12,9 +12,6 @@
 # 
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-'''
-Load the logging config from a file.
-'''
 from logging import DEBUG, addLevelName
 
 
