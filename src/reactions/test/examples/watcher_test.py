@@ -17,13 +17,11 @@ An example showing how a class can watch a state for changes.
 '''
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass, field
 from typing import List
 from unittest import TestCase, main
 
-from ... import Field, ReactionExecutor, FieldManager, FieldWatcher
-
+from ... import Field, FieldManager, FieldWatcher
 
 @dataclass
 class Watched(FieldManager):
@@ -49,17 +47,17 @@ class Watched(FieldManager):
     def _start(self):
         self.ticks = 0
 
-
 @dataclass
 class Watcher(FieldWatcher):
     ticks_seen: List[int] = field(default_factory=list[int])
 
-    @ Watched.ticks != None
-    async def watcher(self,
-                      #watched: Watched,
-                      _: Field[int],
-                      old: int, new: int):
+    #@ Watched.ticks != None  # todo make this work
+    async def watch(self,
+                    watched: Watched,
+                    _: Field[int],
+                    old: int, new: int):
         assert isinstance(self, Watcher), f'got {type(self)=}'
+        assert isinstance(watched, Watcher), f'got {type(watched)=}'
         self.ticks_seen.append(new)
 
 
@@ -67,10 +65,16 @@ class Test(TestCase):
 
     def test_watch_count(self):
         watched = Watched()
-        watcher = Watcher(watch=(watched,))
+        
+        # todo _watch doesn't do anything yet
+        watcher = Watcher(_watch=(watched,))
+
+        # todo - this is not the syntax client code is expected to use, it's
+        #        not usable
+        (Watched.ticks[watched] != None)(watcher.watch)
+        
         watched.run()
 
-        # todo - use watcher.ticks_seen
         self.assertEqual(watcher.ticks_seen,
                          list(range(watched.last_tick + 1)))
 

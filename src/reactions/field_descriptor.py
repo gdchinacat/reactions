@@ -68,9 +68,12 @@ class ReactionMixin(ABC):
     '''
     _reactions: List[FieldReaction]
 
-    def __init__(self, *args: List[Any], **kwargs: Dict[str, Any]):
+    def __init__(self,
+                 *args: List[Any],
+                 _reactions=None,
+                 **kwargs: Dict[str, Any]):
         super().__init__(*args, **kwargs)
-        self._reactions = []
+        self._reactions = _reactions or []
 
     def reaction(self, reaction: FieldReaction):
         '''
@@ -113,11 +116,14 @@ class FieldDescriptor[T](Evaluatable[T], ReactionMixin):
                  initial_value: Optional[T] = None,
                  classname: Optional[str] = None,
                  attr: Optional[str] = None,
+                 instance: Any|None = None,
                  *args, **kwargs) -> None:
         '''
         initial_value: The initial value for the field.
         classname: the name of the class this is a member of (display only)
         attr: the name of the attribute
+        instance: the instance the field is attached to, None for Fields on
+                  classes.
         *args, **kwargs: play nice with super()
 
         classname and attr are optional and will have meaningless values
@@ -126,10 +132,13 @@ class FieldDescriptor[T](Evaluatable[T], ReactionMixin):
         Typically they will be filled in by FieldManager(Meta) during class
         definition.
         '''
+        if instance is not None:
+            kwargs['_reactions'] = instance._reactions
         super().__init__(*args, **kwargs)
         self.set_names(classname or '<no class associated>',
                        attr or f'field_{next(self._field_count)}')
         self.initial_value: Optional[T] = initial_value
+        self.instance = instance
 
     def set_names(self, classname: str, attr: str):
         '''Update the field with classname and attr.'''
