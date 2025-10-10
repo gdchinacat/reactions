@@ -141,7 +141,15 @@ class FieldDescriptor[T](Evaluatable[T], ReactionMixin):
         self.instance = instance
 
     def set_names(self, classname: str, attr: str):
-        '''Update the field with classname and attr.'''
+        '''
+        Update the field with classname and attr.
+        This is not implemented using __set_name__ because that happens when
+        the class is being created which is after the predicate decorated
+        methods on the class need to use the field. Using a metaclass with a
+        custom namespace allows this to happen as soon as the field is added
+        to the class namespace so any access happens after the field has
+        been named.
+        '''
         self.classname = classname
         self.attr = attr
         self._attr: str = '_' + self.attr               # private
