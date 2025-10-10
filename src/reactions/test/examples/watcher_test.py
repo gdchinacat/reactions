@@ -63,20 +63,23 @@ class Watcher(FieldWatcher):
 
 class Test(TestCase):
 
-    def test_watch_count(self):
+    def test_watch_manual_predicate(self):
         watched = Watched()
         
-        # todo _watch doesn't do anything yet
-        watcher = Watcher(_watch=(watched,))
+        change_events = []
+        def watch(*args):
+            change_events.append(args)
 
-        # todo - this is not the syntax client code is expected to use, it's
-        #        not usable
-        (Watched.ticks[watched] != None)(watcher.watch)
+        # todo - fix failing unit test by making BoundField create predicates
+        # todo - refactor FieldDispatcher to separate descriptor from else.
+        (Watched.ticks[watched] != None)(watch)
         
         watched.run()
 
-        self.assertEqual(watcher.ticks_seen,
-                         list(range(watched.last_tick + 1)))
+        self.assertEqual(change_events,
+                         [(watched, Watched.ticks, x - 1, x)
+                          for x in range(watched.last_tick + 1)])
+        print(change_events)
 
 
 if __name__ == "__main__":

@@ -140,6 +140,20 @@ class TestField(TestCase):
             assert C.field_a
             C.field_a._bind(C())
 
+    def test_bound_field(self) -> None:
+        C = create_class()
+        c1, c2 = C(), C()
+        self.assertIsNot(C.field_a[c1], C.field_a)
+        self.assertIsInstance(C.field_a[c1], BoundField)
+        self.assertNotEqual(C.field_a[c1], C.field_a[c2])
+
+    def test_bound_field_predicate(self) -> None:
+        C = create_class()
+        c = C()
+        c_field_a = C.field_a[c]
+        self.assertIsInstance(c_field_a == 1, Predicate)
+        self.assertIsInstance(1 == c_field_a, Predicate)
+
     def test_bound_field_reaction(self) -> None:
         called = False
         def reaction(*args):
