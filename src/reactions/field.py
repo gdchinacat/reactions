@@ -26,7 +26,7 @@ from typing import NoReturn, Any, Tuple, Awaitable
 
 from .error import FieldAlreadyBound
 from .executor import ReactionExecutor
-from .field_descriptor import FieldDescriptor, ReactionMixin, FieldReaction
+from .field_descriptor import FieldDescriptor, ReactionDispatcher, FieldReaction
 from .predicate import Predicate
 from .predicate_types import And, Or, Eq, Ne, Lt, Le, Gt, Ge
 
@@ -37,7 +37,7 @@ __all__ = ['Field', 'FieldManager', 'FieldWatcher']
 logger = getLogger('reactions.field')
 
 
-class BoundField[T](ReactionMixin[T]):
+class BoundField[T](ReactionDispatcher[T]):
     '''
     A field bound to a specific instance.
 
