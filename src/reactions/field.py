@@ -48,9 +48,10 @@ class BoundField[T](ReactionDispatcher[T]):
 
     def __init__(self,
                  nascent_instance: Any,
-                 field: FieldDescriptor[T], *args, **kwargs) -> None:
+                 field: Field[T],
+                 *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.field: FieldDescriptor[T] = field
+        self.field: Field[T] = field
         self.instance = nascent_instance
 
         # This class is per instance, so it doesn't hurt to store the instance
@@ -188,10 +189,10 @@ class FieldManagerMetaDict(dict[str, Any]):
 
     def __init__(self, classname: str):
         self.classname = classname
-        self['_fields'] = tuple[FieldDescriptor]()
+        self['_fields'] = tuple[Field]()
 
     def __setitem__(self, attr: str, value: Any)->None:
-        if isinstance(value, FieldDescriptor):
+        if isinstance(value, Field):
             value.set_names(self.classname, attr)
             self['_fields'] = self['_fields'] + (value,)
         super().__setitem__(attr, value)
@@ -215,7 +216,7 @@ class FieldManagerMeta(ABCMeta, type):
     # _fields is initialized by FieldManagerMetaDict.__init__() since it needs
     # to be present during the nascent stages before __init__ is called to
     # initialize the instance.
-    _fields: Tuple[FieldDescriptor, ...]
+    _fields: Tuple[Field, ...]
 
     @classmethod
     def __prepare__(cls, name, bases):
@@ -225,7 +226,7 @@ class FieldManagerMeta(ABCMeta, type):
         '''
         Intercept calls to name Field attributes that are set on the class.
         '''
-        if isinstance(value, FieldDescriptor):
+        if isinstance(value, Field):
             value.set_names(self.__qualname__, attr)
             self._fields = self._fields + (value,)
         super().__setattr__(attr, value)
