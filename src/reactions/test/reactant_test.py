@@ -44,10 +44,12 @@ class State(FieldManager):
 
     @ exception != None
     async def _exception(self,
-             field: Field[int],
-             old: int, new:int) -> None:  # @UnusedVariable
+                         field: Field[Exception],
+                         old: Exception|None,
+                         new: Exception|None) -> None:
         '''raise an exception'''
-        raise self.exception
+        if new is not None:
+            raise new
 
     @ infinite_loop == True
     async def _infinite_interuptable_loop(self,

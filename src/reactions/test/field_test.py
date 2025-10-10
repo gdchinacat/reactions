@@ -18,7 +18,7 @@ Test field functionality.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple, List, Optional, NoReturn
+from typing import Tuple, List, NoReturn
 from unittest import TestCase, main
 
 from ..error import MustNotBeCalled, FieldAlreadyBound
@@ -28,21 +28,22 @@ from ..predicate_types import Contains, Not, Or, And
 
 
 class Base(FieldManager):
-    '''
-    exists solely to give create_class() a base class for type annotations
-    '''
-    field_a: Optional[Field[Optional[bool | int]]] = None
-    field_b: Optional[Field[Optional[bool | int]]] = None
+    field_a: Field[bool|int|None]
+    field_b: Field[bool|int|None]
+
     def __init__(self,
-                 a: Optional[bool | int] = None,
-                 b: Optional[bool | int] = None) -> NoReturn:
+                 a: bool|int|None = None,
+                 b: bool|int|None = None) -> NoReturn:
         raise Exception()
 
-def create_class() -> type[Base]:
+    def _start(self)->None:
+        pass
+
+def create_class()->type[Base]:
     @dataclass
     class C(Base):
-        field_a: Field[Optional[bool | int]] = Field(None, 'C', 'field_a')
-        field_b: Field[Optional[bool | int]] = Field(None, 'C', 'field_b')
+        field_a: Field[bool|int|None] = Field(None, 'C', 'field_a')
+        field_b: Field[bool|int|None] = Field(None, 'C', 'field_b')
     return C
 
 class TestField(TestCase):
@@ -102,7 +103,7 @@ class TestField(TestCase):
 
     def test_predicate_operators(self) -> None:
         C = create_class()
-        c: type[Base] = C(True, 0)
+        c: Base = C(True, 0)
         self.assertTrue((C.field_a == True).evaluate(c))
         self.assertFalse((C.field_a != True).evaluate(c))
         self.assertTrue((C.field_b < 1).evaluate(c))
@@ -134,19 +135,19 @@ class TestField(TestCase):
     def test_field_already_bound(self) -> None:
         C = create_class()
         with self.assertRaises(FieldAlreadyBound):
-            assert C.field_a
             C.field_a._bind(C())
 
     def test_bound_field(self) -> None:
         C = create_class()
-        c1, c2 = C(), C()
+        c1: Base =C()
+        c2: Base = C()
         self.assertIsNot(C.field_a[c1], C.field_a)
         self.assertIsInstance(C.field_a[c1], BoundField)
         self.assertNotEqual(C.field_a[c1], C.field_a[c2])
 
     def test_bound_field_predicate(self) -> None:
         C = create_class()
-        c = C()
+        c: Base = C()
         c_field_a = C.field_a[c]
         self.assertIsInstance(c_field_a == 1, Predicate)
         self.assertIsInstance(1 == c_field_a, Predicate)
@@ -157,10 +158,10 @@ class TestField(TestCase):
             nonlocal called
             called = True
             
-        C : type[Base] = create_class()
+        C = create_class()
         
         # add an instance reaction and verify it is called
-        c: Base = C()
+        c: Base = C()  # todo why does c need to be told what it is, and why not C
         C.field_a[c].reaction(reaction)
         self.assertFalse(called)
         c.field_a = 1

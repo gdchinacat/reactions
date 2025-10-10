@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from itertools import count
-from typing import List, Any, Dict, Optional, Callable
+from typing import List, Any, Dict, Optional, Callable, Iterable, overload
 
 from .error import MustNotBeCalled
 
@@ -43,6 +43,11 @@ class Evaluatable[T](ABC):
 
     T is the type the evaluate() returns.
     '''
+
+    @property
+    @abstractmethod
+    def fields(self)->Iterable[FieldDescriptor]:
+        raise NotImplementedError
 
     @abstractmethod
     def evaluate(self, instance: Any) -> Optional[T]:
@@ -87,7 +92,7 @@ class ReactionDispatcher[T](ABC):
             reaction(instance, field, old, new)
 
 
-class FieldDescriptor[T](Evaluatable[T], ReactionDispatcher[T]):
+class FieldDescriptor[T](Evaluatable[T], ReactionDispatcher[T], ABC):
     '''
     An instrumented field.
     - T: is the type of object the field references
@@ -133,6 +138,10 @@ class FieldDescriptor[T](Evaluatable[T], ReactionDispatcher[T]):
                        attr or f'field_{next(self._field_count)}')
         self.initial_value: T = initial_value
 
+    @abstractmethod
+    def _bind(self, instance: Any)->None:
+        raise NotImplementedError()
+
     def set_names(self, classname: str, attr: str):
         '''
         Update the field with classname and attr.
@@ -164,7 +173,13 @@ class FieldDescriptor[T](Evaluatable[T], ReactionDispatcher[T]):
     ###########################################################################
     # Descriptor protocol for intercepting field updates
     ###########################################################################
-    def __get__(self, instance, owner=None)->T|FieldDescriptor[T]:
+    @overload
+    def __get__(self, instance: None, owner: Any)->FieldDescriptor[T]: ...
+
+    @overload
+    def __get__(self, instance: Any, owner: Any)->T: ...
+
+    def __get__(self, instance, owner)->T|FieldDescriptor[T]:
         '''
         Get the value of the field.
 

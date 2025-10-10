@@ -36,7 +36,7 @@ class Watched(FieldManager):
     async def done(self, field_: Field[bool], old: int, new:int):
         assert field_
         assert old != new
-        self.ticks = None
+        self.ticks = -1
         self.stop()
 
     @ ticks != -1
@@ -52,10 +52,10 @@ class Watcher(FieldWatcher):
     ticks_seen: List[int] = field(default_factory=list[int])
 
     #@ Watched.ticks != None  # todo make this work
-    async def watch(self,
-                    watched: Watched,
-                    _: Field[int],
-                    old: int, new: int):
+    async def _watch(self,
+                     watched: Watched,
+                     _: Field[int],
+                     old: int, new: int):
         assert isinstance(self, Watcher), f'got {type(self)=}'
         assert isinstance(watched, Watcher), f'got {type(watched)=}'
         self.ticks_seen.append(new)

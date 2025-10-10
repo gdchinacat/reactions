@@ -76,6 +76,7 @@ class BoundField[T](ReactionDispatcher[T]):
                 f'.{self.field}')
     __repr__ = __str__
 
+
 class Field[T](FieldDescriptor[T]):
     '''
     Field subclass that creates predicates from rich comparison methods.
@@ -98,7 +99,7 @@ class Field[T](FieldDescriptor[T]):
         '''
         return getattr(instance, self._attr_bound)
 
-    def _bind(self, nascent_instance):
+    def _bind(self, nascent_instance)->None:
         '''
         Create a BoundField on instance.
         nascent_instance:
