@@ -94,34 +94,19 @@ class Field[T](FieldDescriptor[T]):
         '''create an Ge (>=) predicate for the field'''
         return Ge(self, other)  # pylint: disable=too-many-function-args
 
-    def __getitem__(self, instance):
+    def ___getitem__(self, instance):
         '''
         Get/create/set a Field specific to the instance.
 
         This allows reations specific to the instance. For example:
         (Watched.field[state] >= 5)(watcher.watch_field)
         '''
-        # How this works:
-        # When an instance is created it does not have instance specific Field
-        # attributes, rather they are inherited from the class. There is no
-        # reason to have them until an instance specific field is requested by
-        # indexing the class Field with the instance as the index (this method)
-        # is invoked. When that happens, if the instance does not already have
-        # an instance specific field, one is created and set on the instance.
-        # This instance field has a reference to the class fields reactions.
-        # At this point this __getitem__ method is complete.
-        # Later, when the instance field is used to create a predicate the
-        # reaction is configured with the field.  When reactions are configured
-        # on instance fields if the reactions is the class reactions the list
-        # is copied and the reaction appended. This places the instance
-        # specific reaction on an attribute of the instance rather than a class
-        # field so the reaction will apply only to that instance and does not
-        # need cleanup or have an impact on the performance of the class level
-        # fields used by other instances.
-        
-        
+        # todo return the bound field for the instance.
+        # todo make the BoundField a Field
+        return self.bound_field(instance)
         return Field(
-            self, self.initial_value, self.attr, self.classname, instance)
+            self.initial_value, self.attr, self.classname, instance)
+    __getitem__ = FieldDescriptor.bound_field
 
 
 class FieldManagerMetaDict(dict[str, Any]):

@@ -66,6 +66,12 @@ class ReactionMixin(ABC):
     '''
     Implements the Reaction members and methods for Field and BoundField.
     '''
+    # TODO - move _reactions to the instance:
+    #        on first access set instance._reactions to be a reference to the
+    #        field.
+    #        on write copy from class field to instance and update with new
+    #        reaction
+    #        allow bound field reactions
     _reactions: List[FieldReaction]
 
     def __init__(self,
@@ -116,7 +122,6 @@ class FieldDescriptor[T](Evaluatable[T], ReactionMixin):
                  initial_value: Optional[T] = None,
                  classname: Optional[str] = None,
                  attr: Optional[str] = None,
-                 instance: Any|None = None,
                  *args, **kwargs) -> None:
         '''
         initial_value: The initial value for the field.
@@ -132,13 +137,10 @@ class FieldDescriptor[T](Evaluatable[T], ReactionMixin):
         Typically they will be filled in by FieldManager(Meta) during class
         definition.
         '''
-        if instance is not None:
-            kwargs['_reactions'] = instance._reactions
         super().__init__(*args, **kwargs)
         self.set_names(classname or '<no class associated>',
                        attr or f'field_{next(self._field_count)}')
         self.initial_value: Optional[T] = initial_value
-        self.instance = instance
 
     def set_names(self, classname: str, attr: str):
         '''
@@ -223,6 +225,10 @@ class FieldDescriptor[T](Evaluatable[T], ReactionMixin):
         assert owner is not None
         return self
 
+    def bound_field(self, instance)->BoundField[T]:
+        '''get the bound field for the instance for this field'''
+        return getattr(instance, self._attr_bound)
+            
     def __set__(self, instance, value: Optional[T]):
         # See comment in __get__ for handling field access. Ignore this call
         # if value is self.
@@ -231,8 +237,7 @@ class FieldDescriptor[T](Evaluatable[T], ReactionMixin):
         old: Optional[T] = self.evaluate(instance)
         if value != old:
             setattr(instance, self._attr, value)
-            bound_field = getattr(instance, self._attr_bound)
-            bound_field.react(instance, self, old, value)
+            self.bound_field(instance).react(instance, self, old, value)
 
     __delete__ = MustNotBeCalled(
         None, "removal of state attributes is not permitted")
@@ -255,12 +260,6 @@ class BoundField[T](ReactionMixin):
     ALL field state relating to the instance should be on this object so that
     it is collected along with the instance. The Field should have no
     references to any instance specific information.
-
-    The reactions for BoundFields is a reference to the unbound Field
-    reactions. Adding class reactions through a bound field would be bad, so
-    an exception is raised if reaction() is called.
-    TODO - if there is a need for instance specific reactions this can be made
-           more complex, but for now, simple is better.
     '''
 
     def __init__(self,
@@ -269,12 +268,26 @@ class BoundField[T](ReactionMixin):
         super().__init__(*args, **kwargs)
         self.field: FieldDescriptor[T] = field
         self.instance = nascent_instance
+
+        # This class is per instance, so it doesn't hurt to store the instance
+        # specific data on the bound field, so unlike the class field instance
+        # data is stored on the bound field.
+        
+        # _reactions is the list of reactions to call when the field changes
+        # value. It starts out as a reference to the class reactions. When an
+        # instance reaction is configured a copy is made of the class reactions
+        # and a private copy for this instance only is created.
         self._reactions = field._reactions
 
     def reaction(self, reaction: FieldReaction):
-        raise FieldConfigurationError(
-            'BoundField specific reactions are not supported, but could be.')
+        '''Add a reaction for when this bound field changes value.'''
+        # ensure the bound field is using a private reactions list
+        if self._reactions is self.field._reactions:
+            self._reactions = list(self.field._reactions)
 
+        self._reactions.append(reaction)
+            
+        
     def __str__(self):
         return (f'{self.field.classname}({id(self.instance)})'
                 f'.{self.field}')

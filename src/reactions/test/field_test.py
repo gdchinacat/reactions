@@ -140,12 +140,27 @@ class TestField(TestCase):
             assert C.field_a
             C.field_a._bind(C())
 
-    def test_bound_field_specific_reactions_not_permitted(self) -> None:
-        C = create_class()
-        with self.assertRaises(FieldConfigurationError):
-            async def reaction(*args): ...
-            C()._field_a_bound.reaction(reaction)
+    def test_bound_field_reaction(self) -> None:
+        called = False
+        def reaction(*args):
+            nonlocal called
+            called = True
+            
+        C : type[Base] = create_class()
+        
+        # add an instance reaction and verify it is called
+        c: Base = C()
+        C.field_a[c].reaction(reaction)
+        self.assertFalse(called)
+        c.field_a = 1
+        self.assertTrue(called)
 
+        # make sure another instance doesn't get called as well
+        called = False
+        c = C()
+        self.assertFalse(called)
+        c.field_a = 1
+        self.assertFalse(called)
 
 if __name__ == '__main__':
     main()

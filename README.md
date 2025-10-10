@@ -10,14 +10,13 @@ reaction methods with predicates specifying the condition for execution of the
 method.
 
 This example shows how to set a counter that increments forever:
-`
-class Counter:
-    count = Field(0)
 
-    @ count >= 0
-    def increment(self, bound_field, old, new):
-        self.count += 1
-`
+    class Counter:
+        count = Field(0)
+        
+        @ count >= 0
+        async def increment(self, bound_field, old, new):
+            self.count += 1
 The salient points:
   - Counter: is the class implementing the state machine.
   - count: a field of the state machine.
