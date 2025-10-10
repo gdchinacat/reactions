@@ -24,7 +24,7 @@ import logging
 from typing import Any, Callable, Type, Iterable, Coroutine, Optional, List
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
-from .field_descriptor import FieldDescriptor, HasNoFields, Evaluatable
+from .field_descriptor import FieldDescriptor, Evaluatable
 from .logging_config import VERBOSE
 
 
@@ -89,19 +89,6 @@ class Predicate(Evaluatable[bool], ABC):
     Predicates can be used to decorate a function to schedule it to be run
     when the Predicate becomes True.
     '''
-
-    #####################
-    # Abstract methods defined on HasFields and Evaluatable. Not sure why
-    # they need to be redeclared here since this derives from them.
-    # todo - figure out why they are required and remove them?
-    #####################
-#    @abstractmethod
-#    def evaluate(self, instance: Any) -> bool:
-#        '''evaluate the predicate against the given model'''
-#        raise NotImplementedError()
-    #####################
-    # End abstract protocol field redeclarations.
-    #####################
 
     def react(self,
               instance: Any,
@@ -193,7 +180,7 @@ class Predicate(Evaluatable[bool], ABC):
 
 
 @dataclass
-class Constant[T](HasNoFields, Evaluatable[T]):
+class Constant[T](Evaluatable[T]):
     '''An Evaluatable that always evaluates to it's value.'''
     value: T
 
@@ -208,6 +195,10 @@ class Constant[T](HasNoFields, Evaluatable[T]):
 
     @InvalidPredicateExpression
     def __bool__(self): ...
+
+    @property
+    def fields(self) -> Iterable[FieldDescriptor]:
+        return ()
 
 
 class OperatorPredicate(Predicate, ABC):
