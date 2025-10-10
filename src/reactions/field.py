@@ -24,8 +24,9 @@ from dataclasses import dataclass, field
 from logging import getLogger
 from typing import NoReturn, Any, Tuple, Awaitable
 
+from .error import FieldAlreadyBound
 from .executor import ReactionExecutor
-from .field_descriptor import FieldDescriptor
+from .field_descriptor import FieldDescriptor, ReactionMixin, FieldReaction
 from .predicate import Predicate
 from .predicate_types import And, Or, Eq, Ne, Lt, Le, Gt, Ge
 
@@ -35,16 +36,95 @@ __all__ = ['Field', 'FieldManager', 'FieldWatcher']
 
 logger = getLogger('reactions.field')
 
+
+class BoundField[T](ReactionMixin[T]):
+    '''
+    A field bound to a specific instance.
+
+    ALL field state relating to the instance should be on this object so that
+    it is collected along with the instance. The Field should have no
+    references to any instance specific information.
+    '''
+
+    def __init__(self,
+                 nascent_instance: Any,
+                 field: FieldDescriptor[T], *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.field: FieldDescriptor[T] = field
+        self.instance = nascent_instance
+
+        # This class is per instance, so it doesn't hurt to store the instance
+        # specific data on the bound field, so unlike the class field instance
+        # data is stored on the bound field.
+
+        # _reactions is the list of reactions to call when the field changes
+        # value. It starts out as a reference to the class reactions. When an
+        # instance reaction is configured a copy is made of the class reactions
+        # and a private copy for this instance only is created.
+        self._reactions = field._reactions
+
+    def reaction(self, reaction: FieldReaction):
+        '''Add a reaction for when this bound field changes value.'''
+        # ensure the bound field is using a private reactions list
+        if self._reactions is self.field._reactions:
+            self._reactions = list(self.field._reactions)
+
+        self._reactions.append(reaction)
+
+    def __str__(self):
+        return (f'{self.field.classname}({id(self.instance)})'
+                f'.{self.field}')
+    __repr__ = __str__
+
 class Field[T](FieldDescriptor[T]):
     '''
     Field subclass that creates predicates from rich comparison methods.
     '''
 
+    def set_names(self, classname:str, attr:str):
+        super().set_names(classname, attr)
+        self._attr_bound: str = self._attr + '_bound'   # bound field
+
     def __hash__(self):
         '''make Field hashable/immutable'''
         return id(self)
 
-    ###########################################################################
+    def __getitem__(self, instance):
+        '''
+        Get/create/set a Field specific to the instance.
+
+        This allows reations specific to the instance. For example:
+        (Watched.field[state] >= 5)(watcher.watch_field)
+        '''
+        return getattr(instance, self._attr_bound)
+
+    def _bind(self, nascent_instance):
+        '''
+        Create a BoundField on instance.
+        nascent_instance:
+            the Reactant that reactions are called on (reaction(self, ...))
+            todo - saying it this way makes me realize the instance I've
+            been struggling with figuring out how to identify is an
+            aspect of the field. Specifically, the bound field. It needs
+            to associate (field, attribute, old, new) with what object
+            is the self for reaction(self, (field, attr,. ..)).
+
+            Beware: field._bind(nascent_instance) called during __new__()
+            before it has been initialized (hence its name). While it goes
+            without saying that instance attributes not managed by Field,
+            FieldManagerMixin, etc should not be acessed since they may not
+            exist and if they do the values have not been initialized, what
+            isn't so obvious is *do not* call str() or repr() on instance
+            as they are likely to fail before the object is initialized.
+        '''
+        if (hasattr(nascent_instance, self._attr_bound)):
+            raise FieldAlreadyBound(
+                f'{self} already bound to object '
+                f'id(instance)={id(nascent_instance)}')
+        bound_field = BoundField[T](nascent_instance, self)
+        setattr(nascent_instance, self._attr_bound, bound_field)
+
+    ##########################################################################
     # Predicate creation operators
     #
     # todo - pylint too-many-function-args is disabled because it doesn't seem
@@ -93,20 +173,6 @@ class Field[T](FieldDescriptor[T]):
     def __ge__(self, other) -> Predicate:
         '''create an Ge (>=) predicate for the field'''
         return Ge(self, other)  # pylint: disable=too-many-function-args
-
-    def ___getitem__(self, instance):
-        '''
-        Get/create/set a Field specific to the instance.
-
-        This allows reations specific to the instance. For example:
-        (Watched.field[state] >= 5)(watcher.watch_field)
-        '''
-        # todo return the bound field for the instance.
-        # todo make the BoundField a Field
-        return self.bound_field(instance)
-        return Field(
-            self.initial_value, self.attr, self.classname, instance)
-    __getitem__ = FieldDescriptor.bound_field
 
 
 class FieldManagerMetaDict(dict[str, Any]):
@@ -176,6 +242,11 @@ class BoundFieldCreatorMixin:
 
     Not intended to be used directly. Classes should use the FieldManagerMeta
     which will insert this into the bases if needed.
+
+    The purpose of this is to ensure that all instances have bound fields for
+    all the class Field attributes. This allows reactions to invariably
+    dispatch to the bound field rather than having to check if the Field or the 
+    bound field should be called.
     '''
     def __new__(cls, *_):
         nascent = super().__new__(cls)
@@ -196,7 +267,7 @@ class Reactant(): # todo metaclass=FieldManagerMeta):
         count: Field[Counter, int] = Field(-1)
 
         @ count != -1
-        async defcounter(self, bound_field: BoundField[Counter, int],
+        async defcounter(self, field: Field[int],
                  old: int, new: int) -> None:
             self.count += 1
 

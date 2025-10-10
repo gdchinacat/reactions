@@ -21,11 +21,8 @@ from dataclasses import dataclass
 from typing import Tuple, List, Optional, NoReturn
 from unittest import TestCase, main
 
-from ..error import (MustNotBeCalled, FieldAlreadyBound,
-                     FieldConfigurationError)
-from ..field import Field
-from ..field import FieldManager
-from ..field_descriptor import BoundField
+from ..error import MustNotBeCalled, FieldAlreadyBound
+from ..field import Field, BoundField, FieldManager
 from ..predicate import Predicate
 from ..predicate_types import Contains, Not, Or, And
 

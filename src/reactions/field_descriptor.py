@@ -15,14 +15,14 @@
 '''
 Where most of the 'magic' happens.
 '''
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from itertools import count
 from typing import List, Any, Dict, Optional, Callable, Iterable
 
-from .error import (MustNotBeCalled, FieldAlreadyBound,
-                    FieldConfigurationError)
+from .error import MustNotBeCalled
 
 
 __all__ = []
@@ -62,16 +62,11 @@ class Evaluatable[T](HasFields, ABC):
         raise NotImplementedError()
 
 
-class ReactionMixin(ABC):
+class ReactionMixin[T](ABC):
     '''
-    Implements the Reaction members and methods for Field and BoundField.
+    Class that reacts to FieldReactions by synchronously dispatching them to
+    a list of reactions that have been configured.
     '''
-    # TODO - move _reactions to the instance:
-    #        on first access set instance._reactions to be a reference to the
-    #        field.
-    #        on write copy from class field to instance and update with new
-    #        reaction
-    #        allow bound field reactions
     _reactions: List[FieldReaction]
 
     def __init__(self,
@@ -88,7 +83,11 @@ class ReactionMixin(ABC):
         '''
         self._reactions.append(reaction)
 
-    def react[T](self, instance: Any, field: "FieldDescriptor[T]", old: T, new: T):
+    def react(self,
+              instance: Any,
+              field: "FieldDescriptor[T]",
+              old: T,
+              new: T):
         '''
         Notify the reactions that the value changed from old to new.
         '''
@@ -96,7 +95,7 @@ class ReactionMixin(ABC):
             reaction(instance, field, old, new)
 
 
-class FieldDescriptor[T](Evaluatable[T], ReactionMixin):
+class FieldDescriptor[T](Evaluatable[T], ReactionMixin[T]):
     '''
     An instrumented field.
     - T: is the type of object the field references
@@ -119,7 +118,7 @@ class FieldDescriptor[T](Evaluatable[T], ReactionMixin):
     _field_count = count()  # class member for assigning default attr names
 
     def __init__(self,
-                 initial_value: Optional[T] = None,
+                 initial_value: T,
                  classname: Optional[str] = None,
                  attr: Optional[str] = None,
                  *args, **kwargs) -> None:
@@ -140,7 +139,7 @@ class FieldDescriptor[T](Evaluatable[T], ReactionMixin):
         super().__init__(*args, **kwargs)
         self.set_names(classname or '<no class associated>',
                        attr or f'field_{next(self._field_count)}')
-        self.initial_value: Optional[T] = initial_value
+        self.initial_value: T = initial_value
 
     def set_names(self, classname: str, attr: str):
         '''
@@ -155,7 +154,6 @@ class FieldDescriptor[T](Evaluatable[T], ReactionMixin):
         self.classname = classname
         self.attr = attr
         self._attr: str = '_' + self.attr               # private
-        self._attr_bound: str = self._attr + '_bound'   # bound field
 
     def __hash__(self):
         '''
@@ -164,33 +162,7 @@ class FieldDescriptor[T](Evaluatable[T], ReactionMixin):
         '''
         return id(self)
 
-    def _bind(self, nascent_instance):
-        '''
-        Create a BoundField on instance.
-        nascent_instance:
-            the Reactant that reactions are called on (reaction(self, ...))
-            todo - saying it this way makes me realize the instance I've
-            been struggling with figuring out how to identify is an
-            aspect of the field. Specifically, the bound field. It needs
-            to associate (field, attribute, old, new) with what object
-            is the self for reaction(self, (field, attr,. ..)).
-
-            Beware: field._bind(nascent_instance) called during __new__()
-            before it has been initialized (hence its name). While it goes
-            without saying that instance attributes not managed by Field,
-            FieldManagerMixin, etc should not be acessed since they may not
-            exist and if they do the values have not been initialized, what
-            isn't so obvious is *do not* call str() or repr() on instance
-            as they are likely to fail before the object is initialized.
-        '''
-        if (hasattr(nascent_instance, self._attr_bound)):
-            raise FieldAlreadyBound(
-                f'{self} already bound to object '
-                f'id(instance)={id(nascent_instance)}')
-        bound_field = BoundField[T](nascent_instance, self)
-        setattr(nascent_instance, self._attr_bound, bound_field)
-
-    def evaluate(self, instance) -> Optional[T]:
+    def evaluate(self, instance)->T:
         try:
             return getattr(instance, self._attr)
         except AttributeError:
@@ -200,7 +172,7 @@ class FieldDescriptor[T](Evaluatable[T], ReactionMixin):
     ###########################################################################
     # Descriptor protocol for intercepting field updates
     ###########################################################################
-    def __get__(self, instance, owner=None):
+    def __get__(self, instance, owner=None)->T|FieldDescriptor[T]:
         '''
         Get the value of the field.
 
@@ -225,19 +197,15 @@ class FieldDescriptor[T](Evaluatable[T], ReactionMixin):
         assert owner is not None
         return self
 
-    def bound_field(self, instance)->BoundField[T]:
-        '''get the bound field for the instance for this field'''
-        return getattr(instance, self._attr_bound)
-            
-    def __set__(self, instance, value: Optional[T]):
+    def __set__(self, instance, value: T):
         # See comment in __get__ for handling field access. Ignore this call
         # if value is self.
         if value is self:
             return
-        old: Optional[T] = self.evaluate(instance)
+        old: T = self.evaluate(instance)
         if value != old:
             setattr(instance, self._attr, value)
-            self.bound_field(instance).react(instance, self, old, value)
+            self.react(instance, self, old, value)
 
     __delete__ = MustNotBeCalled(
         None, "removal of state attributes is not permitted")
@@ -252,44 +220,4 @@ class FieldDescriptor[T](Evaluatable[T], ReactionMixin):
         return f"{self.classname}.{self.attr}"
     __repr__ = __str__
 
-
-class BoundField[T](ReactionMixin):
-    '''
-    A field bound to a specific instance.
-
-    ALL field state relating to the instance should be on this object so that
-    it is collected along with the instance. The Field should have no
-    references to any instance specific information.
-    '''
-
-    def __init__(self,
-                 nascent_instance: Any,
-                 field: FieldDescriptor[T], *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.field: FieldDescriptor[T] = field
-        self.instance = nascent_instance
-
-        # This class is per instance, so it doesn't hurt to store the instance
-        # specific data on the bound field, so unlike the class field instance
-        # data is stored on the bound field.
-        
-        # _reactions is the list of reactions to call when the field changes
-        # value. It starts out as a reference to the class reactions. When an
-        # instance reaction is configured a copy is made of the class reactions
-        # and a private copy for this instance only is created.
-        self._reactions = field._reactions
-
-    def reaction(self, reaction: FieldReaction):
-        '''Add a reaction for when this bound field changes value.'''
-        # ensure the bound field is using a private reactions list
-        if self._reactions is self.field._reactions:
-            self._reactions = list(self.field._reactions)
-
-        self._reactions.append(reaction)
-            
-        
-    def __str__(self):
-        return (f'{self.field.classname}({id(self.instance)})'
-                f'.{self.field}')
-    __repr__ = __str__
 

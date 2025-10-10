@@ -34,8 +34,9 @@ class State(FieldManager):
     Kitchen sink state machine for testing various aspects of State.
     '''
 
-    exception = Field[Optional[Exception]]()
-    infinite_loop  = Field[bool](False)
+    exception = Field[Exception|None](None)
+    infinite_loop  = Field(False)
+
     infinite_loop_running: Future[None] = field(default_factory=Future)
     
     def _start(self) -> None:
