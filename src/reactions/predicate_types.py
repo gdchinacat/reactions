@@ -1,15 +1,15 @@
 # Copyright (C) 2025 Anthony (Lonnie) Hutchinson <chinacat@chinacat.org>
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 '''
@@ -25,24 +25,26 @@ from .predicate import UnaryPredicate, BinaryPredicate, Predicate
 
 
 __all__ = ['Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
-           'Contains', 'BinaryAnd', 'BinaryOr', 'ComparisonPredicates']
+           'Contains', 'BinaryAnd', 'BinaryOr', 'BinaryNot',
+           'ComparisonPredicates']
 
 
-Not = UnaryPredicate.factory('Not', '!not!', operator.not_, __all__)
-And = BinaryPredicate.factory('And', '!and!', lambda _, a, b: a and b, __all__)
-Or = BinaryPredicate.factory('Or', 'or', lambda _, a, b: a or b, __all__)
-Eq = BinaryPredicate.factory('Eq', '==', operator.eq, __all__)
-Ne = BinaryPredicate.factory('Ne', '!=', operator.ne, __all__)
-Lt = BinaryPredicate.factory('Lt', '<', operator.lt, __all__)
-Le = BinaryPredicate.factory('Le', '<=', operator.le, __all__)
-Gt = BinaryPredicate.factory('Gt', '>', operator.gt, __all__)
-Ge = BinaryPredicate.factory('Ge', '>=', operator.ge, __all__)
-Contains = BinaryPredicate.factory('Contains','contains', operator.contains, __all__)
+Not = UnaryPredicate.factory('Not', '!not!', operator.not_)
+And = BinaryPredicate.factory('And', '!and!', lambda _, a, b: a and b)
+Or = BinaryPredicate.factory('Or', '!or!', lambda _, a, b: a or b)
+Eq = BinaryPredicate.factory('Eq', '==', operator.eq)
+Ne = BinaryPredicate.factory('Ne', '!=', operator.ne)
+Lt = BinaryPredicate.factory('Lt', '<', operator.lt)
+Le = BinaryPredicate.factory('Le', '<=', operator.le)
+Gt = BinaryPredicate.factory('Gt', '>', operator.gt)
+Ge = BinaryPredicate.factory('Ge', '>=', operator.ge)
+Contains = BinaryPredicate.factory('Contains','contains', operator.contains)
 
 # BinaryAnd and BinaryOr aren't strictly predicates since they don't evaluate
 # to a bool. Still useful, so included.
-BinaryAnd = BinaryPredicate.factory('BinaryAnd', '&', operator.and_, __all__)
-BinaryOr = BinaryPredicate.factory('BinaryOr', '|', operator.or_, __all__)
+BinaryAnd = BinaryPredicate.factory('BinaryAnd', '&', operator.and_)
+BinaryOr = BinaryPredicate.factory('BinaryOr', '|', operator.or_)
+BinaryNot = BinaryPredicate.factory('BinaryNot', '~', operator.or_)
 
 
 class ComparisonPredicates:
@@ -67,32 +69,32 @@ class ComparisonPredicates:
 
     def __and__(self, other) -> Predicate:
         '''create an And (&) predicate for the field'''
-        return BinaryAnd(self, other)  # pylint: disable=too-many-function-args
+        return BinaryAnd(self, other)  # pylint: disable=too-many-function-args, abstract-class-instantiated
 
     def __or__(self, other) -> Predicate:
         '''create an Or (|) predicate for the field'''
-        return BinaryOr(self, other)  # pylint: disable=too-many-function-args
+        return BinaryOr(self, other)  # pylint: disable=too-many-function-args, abstract-class-instantiated
 
     def __eq__(self, other) -> Predicate:  # type: ignore[override]
         '''create an Eq (==) predicate for the field'''
-        return Eq(self, other)  # pylint: disable=too-many-function-args
+        return Eq(self, other)  # pylint: disable=too-many-function-args, abstract-class-instantiated
 
     def __ne__(self, other) -> Predicate:  # type: ignore[override]
         '''create an Eq predicate for the field'''
-        return Ne(self, other)  # pylint: disable=too-many-function-args
+        return Ne(self, other)  # pylint: disable=too-many-function-args, abstract-class-instantiated
 
     def __lt__(self, other) -> Predicate:
         '''create an Lt (<) predicate for the field'''
-        return Lt(self, other)  # pylint: disable=too-many-function-args
+        return Lt(self, other)  # pylint: disable=too-many-function-args, abstract-class-instantiated
 
     def __le__(self, other) -> Predicate:
         '''create an Le (<=) predicate for the field'''
-        return Le(self, other)  # pylint: disable=too-many-function-args
+        return Le(self, other)  # pylint: disable=too-many-function-args, abstract-class-instantiated
 
     def __gt__(self, other) -> Predicate:
         '''create an Gt (>) predicate for the field'''
-        return Gt(self, other)  # pylint: disable=too-many-function-args
+        return Gt(self, other)  # pylint: disable=too-many-function-args, abstract-class-instantiated
 
     def __ge__(self, other) -> Predicate:
         '''create an Ge (>=) predicate for the field'''
-        return Ge(self, other)  # pylint: disable=too-many-function-args
+        return Ge(self, other)  # pylint: disable=too-many-function-args, abstract-class-instantiated

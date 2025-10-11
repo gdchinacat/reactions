@@ -1,15 +1,15 @@
 # Copyright (C) 2025 Anthony (Lonnie) Hutchinson <chinacat@chinacat.org>
-# 
+#
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 '''
@@ -21,7 +21,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import partial
 import logging
-from typing import Any, Callable, Type, Iterable, Coroutine, Optional, List
+from typing import Any, Callable, Type, Iterable, Coroutine
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
 from .field_descriptor import FieldDescriptor, Evaluatable
@@ -103,7 +103,7 @@ class Predicate(Evaluatable[bool], ABC):
         the fields reaction executor. TODO - update comment once predicates
         have a Reactant to schedule reaction with.
         '''
-        logger.log(VERBOSE, 
+        logger.log(VERBOSE,
                    '%s notified that %s %s -> %s',
                    self, field, old, new)
 
@@ -174,7 +174,7 @@ class Predicate(Evaluatable[bool], ABC):
         # Add a reaction on all the fields to call self.react() with
         # func as the reaction function.
         for field in set(self.fields):
-            logger.info(f'changes to {field} will call {func}')
+            logger.info('changes to %s will call %s', field, func)
             field.reaction(partial(self.react, reaction=func))
         return ReactionMustNotBeCalled(func)
 
@@ -210,14 +210,14 @@ class OperatorPredicate(Predicate, ABC):
 
     @property
     @abstractmethod
-    def token(self) -> str: ...  # field from subclass
+    def token(self) -> str:
+        '''the operator token (i.e. '==') to use for logging the predicate'''
 
     @classmethod
     def factory[Tp](cls: Type[Tp],
                 name: str,
                 token: str,
-                op: Callable[..., bool],
-                module_all: List[str]|None = None,
+                op: Callable[..., bool]
                ) -> Type[Tp]:
         '''
         Create a Predicate class using the given op. token is for str/repr
@@ -230,8 +230,6 @@ class OperatorPredicate(Predicate, ABC):
                    (cls, ),
                    {'token': token,
                     'operator': op})
-        if module_all is not None:
-            module_all.append(name)
         return ret
 
 
@@ -268,7 +266,7 @@ class BinaryPredicate(OperatorPredicate, ABC):
         # This may need to be reevaluated, but it helps with the fields()
         # logic for now.
         super().__init__()
-        self.left = (left if isinstance(left, Evaluatable) 
+        self.left = (left if isinstance(left, Evaluatable)
                           else Constant(left))
         self.right = (right if isinstance(right, Evaluatable)
                             else Constant(right))
@@ -287,6 +285,6 @@ class BinaryPredicate(OperatorPredicate, ABC):
 
     # Disallow evaluation of predicate truthiness as doing so is more likely to
     # cause predicates to not work as expected than there are use cases for it.
-    __bool__ = InvalidPredicateExpression( None, 
+    __bool__ = InvalidPredicateExpression( None,
         "bool(Predicate) (or 'Predicate and ...') not supported, use "
         "'And(Predicate, Predicate)' instead")
