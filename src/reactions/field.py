@@ -222,34 +222,13 @@ class BoundFieldCreatorMixin:
         return nascent
 
 @dataclass
-class Reactant(): # todo metaclass=FieldManagerMeta):
+class Reactant():
     '''
-    Base class that allows classes to react asynchronously to predicates that
-    become true. Not intended for direct use by client code, FieldManager and
+    Mixin to give a class a reaction executor and methods to manage its
+    lifecycle.
+
+    Not intended for direct use by client code, FieldManager and
     FieldWatcher should be used instead.
-
-    Usage:
-    class Counter(Reactant):
-        """A counter that spins until stopped"""
-        count: Field[Counter, int] = Field(-1)
-
-        @ count != -1
-        async defcounter(self, field: Field[int],
-                 old: int, new: int) -> None:
-            self.count += 1
-
-        def _start(self):
-            'transition from initial state, called during start()'
-            self.count = 0
-
-    async def run_counter_for_awhile():
-        counter = Counter()
-        counter_task = asyncio.create_task(counter.start())
-        ....
-        counter.stop()
-        await counter_task
-
-    Reactions are called asynchronously in the Reactant's reaction executor.
     '''
     # todo - a reaction_executor for instances introduces an ambiguity of
     #        which instances executor predicate reactions will be executed
@@ -365,4 +344,8 @@ class FieldWatcher(Reactant):
     '''The set of instances being watched.'''
 
     def __post_init__(self):
+        # todo - when new instances of FieldWatcher are created this should
+        #        inspect the methods that have been decorated with predicates
+        #        and create instance reactions for the predicate fields on the
+        #        corresponding self.watch object fields.
         logger.error(f'todo - add bound predicates on {self.watch} for {self}')
