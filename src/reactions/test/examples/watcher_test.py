@@ -73,7 +73,7 @@ class Test(TestCase):
         watched = Watched()
         change_events = []
 
-        @Watched.ticks[watched] != None
+        @ Watched.ticks[watched] != None
         async def watch(*args):
             change_events.append(args)
 

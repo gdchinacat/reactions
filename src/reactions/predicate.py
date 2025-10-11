@@ -34,10 +34,6 @@ __all__ = ['Constant']
 logger = logging.getLogger("reactions.predicate")
 
 
-# todo hack
-reaction_executor = None
-# end hack
-
 type ReactionCoroutine = Coroutine[Any, Any, None]
 # Callable arguments behavior is contravariant to ensure type safety.
 # todo  - make FieldDescriptor[T] arg covariant so client code can declare
@@ -99,9 +95,10 @@ class Predicate(Evaluatable[bool], ABC):
               reaction: PredicateReaction) -> None:
         '''
         React to a field value changing. If the result of evaluating this
-        predicate is True the reaction will be scheduled for execution by
-        the fields reaction executor. TODO - update comment once predicates
-        have a Reactant to schedule reaction with.
+        predicate is True the reaction will be scheduled for execution.
+        The executor to use is determined by the object the reaction is being
+        called on. For bound method reactions the object the reaction is bound
+        to provides the executor, otherwise the instance.
         '''
         logger.log(VERBOSE,
                    '%s notified that %s %s -> %s',
@@ -110,21 +107,15 @@ class Predicate(Evaluatable[bool], ABC):
         if self.evaluate(instance):
             logger.debug('%s TRUE for %s %s -> %s',
                          self, field, old, new)
-            # TODO - where to get the executor from
-            #    self - execution is bound to the predicate
-            #        - most predicates are specified at class definition time.
-            #          how is the executor set?
-            #    instance - what currently exists, state objects provide the
-            #               executor. Doesn't work well for reactions on
-            #               things other than the instance that changed.
-            #    field - more closely aligned with reactions being used for
-            #            atomic state updates. Same issue as self...how is
-            #            a field associated with an executor, how are
-            #            executors shared between fields?
-            #    async context - require code set the executor to use...not
-            #                    sure this is scoped well enought...feels like
-            #                    it will devolve into a global since reactions
-            #                    are asynchronous.
+            
+            # It is noticeably faster to just try to get __self__ than to check
+            # inspect.ismethod(react). if reaction is a method the fastest is
+            # to try/except AttributeError, but if it's not that is horrendous.
+            executor_instance = getattr(reaction, '__self__', instance)
+
+            # Objects that react must provide an executor. This is typically
+            # done by deriving from FieldManager or FieldWatcher.
+            reaction_executor = executor_instance._reaction_executor
             reaction_executor.react(reaction,
                                     instance,
                                     field,

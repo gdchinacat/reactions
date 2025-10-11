@@ -42,13 +42,9 @@ logger: Logger = getLogger('reactions.executor')
 #        to allow reactants to share executors to provide concurrency control.
 class ReactionExecutor:
     '''
-    ReactionExecutor executes reactions submitted by Reactants. It is separate
-    from Reactant to allow multiple reactants to share the same executor to
-    allow the executor to act as a means of providing other reactions
-    consistent views of the fields managed by the executor.
-    todo - figure out exactly how this management happens). 
-    todo - move start/stop from Reactant? Force users to manage
-           ReactionExecutors? Part of cleaning up the tight coupling.
+    ReactionExecutor executes ReactionCoroutines sequentially but
+    asynchronously (the submitter is not blocked). Submitters are typically
+    Predicates.
 
     ReactionExecutor has a queue and a task. The queue contains the coroutines
     for the reactions to execute, while the task drains the queue and executes
@@ -65,12 +61,15 @@ class ReactionExecutor:
     reactions to the executor directly, but rather incorporate this into the
     Field state and use the predicate facility to create reactions. No
     management of tasks created by reactions is provided.
+
+    todo - move start/stop from Reactant? Force users to manage
+           ReactionExecutors? Part of cleaning up the tight coupling.
     '''
 
     task: Optional[Task] = None
     '''the task that is processing the queue to execute reactions'''
 
-    queue: Queue[Tuple[int, Any, ReactionCoroutine, Any]]
+    queue: Queue[Tuple[int, ReactionCoroutine, Any]]
     '''
     The queue of reactions to execute.
     TODO - The Tuple has grown to the point an actual class makes sense.
@@ -81,12 +80,9 @@ class ReactionExecutor:
            readable.
     Tuple elements are:
         [0] - the id of the reaction (for logging)
-        [1] - the instance the reaction is called on
-              (todo - is actually the instance of the field that changed)
-              stop() is called on this if the reaction raises an exception
-        [2] - the coroutine that implements the reaction (*not* the coroutine
+        [1] - the coroutine that implements the reaction (*not* the coroutine
               function, but the coroutine the function returns)
-        [3] - the args (used only for logging)
+        [2] - the args (used only for logging)
     '''
 
     _ids: count = count()
@@ -97,7 +93,7 @@ class ReactionExecutor:
     a process. Log messages should include the assigned id to aid in log
     analysis.
     '''
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.queue = Queue()
@@ -105,7 +101,6 @@ class ReactionExecutor:
     def react[T](self,
                  reaction: PredicateReaction,
                  instance,
-                 # TODO - should be the instance of the class that defined the reaction, not the instance of the class that field change triggered reaction
                  field: FieldDescriptor[T],
                  old: T, new: T) -> None:
         '''reaction that asynchronously executes the reaction'''
@@ -115,10 +110,9 @@ class ReactionExecutor:
         id_ = next(self._ids)
 
         try:
-            coro = reaction(instance, field, old, new)
+            reaction_coroutine = reaction(instance, field, old, new)
             self.queue.put_nowait((id_,
-                                   instance,
-                                   coro,
+                                   reaction_coroutine,
                                    (field, old, new)))
             logger.log(VERBOSE,
                 '%d scheduled %s(..., %s,  %s)',
@@ -149,10 +143,6 @@ class ReactionExecutor:
     ###########################################################################
 
     def start(self) -> Awaitable:
-        ## todo major hack till reaction executors are plumbed where they needed
-        from . import predicate
-        predicate.reaction_executor = self
-        ##
         if self.task is not None:
             raise ExecutorAlreadyStarted()
         self.task = create_task(self.execute_reactions())
@@ -163,12 +153,7 @@ class ReactionExecutor:
         if not self.task:
             raise ExecutorNotStarted()
 
-        logger.debug(f'{self} stopping.')
-
-        ## todo major hack till reaction executors are plumbed where they needed
-        from . import predicate
-        predicate.reaction_executor = None
-        ##
+        logger.debug('%s stopping.', self)
 
         self.queue.shutdown()
 
@@ -178,8 +163,8 @@ class ReactionExecutor:
             if timeout is not None:
                 def _cancel_task():
                     if not self.task.done():
-                        logger.error(f'{self} cancelled after shutdown '
-                                     f'took more than {timeout}s')
+                        logger.error('%s cancelled after shutdown '
+                                     'took more than %.2fs', self, timeout)
                         self.task.cancel()
                 loop.call_later(timeout, _cancel_task)
 
@@ -192,7 +177,7 @@ class ReactionExecutor:
         '''
         while True:
             try:
-                # TODO - get rid of everything but the coro:
+                # TODO - get rid of everything but the coroutine:
                 #        id_ and args are only for "calling" log
                 #            replace with fmt string that the various logs for
                 #            a specific reaction pass around and things fill
@@ -200,27 +185,27 @@ class ReactionExecutor:
                 #        instance only used to get the logger
                 #    Maybe the solution is to enable a debug mode that passes
                 #    the details for logging and when not in debug it passes
-                #    the coro instead of everything. Maye have different
+                #    the coroutine instead of everything. Maye have different
                 #    executor classes that can be chosen (i.e. "give me speed"
                 #    vs "give me insight").
-                (id_, instance, coro, args) = await self.queue.get()
+                (id_, coroutine, args) = await self.queue.get()
             except QueueShutDown:
-                logger.info(f'{self} stopped')
+                logger.info('%s stopped', self)
                 break
 
             try:
-                logger.debug(f'%s calling %s(%s)',
-                    id_, coro.__qualname__, str(args))
-                await coro
+                logger.debug('%s %s calling %s(%s)',
+                             self, id_, coroutine.__qualname__, str(args))
+                await coroutine
                 await sleep(0)
             except CancelledError as ce:
-                logger.exception(f'{self} stopped with error.', exc_info=ce)
+                logger.exception('%s stopped with error.', self, exc_info=ce)
                 raise  # CancelledError needs to be propagated
             except Exception as exc:
                 # A failure in a reaction means the state is inconsistent.
                 # Log the executor is stopped and raise the error to allow
                 # waiters to see it.
-                logger.exception(f'{self} stopped with error.', exc_info=exc)
+                logger.exception('%s stopped with error.', self, exc_info=exc)
                 raise
             finally:
                 self.queue.task_done()

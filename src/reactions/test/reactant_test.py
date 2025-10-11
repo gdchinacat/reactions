@@ -17,10 +17,9 @@ State machine test.
 '''
 from __future__ import annotations
 
-from asyncio import Future, CancelledError, sleep
+from asyncio import Future, CancelledError, sleep, Barrier
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Optional, AsyncIterator, Tuple, NoReturn
 from unittest import TestCase, main
 
 from .. import (ReactionMustNotBeCalled, ExecutorAlreadyStarted, Field,
@@ -65,15 +64,14 @@ class State(FieldManager):
 @asynccontextmanager
 async def running_state(skip_stop=False,
                         skip_await=False,
-                        *args, **kwargs
                         ) -> AsyncIterator[Tuple[State, ReactionExecutor]]:
     '''
     Async contexst manager to run the state before managed block and wait
     for it after the block. Context is (state, state_done_awaitable).
     async with running_state() as state:
     '''
-    state = State()
     executor = ReactionExecutor()
+    state = State(_reaction_executor=executor)
     executor.start()
     try:
         yield state, executor
@@ -90,9 +88,7 @@ class ReactantTest(TestCase):
     @asynctest
     async def test_reaction_exception_terminates_reactor(self):
         class _Exception(Exception): ...
-        state = State()
-
-        async with running_state(skip_await=True) as (_, executor):
+        async with running_state(skip_await=True) as (state, executor):
             state.exception = _Exception()
             with self.assertRaises(_Exception):
                 await executor
@@ -159,6 +155,30 @@ class ReactantTest(TestCase):
         state = _State()
         self.assertIs(obj, state.foo)
 
+    @asynctest
+    async def test_private_executors(self):
+        '''test that each Reactant has its own executor'''
+
+        # Have reactions on state instances with different reaction executors
+        # wait on a barrier
+        barrier = Barrier(2)
+        class State(FieldManager):
+            field = Field(False)
+            @ field  == True
+            async def field_(self, *_):
+                await barrier.wait()
+
+        state1, state2 = State(), State()
+
+        async with (state1 as executor1,
+                    state2 as executor2):
+            self.assertIsNot(executor1, executor2)
+            # Since both states are waiting on the barrier, that will only
+            # happen if they execute in separate executors.
+            state1.field = True
+            state2.field = True
+        self.assertEqual(0, barrier.n_waiting)
+        
 
 if __name__ == "__main__":
     main()

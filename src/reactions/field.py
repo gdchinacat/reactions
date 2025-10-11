@@ -18,7 +18,7 @@ The public facing Field implementation.
 
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta, abstractmethod, ABC
 from asyncio import run
 from dataclasses import dataclass, field
 from logging import getLogger
@@ -107,7 +107,6 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
         return getattr(instance, self._attr_bound)
     bound_field = __getitem__
 
-
     def _bind(self, nascent_instance)->None:
         '''
         Create a BoundField on instance.
@@ -189,11 +188,11 @@ class FieldManagerMeta(ABCMeta, type):
 
     def __setattr__(self, attr: str, value: Any):
         '''
-        Intercept calls to name Field attributes that are set on the class.
+        call set_names() on Field attributes
         '''
         if isinstance(value, Field):
             value.set_names(self.__qualname__, attr)
-            self._fields = self._fields + (value,)
+            self._fields = self._fields + (value,)  # pylint: disable=no-member
         super().__setattr__(attr, value)
 
     def __new__(cls, name, bases, namespace):
@@ -215,10 +214,10 @@ class BoundFieldCreatorMixin:
     dispatch to the bound field rather than having to check if the Field or the 
     bound field should be called.
     '''
-    def __new__(cls, *_):
+    def __new__(cls, *_, **__):
         nascent = super().__new__(cls)
-        for field in nascent._fields:
-            field._bind(nascent)
+        for field_ in nascent._fields:
+            field_._bind(nascent)
         return nascent
 
 @dataclass
@@ -229,49 +228,13 @@ class Reactant():
 
     Not intended for direct use by client code, FieldManager and
     FieldWatcher should be used instead.
+
+    Reactants are asynchronous context managers that start on enter and stop
+    on exit.
     '''
-    # todo - a reaction_executor for instances introduces an ambiguity of
-    #        which instances executor predicate reactions will be executed
-    #        in, meaning it actually *is* possible for reactions to do dirty
-    #        reads if a predicate contains multiple reaction executors.
-    #        Fix this by defining a better executor management strategy.
-    #          - global - yuck,  this would have the effect of serializaiong
-    #                     all reactions. This isn't good because two
-    #                     independent state instances should be able to execute
-    #                     reinvent a GIL. Unrelated states should be able to
-    #                     execute asynchronously.
-    #          - specify it for every instance created - yuck...a goal is to
-    #            make it so users don't have to think about how to schedule
-    #            reactions.
-    #          - Specify on the predicate, with a lambda? that is called when
-    #            the predicate is true with itself (for fields) that provides
-    #            an executor that the predicate should execute in.
-    #          - don't allow ambiguous predicates...if the instances the
-    #            predicates are using have different reaction executors raise
-    #            an error
-    #          - unfortunately the mechanism to get instances other than bound
-    #            field isn't complete yet and sorting it out will likely
-    #            provide structure (ie watcher = Watcher(watched)) to associate
-    #            instances with each other (1:1 seems a bit restrictuve, need
-    #            a mapping for each end that isn't 1 to or to 1. Performance?
-    #            Ramble Ramble Ramble: using metaclasses to hook into instance
-    #            creation/initialization seems like the most promising route.
-    #            The problem is the instance a reaction is called on is
-    #            currently acquired from the BoundField that had a field
-    #            change. This works fine for reactions that listen on their
-    #            own classes fields (including base class fields). But
-    #            reactions on other classes will invoke the reaction with the
-    #            other class as 'self', or at least the only instance
-    #            available.
-    #                - @(Foo.foo == 1) on Bar.foo_eq_one(): The method on Bar
-    #                  will not get a reference to an Bar instance.A
-    #                  ??? create Foo: Watched with reference to Bar: yuck, it
-    #                      is totally backwards and there are multiple
-    #                      for different Fields.
-    #                  ??? give predicate a resolver to push back to user
-    #                  ??? Factory method to create a new Watcher from a 
-    #                      Watched.
-    #                  ??? asyncio Context? 
+    # TODO - don't allow ambiguous predicates...if the instances the
+    #        predicates are using have different reaction executors raise
+    #        an error
     _reaction_executor: ReactionExecutor = field(
         default_factory=ReactionExecutor, kw_only=True,
         doc=
@@ -322,8 +285,16 @@ class Reactant():
     def cancel(self) -> None:
         self.stop(0)
 
+    async def __aenter__(self)->Awaitable:
+        return await self.start()
 
-class FieldManager(Reactant, metaclass=FieldManagerMeta):
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        self.stop()
+        await self._reaction_executor
+
+
+
+class FieldManager(Reactant, ABC, metaclass=FieldManagerMeta):
     '''
     Base class for classes with Field attributes.
 
@@ -332,7 +303,7 @@ class FieldManager(Reactant, metaclass=FieldManagerMeta):
 
 
 @dataclass
-class FieldWatcher(Reactant):
+class FieldWatcher(Reactant, ABC):
     '''
     Base class to allow subclasses to watch Fields on other classes.
 

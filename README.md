@@ -72,15 +72,7 @@ occur within a reaction will be seen in a consistent manner by other reactions
 executed within the same executor since the reactions will be executed only
 once the change initiating reaction has returned. In a sense, reactions are
 similar to RDBMS transaction (but no rollback exists...yet).
-WIP:
-It is important that state objects, fields, predicate, and reactions use the
-'proper' executor to provide the desired consistency semantics.
-Reactions are what is executed, so the question is how to select the executor
-for a reaction.
-  Field/BoundField - each field has an executor and all reactions are executed
-  using the reaction for the field that changed
-  
-END WIP
+
 ## Why?
 Expressing when code should be executed aligns with well defined state
 machines. Reading the code in this way makes it easy to see how the state
@@ -160,6 +152,17 @@ do. (I believe python doesn't provide these operators as dunders for
 performance reasons, which is valid).
 
 
+# Credits
+
+The idea for this started as a sleepless sick night after reading
+https://www.reddit.com/r/Python/comments/1nmta0f/i_built_a_full_programming_language_interpreter/ . Thanks to u/HearMeOut-13 for
+the post that got my mind going down this path.
+
+# Glossary
+*state instance* - the instance whose field value changed
+*reacting instance* - the instance that is reacting to a field change. May be
+					  the state instance or some other object
+
 # Licensed under GPL v3
 See the COPYING file for complete details.
 Copyright (C) 2025 Anthony (Lonnie) Hutchinson <chinacat@chinacat.org>
@@ -176,9 +179,3 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-# Credits
-
-The idea for this started as a sleepless sick night after reading
-https://www.reddit.com/r/Python/comments/1nmta0f/i_built_a_full_programming_language_interpreter/ . Thanks to u/HearMeOut-13 for
-the post that got my mind going down this path.
