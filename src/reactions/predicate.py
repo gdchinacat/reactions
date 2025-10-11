@@ -213,12 +213,12 @@ class OperatorPredicate(Predicate, ABC):
     def token(self) -> str: ...  # field from subclass
 
     @classmethod
-    def factory[T](cls: Type[T],
-                   name: str,
-                   token: str,
-                   op: Callable[..., bool],
-                   module_all: Optional[List[str]] = None,
-                  ) -> Type[T]:
+    def factory[Tp](cls: Type[Tp],
+                name: str,
+                token: str,
+                op: Callable[..., bool],
+                module_all: List[str]|None = None,
+               ) -> Type[Tp]:
         '''
         Create a Predicate class using the given op. token is for str/repr
         and has no other use.
