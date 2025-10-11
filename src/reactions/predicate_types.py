@@ -29,24 +29,59 @@ __all__ = ['Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
            'ComparisonPredicates']
 
 
-# todo - factory generated classes have are type[BinaryPredicate] which is
-#        an abstract class. Should these just be statically defined?
-Not = UnaryPredicate.factory('Not', '!not!', operator.not_)
-And = BinaryPredicate.factory('And', '!and!', lambda _, a, b: a and b)
-Or = BinaryPredicate.factory('Or', '!or!', lambda _, a, b: a or b)
-Eq = BinaryPredicate.factory('Eq', '==', operator.eq)
-Ne = BinaryPredicate.factory('Ne', '!=', operator.ne)
-Lt = BinaryPredicate.factory('Lt', '<', operator.lt)
-Le = BinaryPredicate.factory('Le', '<=', operator.le)
-Gt = BinaryPredicate.factory('Gt', '>', operator.gt)
-Ge = BinaryPredicate.factory('Ge', '>=', operator.ge)
-Contains = BinaryPredicate.factory('Contains','contains', operator.contains)
+class Not(UnaryPredicate):
+    token = '!not!'
+    operator = operator.not_
+
+class And(BinaryPredicate):
+    token = '!and!'
+    operator = lambda _, a, b: a and b
+
+class Or(BinaryPredicate):
+    token = '!or!'
+    operator = lambda _, a, b: a or b
+
+class Eq(BinaryPredicate):
+    token = '=='
+    operator = operator.eq
+
+class Ne(BinaryPredicate):
+    token = '!='
+    operator = operator.ne
+
+class Lt(BinaryPredicate):
+    token = '<'
+    operator = operator.lt
+
+class Le(BinaryPredicate):
+    token = '<='
+    operator = operator.le
+
+class Gt(BinaryPredicate):
+    token = '>'
+    operator = operator.gt
+
+class Ge(BinaryPredicate):
+    token = '>='
+    operator = operator.ge
+
+class Contains(BinaryPredicate):
+    token = 'contains'
+    operator = operator.contains
 
 # BinaryAnd and BinaryOr aren't strictly predicates since they don't evaluate
 # to a bool. Still useful, so included.
-BinaryAnd = BinaryPredicate.factory('BinaryAnd', '&', operator.and_)
-BinaryOr = BinaryPredicate.factory('BinaryOr', '|', operator.or_)
-BinaryNot = BinaryPredicate.factory('BinaryNot', '~', operator.or_)
+class BinaryAnd(BinaryPredicate):
+    token = '&'
+    operator = operator.and_
+
+class BinaryOr(BinaryPredicate):
+    token = '|'
+    operator = operator.or_
+
+class BinaryNot(BinaryPredicate):
+    token = '~'
+    operator = operator.or_
 
 
 class ComparisonPredicates:
@@ -54,8 +89,6 @@ class ComparisonPredicates:
     ##########################################################################
     # Predicate creation operators
     #
-    # todo - pylint too-many-function-args is disabled because it doesn't seem
-    #        to understand that they are classes.
     # type: ignore[override]
     #       suppress override errors on on __eq__ and __ne__ because the
     #       builtin being overridden returns bool and these do not, so the
@@ -71,32 +104,32 @@ class ComparisonPredicates:
 
     def __and__(self, other) -> Predicate:
         '''create an And (&) predicate for the field'''
-        return BinaryAnd(self, other)  # pylint: disable=too-many-function-args, abstract-class-instantiated
+        return BinaryAnd(self, other)
 
     def __or__(self, other) -> Predicate:
         '''create an Or (|) predicate for the field'''
-        return BinaryOr(self, other)  # pylint: disable=too-many-function-args, abstract-class-instantiated
+        return BinaryOr(self, other)
 
     def __eq__(self, other) -> Predicate:  # type: ignore[override]
         '''create an Eq (==) predicate for the field'''
-        return Eq(self, other)  # pylint: disable=too-many-function-args, abstract-class-instantiated
+        return Eq(self, other)
 
     def __ne__(self, other) -> Predicate:  # type: ignore[override]
         '''create an Eq predicate for the field'''
-        return Ne(self, other)  # pylint: disable=too-many-function-args, abstract-class-instantiated
+        return Ne(self, other)
 
     def __lt__(self, other) -> Predicate:
         '''create an Lt (<) predicate for the field'''
-        return Lt(self, other)  # pylint: disable=too-many-function-args, abstract-class-instantiated
+        return Lt(self, other)
 
     def __le__(self, other) -> Predicate:
         '''create an Le (<=) predicate for the field'''
-        return Le(self, other)  # pylint: disable=too-many-function-args, abstract-class-instantiated
+        return Le(self, other)
 
     def __gt__(self, other) -> Predicate:
         '''create an Gt (>) predicate for the field'''
-        return Gt(self, other)  # pylint: disable=too-many-function-args, abstract-class-instantiated
+        return Gt(self, other)
 
     def __ge__(self, other) -> Predicate:
         '''create an Ge (>=) predicate for the field'''
-        return Ge(self, other)  # pylint: disable=too-many-function-args, abstract-class-instantiated
+        return Ge(self, other)

@@ -212,25 +212,6 @@ class OperatorPredicate(Predicate, ABC):
     def token(self) -> str:
         '''the operator token (i.e. '==') to use for logging the predicate'''
 
-    @classmethod
-    def factory[Tp](cls: Type[Tp],
-                name: str,
-                token: str,
-                op: Callable[..., bool]
-               ) -> Type[Tp]:
-        '''
-        Create a Predicate class using the given op. token is for str/repr
-        and has no other use.
-        The generated class name is appended to module_all to export it from
-        the module.
-        '''
-
-        ret = type(name,
-                   (cls, ),
-                   {'token': token,
-                    'operator': op})
-        return ret
-
 
 @dataclass
 class UnaryPredicate(OperatorPredicate, ABC):
