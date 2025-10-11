@@ -21,7 +21,8 @@ from dataclasses import dataclass
 from typing import Tuple, List, NoReturn
 from unittest import TestCase, main
 
-from ..error import MustNotBeCalled, FieldAlreadyBound
+from ..error import (MustNotBeCalled, FieldAlreadyBound,
+                     InvalidPredicateExpression)
 from ..field import Field, BoundField, FieldManager
 from ..predicate import Predicate
 from ..predicate_types import Contains, Not, Or, And
@@ -139,11 +140,18 @@ class TestField(TestCase):
 
     def test_bound_field(self) -> None:
         C = create_class()
-        c1: Base =C()
+        c1: Base = C()
         c2: Base = C()
-        self.assertIsNot(C.field_a[c1], C.field_a)
         self.assertIsInstance(C.field_a[c1], BoundField)
-        self.assertNotEqual(C.field_a[c1], C.field_a[c2])
+        self.assertIsNot(C.field_a[c1], C.field_a)
+        self.assertIsNot(C.field_a[c1], C.field_a[c2])
+        with self.assertRaises(InvalidPredicateExpression):
+            # The above assertIsNot are because comparing two fields creates
+            # a predicate which is then evaluated for truthiness which is not
+            # allowed because it is rarely what is intended. This demonstrates
+            # why not to use assertNotEqaul to verify that the bound fields
+            # are not the same.
+            self.assertNotEqual(C.field_a[c1], C.field_a[c2])
 
     def test_bound_field_predicate(self) -> None:
         C = create_class()

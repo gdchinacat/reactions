@@ -285,7 +285,8 @@ class BinaryPredicate(OperatorPredicate, ABC):
     def __str__(self) -> str:
         return f"({self.left} {self.token} {self.right})"
 
-    __bool__ = InvalidPredicateExpression(
-        None, 
-        "'Predicate and Predicate' not supported, use "
+    # Disallow evaluation of predicate truthiness as doing so is more likely to
+    # cause predicates to not work as expected than there are use cases for it.
+    __bool__ = InvalidPredicateExpression( None, 
+        "bool(Predicate) (or 'Predicate and ...') not supported, use "
         "'And(Predicate, Predicate)' instead")

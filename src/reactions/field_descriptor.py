@@ -88,6 +88,9 @@ class ReactionDispatcher[T](ABC):
         '''
         Notify the reactions that the value changed from old to new.
         '''
+        # todo - this is used exclusively by BoundField. Field overrides to
+        #        call bound_field.react() (this implementation). Doesn't seem
+        #        very clean.
         for reaction in self._reactions:
             reaction(instance, field, old, new)
 
@@ -212,6 +215,9 @@ class FieldDescriptor[T](Evaluatable[T], ReactionDispatcher[T], ABC):
         old: T = self.evaluate(instance)
         if value != old:
             setattr(instance, self._attr, value)
+            # todo this needs to go to the bound field, so just do that
+            # from here rather than having self.react (Field.react) call the
+            # bound field react().
             self.react(instance, self, old, value)
 
     __delete__ = MustNotBeCalled(

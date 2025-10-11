@@ -21,31 +21,37 @@ from dataclasses import dataclass, field
 from typing import List
 from unittest import TestCase, main
 
-from ... import Field, FieldManager, FieldWatcher
+from ... import Field, FieldManager, FieldWatcher, And
 
 @dataclass
 class Watched(FieldManager):
-    last_tick = Field[int](5)
+
+    # While last_tick doesn't change, it is a Field so that its value will be
+    # evaluated in the predicates. if it were a simple field whatever value
+    # it had at class definition time would be used as a constant.
+    # todo - document this as a reason for making a static attribute a Field.
+    last_tick: Field[int] = Field[int](0)
     ticks = Field[int](-1)
 
-    @ ticks == 5
+    def _start(self):
+        self.ticks = 0
+
+    @ And(ticks != -1,
+          ticks != last_tick)
+    async def tick(self, *_):
+        self.ticks += 1
+
+    @ ticks == last_tick
     # todo - Field[..., bool] is wrong...predicate decorator typing isn't
     #        working because it expects to pass a BaseField to reaction and
     #        reaction accepts more specific Field. Even then, the field type
     #        isn't validating properly. Needs a fair bit of work.
-    async def done(self, field_: Field[bool], old: int, new:int):
-        assert field_
-        assert old != new
+    async def done(self, field: Field[bool], old: int, new:int):
         self.ticks = -1
         self.stop()
 
-    @ ticks != -1
-    async def tick(self, *_):
-        if self.ticks is not None:
-            self.ticks += 1
-
-    def _start(self):
-        self.ticks = 0
+    def __repr__(self):
+        return f'{type(self).__qualname__}({id(self)})'
 
 @dataclass
 class Watcher(FieldWatcher):
@@ -65,21 +71,20 @@ class Test(TestCase):
 
     def test_watch_manual_predicate(self):
         watched = Watched()
-        
         change_events = []
-        def watch(*args):
+
+        @Watched.ticks[watched] != None
+        async def watch(*args):
             change_events.append(args)
 
-        # todo - fix failing unit test by making BoundField create predicates
-        # todo - refactor FieldDispatcher to separate descriptor from else.
-        (Watched.ticks[watched] != None)(watch)
-        
         watched.run()
 
-        self.assertEqual(change_events,
-                         [(watched, Watched.ticks, x - 1, x)
-                          for x in range(watched.last_tick + 1)])
-        print(change_events)
+        # last_tick + 2 for changing ticks to -1
+        expected = [(watched, Watched.ticks, x - 1,
+                     x if x != watched.last_tick + 1 else -1)
+                    for x in range(watched.last_tick + 2)]
+
+        self.assertEqual(change_events, expected)
 
 
 if __name__ == "__main__":
