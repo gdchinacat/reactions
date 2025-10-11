@@ -29,6 +29,8 @@ __all__ = ['Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
            'ComparisonPredicates']
 
 
+# todo - factory generated classes have are type[BinaryPredicate] which is
+#        an abstract class. Should these just be statically defined?
 Not = UnaryPredicate.factory('Not', '!not!', operator.not_)
 And = BinaryPredicate.factory('And', '!and!', lambda _, a, b: a and b)
 Or = BinaryPredicate.factory('Or', '!or!', lambda _, a, b: a or b)
