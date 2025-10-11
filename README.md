@@ -42,14 +42,6 @@ Field reactions are invoked synchronously and execute as part of setting the
 new value on the field.
 Fields are used to create predicates using rich comparison functions (i.e
 'field == 1' will create a Predicate for this condition.
-*Note* that because reactions are executed asynchronously it is possible that
-the value of a field may be different when the reaction is executed than the
-predicate that triggered the execution. This happens when another reaction
-updates the field while the reaction is scheduled for execution. State machines
-and reactions should be designed and implemented to take this into account.
-In other words, predicates are evaluated when field values change, not when
-the reaction is executed. Reactions execution indicates the state *was* true,
-not that it *is still* true.
 ### Predicates
 The *predicate* module provides predicates for evaluating whether conditions
 on fields are true. The predicates are typically created through the Field
@@ -60,11 +52,35 @@ Predicates are decorators that can be used to specify the conditions when a
 decorated reaction method should be called. The predicate reaction evaluates
 the predicate and when true asynchronously calls the decorated reaction method
 using the associate executor.
+
+*Note* that because predicate reactions are executed asynchronously it is
+possible that the value of a field may be different when the reaction is
+executed than the predicate that triggered the execution. This happens when
+another reaction updates the field while the reaction is scheduled for
+execution. State machines and reactions should be designed and implemented to
+take this into account. In other words, predicates are evaluated when field
+values change, not when the reaction is executed. Reactions execution indicates
+the state *was* true, not that it *is still* true.
 ### Executors
 The *executor* module provides a *ReactionExecutor* class that is used to
 execute the predicate reactions. Reactions are executed sequentially in the
 order they are submitted. They are executed in the asyncio event loop for the
 context they are started in.
+#### Consistency
+Executors define the consistency of views of the fields. Updates to fields that
+occur within a reaction will be seen in a consistent manner by other reactions
+executed within the same executor since the reactions will be executed only
+once the change initiating reaction has returned. In a sense, reactions are
+similar to RDBMS transaction (but no rollback exists...yet).
+WIP:
+It is important that state objects, fields, predicate, and reactions use the
+'proper' executor to provide the desired consistency semantics.
+Reactions are what is executed, so the question is how to select the executor
+for a reaction.
+  Field/BoundField - each field has an executor and all reactions are executed
+  using the reaction for the field that changed
+  
+END WIP
 ## Why?
 Expressing when code should be executed aligns with well defined state
 machines. Reading the code in this way makes it easy to see how the state
