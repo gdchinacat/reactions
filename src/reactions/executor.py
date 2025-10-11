@@ -34,12 +34,6 @@ __all__ = ['ReactionExecutor']
 
 logger: Logger = getLogger('reactions.executor')
 
-# TODO - ReactionExecutor and Reactant are very tightly coupled and should be
-#        better encapsulated. The done-ness of the Reactant is entirely
-#        controlled by ReactionExecutor.complete, which shadows the task
-#        future and may be able to be cleaned up. This may remove the need for
-#        the task done callbacks. Executor and Reactant are separate entities
-#        to allow reactants to share executors to provide concurrency control.
 class ReactionExecutor:
     '''
     ReactionExecutor executes ReactionCoroutines sequentially but
@@ -61,9 +55,6 @@ class ReactionExecutor:
     reactions to the executor directly, but rather incorporate this into the
     Field state and use the predicate facility to create reactions. No
     management of tasks created by reactions is provided.
-
-    todo - move start/stop from Reactant? Force users to manage
-           ReactionExecutors? Part of cleaning up the tight coupling.
     '''
 
     task: Optional[Task] = None
@@ -72,12 +63,6 @@ class ReactionExecutor:
     queue: Queue[Tuple[int, ReactionCoroutine, Any]]
     '''
     The queue of reactions to execute.
-    TODO - The Tuple has grown to the point an actual class makes sense.
-           Initially the queue only contained the coroutine and was 'fast' in
-           that scheduling and executing a reaction didn't require creation of
-           a wrapper object. But, that is no longer the case...the tuple has to
-           be created, so it might as well just be a custom object that is
-           readable.
     Tuple elements are:
         [0] - the id of the reaction (for logging)
         [1] - the coroutine that implements the reaction (*not* the coroutine
@@ -109,19 +94,10 @@ class ReactionExecutor:
 
         id_ = next(self._ids)
 
-        try:
-            reaction_coroutine = reaction(instance, field, old, new)
-            self.queue.put_nowait((id_,
-                                   reaction_coroutine,
-                                   (field, old, new)))
-            logger.log(VERBOSE,
-                '%d scheduled %s(..., %s,  %s)',
-                id_, reaction.__qualname__, old, new)
-        except Exception:
-            logger.exception(
-                '%d failed to schedule %s (..., %s,  %s)',
-                id_, reaction.__qualname__, old, new)
-            raise
+        reaction_coroutine = reaction(instance, field, old, new)
+        self.queue.put_nowait((id_, reaction_coroutine, (field, old, new)))
+        logger.log(VERBOSE, '%d scheduled %s(..., %s,  %s)',
+                   id_, reaction.__qualname__, old, new)
 
     ###########################################################################
     # Task life cycle:
@@ -143,6 +119,7 @@ class ReactionExecutor:
     ###########################################################################
 
     def start(self) -> Awaitable:
+        '''start the task to execute the queued reactions'''
         if self.task is not None:
             raise ExecutorAlreadyStarted()
         self.task = create_task(self.execute_reactions())
@@ -159,14 +136,12 @@ class ReactionExecutor:
 
         # Create a callback to cancel the task if a timeout is specified.
         if timeout is not None:
-            loop = get_event_loop()
-            if timeout is not None:
-                def _cancel_task():
-                    if not self.task.done():
-                        logger.error('%s cancelled after shutdown '
-                                     'took more than %.2fs', self, timeout)
-                        self.task.cancel()
-                loop.call_later(timeout, _cancel_task)
+            def _cancel_task():
+                if not self.task.done():
+                    logger.error('%s cancelled after shutdown '
+                                 'took more than %.2fs', self, timeout)
+                    self.task.cancel()
+            get_event_loop().call_later(timeout, _cancel_task)
 
     async def execute_reactions(self) -> None:
         '''
@@ -177,17 +152,8 @@ class ReactionExecutor:
         '''
         while True:
             try:
-                # TODO - get rid of everything but the coroutine:
-                #        id_ and args are only for "calling" log
-                #            replace with fmt string that the various logs for
-                #            a specific reaction pass around and things fill
-                #            in the action pertaining to the reaction:
-                #        instance only used to get the logger
-                #    Maybe the solution is to enable a debug mode that passes
-                #    the details for logging and when not in debug it passes
-                #    the coroutine instead of everything. Maye have different
-                #    executor classes that can be chosen (i.e. "give me speed"
-                #    vs "give me insight").
+                # todo - use template string for id, args, other logging only
+                #        info.
                 (id_, coroutine, args) = await self.queue.get()
             except QueueShutDown:
                 logger.info('%s stopped', self)
@@ -199,19 +165,19 @@ class ReactionExecutor:
                 await coroutine
                 await sleep(0)
             except CancelledError as ce:
-                logger.exception('%s stopped with error.', self, exc_info=ce)
+                logger.exception('%s cancelled.', self, exc_info=ce)
                 raise  # CancelledError needs to be propagated
             except Exception as exc:
                 # A failure in a reaction means the state is inconsistent.
                 # Log the executor is stopped and raise the error to allow
                 # waiters to see it.
-                logger.exception('%s stopped with error.', self, exc_info=exc)
+                logger.exception('%s stopping on error.', self, exc_info=exc)
                 raise
             finally:
                 self.queue.task_done()
 
     def __await__(self):
-        '''wait for the task kto complete'''
+        '''wait for the task to complete'''
         if not self.task:
             raise ExecutorNotStarted()
         yield from self.task

@@ -147,11 +147,19 @@ class Predicate(Evaluatable[bool], ABC):
 
         Reaction execution start order is undefined (but consistent). It is too
         premature to define it well. It is currently determined by the order
-        of the reactions on the field which is the order the predicate
+        of the reactions on the field, which is the order the predicate
         decorator was applied to the fields in the predicate. It is therefore
         sensitive to which side a field is placed in a predicate, the method
         definition order, and the import order. This should be better defined,
         but at this time it is not. TODO
+
+        Consistency is the hobgoblin....oh, wait, that's entirely different.
+        Consistency is provided by the executors sequentially executing
+        reactions. Each reaction within an executor can be thought of as a sort
+        of transaction. Within an executor reactions will see consistent states
+        created by other reactions in the executor. Inconsistent reads will
+        occur when the fields being read are updated outside a reaction
+        executing in the same executor.
 
         TODO - remove ReactionMustNotBeCalled to allow stacking predicate
                decorators?

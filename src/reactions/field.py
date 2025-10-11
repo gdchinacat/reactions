@@ -111,12 +111,8 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
         '''
         Create a BoundField on instance.
         nascent_instance:
-            the Reactant that reactions are called on (reaction(self, ...))
-            todo - saying it this way makes me realize the instance I've
-            been struggling with figuring out how to identify is an
-            aspect of the field. Specifically, the bound field. It needs
-            to associate (field, attribute, old, new) with what object
-            is the self for reaction(self, (field, attr,. ..)).
+            the state instance that reactions are called on
+            (reaction(self, ...))
 
             Beware: field._bind(nascent_instance) called during __new__()
             before it has been initialized (hence its name). While it goes
@@ -232,9 +228,6 @@ class Reactant():
     Reactants are asynchronous context managers that start on enter and stop
     on exit.
     '''
-    # TODO - don't allow ambiguous predicates...if the instances the
-    #        predicates are using have different reaction executors raise
-    #        an error
     _reaction_executor: ReactionExecutor = field(
         default_factory=ReactionExecutor, kw_only=True,
         doc=
