@@ -22,14 +22,13 @@ from abc import ABCMeta, abstractmethod
 from asyncio import run
 from dataclasses import dataclass, field
 from logging import getLogger
-from typing import NoReturn, Any, Tuple, Awaitable
+from typing import Any, Tuple, Awaitable
 
 from .error import FieldAlreadyBound
 from .executor import ReactionExecutor
 from .field_descriptor import (FieldDescriptor, ReactionDispatcher,
                                FieldReaction, Evaluatable)
-from .predicate import Predicate
-from .predicate_types import And, Or, Eq, Ne, Lt, Le, Gt, Ge
+from .predicate_types import ComparisonPredicates
 
 
 __all__ = ['Field', 'FieldManager', 'FieldWatcher']
@@ -38,59 +37,7 @@ __all__ = ['Field', 'FieldManager', 'FieldWatcher']
 logger = getLogger('reactions.field')
 
 
-class FieldPredicates:
-    ##########################################################################
-    # Predicate creation operators
-    #
-    # todo - pylint too-many-function-args is disabled because it doesn't seem
-    #        to understand that they are classes.
-    # type: ignore[override]
-    #       suppress override errors on on __eq__ and __ne__ because the
-    #       builtin being overridden returns bool and these do not, so the
-    #       error is valid. However, this is what the implementation needs to
-    #       so so silence the error.
-    ###########################################################################
-    # TODO - the returned predicates need to have the type of the field that
-    #        created them in their type so that when they are called the type
-    #        of field the PredicateReaction accepts will match.
-    def __contains__(self, other) -> NoReturn:
-        '''not implemented'''
-        raise NotImplementedError('use Contains(self, other) instead')
-
-    def __and__(self, other) -> Predicate:  # todo should be And (below too)
-        '''create an And (&) predicate for the field'''
-        return And(self, other)  # pylint: disable=too-many-function-args
-
-    def __or__(self, other) -> Predicate:
-        '''create an Or (|) predicate for the field'''
-        return Or(self, other)  # pylint: disable=too-many-function-args
-
-    def __eq__(self, other) -> Predicate:  # type: ignore[override]
-        '''create an Eq (==) predicate for the field'''
-        return Eq(self, other)  # pylint: disable=too-many-function-args
-
-    def __ne__(self, other) -> Predicate:  # type: ignore[override]
-        '''create an Eq predicate for the field'''
-        return Ne(self, other)  # pylint: disable=too-many-function-args
-
-    def __lt__(self, other) -> Predicate:
-        '''create an Lt (<) predicate for the field'''
-        return Lt(self, other)  # pylint: disable=too-many-function-args
-
-    def __le__(self, other) -> Predicate:
-        '''create an Le (<=) predicate for the field'''
-        return Le(self, other)  # pylint: disable=too-many-function-args
-
-    def __gt__(self, other) -> Predicate:
-        '''create an Gt (>) predicate for the field'''
-        return Gt(self, other)  # pylint: disable=too-many-function-args
-
-    def __ge__(self, other) -> Predicate:
-        '''create an Ge (>=) predicate for the field'''
-        return Ge(self, other)  # pylint: disable=too-many-function-args
-
-
-class BoundField[T](ReactionDispatcher[T], Evaluatable[T], FieldPredicates):
+class BoundField[T](ReactionDispatcher[T], Evaluatable[T], ComparisonPredicates):
     '''
     A field bound to a specific instance.
 
@@ -137,7 +84,7 @@ class BoundField[T](ReactionDispatcher[T], Evaluatable[T], FieldPredicates):
     def evaluate(self, instance:Any)->T:
         return self.field.evaluate(instance)
 
-class Field[T](FieldDescriptor[T], FieldPredicates):
+class Field[T](FieldDescriptor[T], ComparisonPredicates):
     '''
     Field subclass that creates predicates from rich comparison methods.
     '''
