@@ -26,8 +26,7 @@ from typing import Any, Tuple, Awaitable
 
 from .error import FieldAlreadyBound
 from .executor import ReactionExecutor
-from .field_descriptor import (FieldDescriptor, ReactionDispatcher,
-                               FieldReaction, Evaluatable)
+from .field_descriptor import FieldDescriptor, FieldReaction, Evaluatable
 from .predicate_types import ComparisonPredicates
 
 
@@ -37,7 +36,7 @@ __all__ = ['Field', 'FieldManager', 'FieldWatcher']
 logger = getLogger('reactions.field')
 
 
-class BoundField[T](ReactionDispatcher[T], Evaluatable[T], ComparisonPredicates):
+class BoundField[T](Evaluatable[T], ComparisonPredicates):
     '''
     A field bound to a specific instance.
 
@@ -54,23 +53,24 @@ class BoundField[T](ReactionDispatcher[T], Evaluatable[T], ComparisonPredicates)
         self.field: Field[T] = field
         self.instance = nascent_instance
 
-        # This class is per instance, so it doesn't hurt to store the instance
-        # specific data on the bound field, so unlike the class field instance
-        # data is stored on the bound field.
-
-        # _reactions is the list of reactions to call when the field changes
-        # value. It starts out as a reference to the class reactions. When an
-        # instance reaction is configured a copy is made of the class reactions
-        # and a private copy for this instance only is created.
-        self._reactions = field._reactions
+        # reactions is the list of reactions to call. Initialixe as a reference
+        # to the Field creactions. A copy is made when any instance reactions
+        # are configured.
+        self.reactions = field.reactions
 
     def reaction(self, reaction: FieldReaction):
         '''Add a reaction for when this bound field changes value.'''
         # ensure the bound field is using a private reactions list
-        if self._reactions is self.field._reactions:
-            self._reactions = list(self.field._reactions)
+        if self.reactions is self.field.reactions:
+            self.reactions = list(self.field.reactions)
 
-        self._reactions.append(reaction)
+        self.reactions.append(reaction)
+
+    def react(self, instance:Any, field:FieldDescriptor[T],
+              old:T, new:T):
+        """React to field change events by dispatching them to the reactions"""
+        for reaction in self.reactions:
+            reaction(instance, field, old, new)
 
     def __str__(self):
         return (f'{self.field.classname}({id(self.instance)})'
@@ -105,6 +105,8 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
         (Watched.field[state] >= 5)(watcher.watch_field)
         '''
         return getattr(instance, self._attr_bound)
+    bound_field = __getitem__
+
 
     def _bind(self, nascent_instance)->None:
         '''
@@ -137,14 +139,8 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
               field: FieldDescriptor[T],
               old: T,
               new: T):
-        '''
-        Notify the reactions that the value changed from old to new.
-        Override ReactionDispatcher to dispatch using the bound field.
-        '''
-        # todo - get rid of the extra call in Field.__set__->Field.react()->BoundField.react()
-        assert field is self
-        self[instance].react(instance, field, old, new)
-
+        raise NotImplementedError('reactions should be on bound field')
+    
 
 class FieldManagerMetaDict(dict[str, Any]):
     '''
