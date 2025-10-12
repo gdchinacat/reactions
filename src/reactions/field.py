@@ -15,7 +15,6 @@
 '''
 The public facing Field implementation.
 '''
-
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod, ABC
@@ -23,7 +22,7 @@ from asyncio import run
 from dataclasses import dataclass, field
 from logging import getLogger
 from types import MethodType
-from typing import Any, Tuple, Awaitable
+from typing import Any, Tuple, Awaitable, Iterable, Set
 
 from .error import FieldAlreadyBound
 from .executor import ReactionExecutor
@@ -310,7 +309,6 @@ class FieldManager(Reactant, ABC, metaclass=FieldManagerMeta):
     '''
 
 
-@dataclass
 class FieldWatcher[T: type](Reactant, ABC):
     '''
     Base class to allow subclasses to watch Fields on other classes.
@@ -322,17 +320,37 @@ class FieldWatcher[T: type](Reactant, ABC):
     watched: T
     '''The instance being watched.'''
 
-    def __post_init__(self):
-        # Configure bound reactions for all _Reaction attributes on self.
-        for value in type(self).__dict__.values():
-            # todo - is there a better way than scaning __dict__ on every
-            #        instance initialization? Scan during class definition?
-            #        cache the set on first encounter? This is one of the only
-            #        'scan through everything', much less lookups. At least it
-            #        is in an instance create, but still...yuck.
-            if isinstance(value, _Reaction):
-                value.predicate.configure_reaction(
-                    MethodType(value.func, self),
-                    self.watched)
+    _reactions: Set[_Reaction]
+    '''
+    The reactions the class needs to register bound reactions for when
+    instances are initialized.
+    '''
 
-    def _start(self): ...
+    def __init__(self, watched, *args, _reaction_executor=None, **kwargs):
+        '''
+        Create a FieldWatcher
+        '''
+        self.watched = watched
+        executor = _reaction_executor or self.watched._reaction_executor
+        super().__init__(*args, _reaction_executor=executor, **kwargs)
+
+        # Configure the bound reactions.
+        for reaction in self._reactions:
+            reaction.predicate.configure_reaction(
+                MethodType(reaction.func, self), self.watched)
+
+    @classmethod
+    def __init_subclass__(cls)->None:
+        '''Initialize the reactions for the class.'''
+        super().__init_subclass__()
+
+        cls._reactions = set(value for value in cls.__dict__.values()
+                             if isinstance(value, _Reaction))
+        logger.info('%s has bound reactions: %s', cls, cls._reactions)
+
+    def _start(self):
+        '''
+        FieldWatcher implementations typically don't have a start action since
+        they use the watched reaction executor. This is implemented as a no op
+        so subclasses don't have to implement this method.
+        '''

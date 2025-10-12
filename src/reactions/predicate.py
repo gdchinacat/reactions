@@ -62,7 +62,7 @@ Reaction is the type for methods that predicates can decorate.
 '''
 
 
-@dataclass
+@dataclass(eq=True, frozen=True)
 class _Reaction(ReactionMustNotBeCalled):
     '''
     The result of decorating a reaction function.
@@ -71,7 +71,7 @@ class _Reaction(ReactionMustNotBeCalled):
     func: Reaction
 
 
-@dataclass
+@dataclass(eq=True, frozen=True)
 class Predicate(Evaluatable[bool], ABC):
     '''
     Predicate evaluates expressions.
@@ -89,6 +89,8 @@ class Predicate(Evaluatable[bool], ABC):
 
     Predicates can be used to decorate a function to schedule it to be run
     when the Predicate becomes True.
+
+    Predicates objects are immutable and hashable.
     '''
 
     def react(self,
@@ -247,7 +249,6 @@ class OperatorPredicate(Predicate, ABC):
         '''the operator token (i.e. '==') to use for logging the predicate'''
 
 
-@dataclass
 class UnaryPredicate(OperatorPredicate, ABC):
     '''Predicate that has a single operand.'''
     expression: Evaluatable

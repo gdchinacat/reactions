@@ -22,13 +22,15 @@ from typing import List, Tuple
 from unittest import TestCase, main
 
 from ... import Field, FieldManager, FieldWatcher, And
+from ...executor import ReactionExecutor
+from ..async_helpers import asynctest
 
 
 @dataclass
 class Watched(FieldManager):
 
-    last_tick: Field[int] = Field[int](0)
-    ticks = Field[int](-1)
+    last_tick: Field[int] = Field(1)
+    ticks = Field(-1)
 
     def _start(self):
         self.ticks = 0
@@ -50,17 +52,6 @@ class Watched(FieldManager):
     def __repr__(self):
         return f'{type(self).__qualname__}({id(self)})'
 
-@dataclass
-class Watcher[T: type](FieldWatcher):
-    change_events: List[Tuple] = field(default_factory=list)
-
-    @ Watched.ticks != None
-    async def _watch(self, watched: T, field, old, new):
-        assert isinstance(self, Watcher), f'got {type(self)=}'
-        assert isinstance(watched, Watched), f'got {type(watched)=}'
-        self.change_events.append((watched, field, old, new))
-
-
 class Test(TestCase):
 
     def test_manual_predicate(self):
@@ -81,6 +72,18 @@ class Test(TestCase):
         self.assertEqual(change_events, expected)
 
     def test_automatic_predicate(self):
+
+        class Watcher[T: type](FieldWatcher):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.change_events: List[Tuple] = list()
+
+            @ Watched.ticks != None
+            async def _watch(self, watched: T, field, old, new):
+                assert isinstance(self, Watcher), f'got {type(self)=}'
+                assert isinstance(watched, Watched), f'got {type(watched)=}'
+                self.change_events.append((watched, field, old, new))
+
         watched = Watched()
         watcher = Watcher(watched=watched,
                           _reaction_executor=watched._reaction_executor)
@@ -94,6 +97,32 @@ class Test(TestCase):
 
         self.assertEqual(watcher.change_events, expected)
 
+    @asynctest
+    async def test_automatic_dispatches_to_correct_watcher(self):
+        class Watched(FieldManager):
+            field = Field(False)
+
+        class Watcher[T](FieldWatcher):
+            reacted: bool = False
+            @ Watched.field == True
+            async def _true(
+                self, watched: T, field: Field[bool], old:bool, new:bool):
+                assert self.watched is watched
+                self.reacted = True
+
+        executor = ReactionExecutor()
+
+        watched1 = Watched(_reaction_executor=executor)
+        watcher1 = Watcher(watched=watched1, _reaction_executor=executor)
+
+        watched2 = Watched(_reaction_executor=executor)
+        watcher2 = Watcher(watched=watched2, _reaction_executor=executor)
+
+        async with watched1:
+            watched1.field = True
+
+        self.assertTrue(watcher1.reacted)
+        self.assertFalse(watcher2.reacted)
 
 if __name__ == "__main__":
     main()

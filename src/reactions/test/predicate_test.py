@@ -15,25 +15,56 @@
 '''
 Predicate test
 '''
-
 from __future__ import annotations
 
 from unittest import TestCase, main
 
-from .. import Field
+from .. import Field, ReactionMustNotBeCalled, FieldManager, FieldWatcher
+from ..predicate import _Reaction
 from .async_helpers import asynctest
 
 
 class PredicateTest(TestCase):
 
     @asynctest
-    async def test_predicate_decorator_returns__reaction(self):
+    async def test_decorator_returns__reaction(self):
         '''test the object returned by decorating a reaction is correct'''
         class State:
             field: Field[bool] = Field(False)
         predicate = State.field == True
         reaction = predicate(lambda *_: ...)
         self.assertEqual(predicate, reaction.predicate)
+
+    @asynctest
+    async def test_decorator_bound_reactions(self):
+        '''test that bound reactions are handled properly'''
+        class State(FieldManager):
+            field = Field(False)
+        class Watcher(FieldWatcher):
+            called = False
+            @State.field == True
+            async def _true(self,
+                            state: State,
+                            field: Field,
+                            old: bool, new:bool):
+                self.called = True
+
+        self.assertIsInstance(Watcher._true, _Reaction)
+        self.assertRaises(ReactionMustNotBeCalled, Watcher._true)
+
+        # reactions that look like they are bound aren't added to the class
+        # field reactions.
+        self.assertEqual([], State.field.reactions)
+
+        state = State()
+        watcher = Watcher(state)
+
+        self.assertEqual([], State.field.reactions)
+        async with state:  # todo - move async context manager to executor
+            state.field = True
+        self.assertTrue(watcher.called)
+
+        self.assertEqual([], State.field.reactions)
 
 if __name__ == "__main__":
     main()

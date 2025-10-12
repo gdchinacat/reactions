@@ -23,8 +23,8 @@ from unittest import TestCase, main
 
 from ..error import (MustNotBeCalled, FieldAlreadyBound,
                      InvalidPredicateExpression)
-from ..field import Field, BoundField, FieldManager
-from ..predicate import Predicate
+from ..field import Field, BoundField, FieldManager, FieldWatcher
+from ..predicate import Predicate, _Reaction
 from ..predicate_types import Contains, Not, Or, And
 
 
@@ -181,6 +181,37 @@ class TestField(TestCase):
         self.assertFalse(called)
         c.field_a = 1
         self.assertFalse(called)
+
+    def test_watcher__reactions_is_cached(self):
+        class Watched(FieldManager):
+            field = Field(False)
+        class Watcher(FieldWatcher):
+            @ Watched.field == True
+            async def _true(self, watched, field, old, new): ...
+
+        watched = Watched()
+
+        # at this point there is only a single reaction on Watcher
+        watcher = Watcher(watched)
+        reactions = watcher._reactions  # pylint: disable=protected-access
+        self.assertEqual(1, len(reactions))
+
+        # add another reaction to Watcher.
+        @ Watched.field == False
+        async def _false(self, watched, field, old, new): ...
+        self.assertIsInstance(_false, _Reaction)
+        Watcher._false = _false  # unsupported, don't do this outside tests
+
+        # verify Watcher reactions hasn't changed (indicating it was cached)
+        watcher = Watcher(watched)
+        reactions = watcher._reactions  # pylint: disable=protected-access
+        self.assertEqual(1, len(reactions))
+
+        # If the class is reinitialized the new reaction does appear.
+        Watcher.__init_subclass__()  # don't do this outside tests.
+        reactions = watcher._reactions  # pylint: disable=protected-access
+        self.assertEqual(2, len(reactions))
+
 
 if __name__ == '__main__':
     main()

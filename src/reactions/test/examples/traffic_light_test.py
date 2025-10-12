@@ -50,7 +50,7 @@ class TrafficLight(FieldManager):
     simple model that implements a traffic light:
     '''
 
-    color: Field[Color] = Field(Color.RED)
+    color = Field(Color.RED)
     '''color: the current color of the light'''
 
     ticks = Field(-1)
@@ -104,7 +104,7 @@ class TrafficLight(FieldManager):
              old: int, new: int) -> None:  # @UnusedVariable
         
         if self.ticks != new:
-            # Don't increment the tick...the other reaction already handled it.
+            # change reset ticks, don't react
             return
         assert self.ticks != TICKS_PER_LIGHT
 
