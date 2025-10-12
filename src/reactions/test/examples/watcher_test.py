@@ -118,7 +118,7 @@ class Test(TestCase):
         watched2 = Watched(_reaction_executor=executor)
         watcher2 = Watcher(watched=watched2, _reaction_executor=executor)
 
-        async with watched1:
+        async with executor:
             watched1.field = True
 
         self.assertTrue(watcher1.reacted)

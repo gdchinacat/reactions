@@ -176,6 +176,13 @@ class ReactionExecutor:
             finally:
                 self.queue.task_done()
 
+    async def __aenter__(self)->Awaitable:
+        return self.start()
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        self.stop()
+        await self
+
     def __await__(self):
         '''wait for the task to complete'''
         if not self.task:

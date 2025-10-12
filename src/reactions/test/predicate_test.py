@@ -60,7 +60,7 @@ class PredicateTest(TestCase):
         watcher = Watcher(state)
 
         self.assertEqual([], State.field.reactions)
-        async with state:  # todo - move async context manager to executor
+        async with state:
             state.field = True
         self.assertTrue(watcher.called)
 

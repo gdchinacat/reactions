@@ -180,7 +180,7 @@ class ReactantTest(TestCase):
             state1.field = True
             state2.field = True
         self.assertEqual(0, barrier.n_waiting)
-        
+
 
 if __name__ == "__main__":
     main()
