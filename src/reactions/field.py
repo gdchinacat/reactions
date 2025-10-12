@@ -86,7 +86,20 @@ class BoundField[T](Evaluatable[T], ComparisonPredicates):
 
 class Field[T](FieldDescriptor[T], ComparisonPredicates):
     '''
-    Field subclass that creates predicates from rich comparison methods.
+    Field provides attribute change notification and predicates.
+
+    class State:
+        field = Field(0)
+
+        @ field >= 0
+        async def count(self, *):
+        self.field += 1
+
+    An attribute may need to be a Field to use it in predicates even if the
+    value is never changed after instances are initialized. This is necessary
+    because the predicates are defined when the class is defined and whatever
+    value it has at that point will be used as a constant by the predicate. In
+    order to evaluate the instance value it should be made a Field.
     '''
 
     def set_names(self, classname:str, attr:str):

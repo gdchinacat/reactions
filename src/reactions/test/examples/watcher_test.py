@@ -26,10 +26,6 @@ from ... import Field, FieldManager, FieldWatcher, And
 @dataclass
 class Watched(FieldManager):
 
-    # While last_tick doesn't change, it is a Field so that its value will be
-    # evaluated in the predicates. if it were a simple field whatever value
-    # it had at class definition time would be used as a constant.
-    # todo - document this as a reason for making a static attribute a Field.
     last_tick: Field[int] = Field[int](0)
     ticks = Field[int](-1)
 
