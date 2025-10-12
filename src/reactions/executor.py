@@ -26,7 +26,7 @@ from typing import Any, Optional, Tuple, Awaitable
 from .error import ExecutorAlreadyStarted, ExecutorNotStarted
 from .field_descriptor import FieldDescriptor
 from .logging_config import VERBOSE
-from .predicate import ReactionCoroutine, PredicateReaction
+from .predicate import ReactionCoroutine, Reaction
 
 
 __all__ = ['ReactionExecutor']
@@ -84,7 +84,7 @@ class ReactionExecutor:
         self.queue = Queue()
 
     def react[T](self,
-                 reaction: PredicateReaction,
+                 reaction: Reaction,
                  instance,
                  field: FieldDescriptor[T],
                  old: T, new: T) -> None:

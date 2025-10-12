@@ -31,5 +31,3 @@ def asynctest(func):
                 await func(*args, **kwargs)
         asyncio.run(async_test_runner())
     return _asynctest
-
-

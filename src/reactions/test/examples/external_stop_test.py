@@ -51,7 +51,6 @@ class ExternalStopTest(TestCase):
         counter = Counter()
 
         @ Counter.count[counter] == count_to
-        @staticmethod
         async def stop(instance, field, old, new):
             # the Counter reaction to increment count has already executed by
             # the time this one executes, so instance.count is one greater than

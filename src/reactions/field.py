@@ -22,11 +22,13 @@ from abc import ABCMeta, abstractmethod, ABC
 from asyncio import run
 from dataclasses import dataclass, field
 from logging import getLogger
+from types import MethodType
 from typing import Any, Tuple, Awaitable
 
 from .error import FieldAlreadyBound
 from .executor import ReactionExecutor
 from .field_descriptor import FieldDescriptor, FieldReaction, Evaluatable
+from .predicate import _Reaction
 from .predicate_types import ComparisonPredicates
 
 
@@ -309,7 +311,7 @@ class FieldManager(Reactant, ABC, metaclass=FieldManagerMeta):
 
 
 @dataclass
-class FieldWatcher(Reactant, ABC):
+class FieldWatcher[T: type](Reactant, ABC):
     '''
     Base class to allow subclasses to watch Fields on other classes.
 
@@ -317,12 +319,20 @@ class FieldWatcher(Reactant, ABC):
     the reactions are routed to the proper instance.
     '''
     
-    watch: Tuple[Any]
-    '''The set of instances being watched.'''
+    watched: T
+    '''The instance being watched.'''
 
     def __post_init__(self):
-        # todo - when new instances of FieldWatcher are created this should
-        #        inspect the methods that have been decorated with predicates
-        #        and create instance reactions for the predicate fields on the
-        #        corresponding self.watch object fields.
-        logger.error(f'todo - add bound predicates on {self.watch} for {self}')
+        # Configure bound reactions for all _Reaction attributes on self.
+        for value in type(self).__dict__.values():
+            # todo - is there a better way than scaning __dict__ on every
+            #        instance initialization? Scan during class definition?
+            #        cache the set on first encounter? This is one of the only
+            #        'scan through everything', much less lookups. At least it
+            #        is in an instance create, but still...yuck.
+            if isinstance(value, _Reaction):
+                value.predicate.configure_reaction(
+                    MethodType(value.func, self),
+                    self.watched)
+
+    def _start(self): ...

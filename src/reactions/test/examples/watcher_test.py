@@ -18,10 +18,11 @@ An example showing how a class can watch a state for changes.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Tuple
 from unittest import TestCase, main
 
 from ... import Field, FieldManager, FieldWatcher, And
+
 
 @dataclass
 class Watched(FieldManager):
@@ -50,22 +51,19 @@ class Watched(FieldManager):
         return f'{type(self).__qualname__}({id(self)})'
 
 @dataclass
-class Watcher(FieldWatcher):
-    ticks_seen: List[int] = field(default_factory=list[int])
+class Watcher[T: type](FieldWatcher):
+    change_events: List[Tuple] = field(default_factory=list)
 
-    #@ Watched.ticks != None  # todo make this work
-    async def _watch(self,
-                     watched: Watched,
-                     _: Field[int],
-                     old: int, new: int):
+    @ Watched.ticks != None
+    async def _watch(self, watched: T, field, old, new):
         assert isinstance(self, Watcher), f'got {type(self)=}'
-        assert isinstance(watched, Watcher), f'got {type(watched)=}'
-        self.ticks_seen.append(new)
+        assert isinstance(watched, Watched), f'got {type(watched)=}'
+        self.change_events.append((watched, field, old, new))
 
 
 class Test(TestCase):
 
-    def test_watch_manual_predicate(self):
+    def test_manual_predicate(self):
         watched = Watched()
         change_events = []
 
@@ -81,6 +79,20 @@ class Test(TestCase):
                     for x in range(watched.last_tick + 2)]
 
         self.assertEqual(change_events, expected)
+
+    def test_automatic_predicate(self):
+        watched = Watched()
+        watcher = Watcher(watched=watched,
+                          _reaction_executor=watched._reaction_executor)
+
+        watched.run()
+
+        # last_tick + 2 for changing ticks to -1
+        expected = [(watched, Watched.ticks, x - 1,
+                     x if x != watched.last_tick + 1 else -1)
+                    for x in range(watched.last_tick + 2)]
+
+        self.assertEqual(watcher.change_events, expected)
 
 
 if __name__ == "__main__":

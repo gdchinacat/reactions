@@ -20,10 +20,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import partial
-import logging
+from inspect import getargs
 from typing import Any, Callable, Type, Iterable, Coroutine
+import logging
 
-from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
+from .error import (InvalidPredicateExpression, ReactionMustNotBeCalled,
+                    InvalidReactionArgumentCount)
 from .field_descriptor import FieldDescriptor, Evaluatable
 from .logging_config import VERBOSE
 
@@ -40,7 +42,7 @@ type ReactionCoroutine = Coroutine[Any, Any, None]
 #         reactions as taking Field[T] rather than FieldDescriptor[T].
 #         -- or --
 #         Is there someway to make the predicates created by Field take a
-#         PredicateReaction that takes Field? This is probably better from
+#         Reaction that takes Field? This is probably better from
 #         a type safety perspective since it doesn't violate type safety :)
 # TODO - this _T, B, etc makes errors go away, but specifying different types
 #        for T on the reaction (Field[T], T, T) don't show as errors either,
@@ -51,19 +53,22 @@ type ReactionCoroutine = Coroutine[Any, Any, None]
 #        for maybe how to do this.
 #type _T = Any
 #type B = FieldDescriptor[_T]
-#type PredicateReaction[_T, F: B] = Callable[[Any, F, _T, _T],
+#type Reaction[_T, F: B] = Callable[[Any, F, _T, _T],
 #                                     ReactionCoroutine]
-type PredicateReaction[T] = Callable[[Any, FieldDescriptor[T], T, T],
+type Reaction[T] = Callable[[Any, FieldDescriptor[T], T, T],
                                      ReactionCoroutine]
-
 '''
-A _Reactant method that is called asynchronously when a _Predicate value
-changes.
-
-Predicate reactions are processed asynchronously and require the type that
-defines them be a _Reactant so the reaction can be scheduled with the
-_ReactionExecutor for the _Reactant.
+Reaction is the type for methods that predicates can decorate.
 '''
+
+
+@dataclass
+class _Reaction(ReactionMustNotBeCalled):
+    '''
+    The result of decorating a reaction function.
+    '''
+    predicate: Predicate
+    func: Reaction
 
 
 @dataclass
@@ -92,7 +97,7 @@ class Predicate(Evaluatable[bool], ABC):
               old: Any,
               new: Any,
               *,
-              reaction: PredicateReaction) -> None:
+              reaction: Reaction) -> None:
         '''
         React to a field value changing. If the result of evaluating this
         predicate is True the reaction will be scheduled for execution.
@@ -121,7 +126,7 @@ class Predicate(Evaluatable[bool], ABC):
                                     field,
                                     old, new)
 
-    def __call__(self, func: PredicateReaction) -> ReactionMustNotBeCalled:
+    def __call__(self, func: Reaction) -> _Reaction:
         '''
         Predicates are decorators that arrange for the decorated method to be
         called when the predicate becomes True.
@@ -170,13 +175,42 @@ class Predicate(Evaluatable[bool], ABC):
                @ field2 == 2
                Attempting this currently raises ReactionMustNotBeCalled.
         '''
+        ##All reactions are configured, even those on different classes than
+        # the field that must be called through a bound field. func has not yet
+        # been added to the nascent class namespace so there really is no way
+        # to tell reliably which class it's on.
+        ##Reactions on the same class as the field dont need to take another
+        # instance. The number of positional args on the func is used to infer
+        # whether this reaction requires a bound reaction.
+        # todo - this argument code would be simpler if a proper change event
+        #        was created and passed on every field value change. That
+        #        hasn't been done because keeping he values off the heap has
+        #        performance improvements, but how much help is it to not
+        #        create a __slot__ed class to make this mess easier
+        args = getargs(func.__code__)
+        argc = len(args.args)
+        if argc != 5:  # todo special case (self, watched, field, old, new)
+            self.configure_reaction(func)
+        else:
+            # todo - the class func is on must be a FieldWatcher, but that is
+            #        not obvious how to enforce at this point since the class
+            #        hasn't been defined and it's nascent namespace isn't
+            #        available from the func.
+            logger.info('changes to %s will use bound reactions to call %s',
+                        ', '.join(str(f) for f in self.fields),
+                         func)
+        return _Reaction(self, func)
+
+    def configure_reaction(self, func: Reaction,
+                           instance:Any=None)->None:
+        '''configure the reaction on the fields'''
         # Add a reaction on all the fields to call self.react() with
         # func as the reaction function.
         for field in set(self.fields):
+            field_ = (field.bound_field(instance)
+                      if instance is not None else field)
             logger.info('changes to %s will call %s', field, func)
-            field.reaction(partial(self.react, reaction=func))
-        return ReactionMustNotBeCalled(func)
-
+            field_.reaction(partial(self.react, reaction=func))
 
 @dataclass
 class Constant[T](Evaluatable[T]):
