@@ -27,19 +27,22 @@ from .async_helpers import asynctest
 class PredicateTest(TestCase):
 
     @asynctest
-    async def test_decorator_returns__reaction(self):
+    async def test_decorator_returns__reaction(self)->None:
         '''test the object returned by decorating a reaction is correct'''
         class State:
-            field: Field[bool] = Field(False)
+            field = Field(False)
+        def reaction(state, field, old, new): # pylint: disable=unused-argument
+            pass
         predicate = State.field == True
-        reaction = predicate(lambda *_: ...)
+        reaction = predicate(reaction)
         self.assertEqual(predicate, reaction.predicate)
 
     @asynctest
-    async def test_decorator_bound_reactions(self):
+    async def test_decorator_bound_reactions(self)->None:
         '''test that bound reactions are handled properly'''
         class State(FieldManager):
             field = Field(False)
+            def _start(self): ...
         class Watcher(FieldWatcher):
             called = False
             @State.field == True

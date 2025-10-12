@@ -149,12 +149,18 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
     # Descriptor protocol for intercepting field updates
     ###########################################################################
     @overload
-    def __get__(self, instance: None, owner: Any)->FieldDescriptor[T]: ...
+    def __get__[Tf: FieldDescriptor[T]](self: Tf,
+                                        instance: None,
+                                        owner: Any)->Tf: ...
 
     @overload
-    def __get__(self, instance: Any, owner: Any)->T: ...
+    def __get__[Tf: FieldDescriptor[T]](self: Tf,
+                                        instance: Any,
+                                        owner: Any)->T: ...
 
-    def __get__(self, instance, owner)->T|FieldDescriptor[T]:
+    def __get__[Tf: FieldDescriptor[T]](self: Tf,
+                                        instance,
+                                        owner: Any|None)->T|Tf:
         '''
         Get the value of the field.
 
@@ -187,13 +193,14 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
         old: T = self.evaluate(instance)
         if value != old:
             setattr(instance, self._attr, value)
+            # todo - bound_field doesn't return a type with react()
             self.bound_field(instance).react(instance, self, old, value)
 
     # end Descriptor protocol.
     ###########################################################################
 
     @abstractmethod
-    def bound_field(self, instance: Any):
+    def bound_field(self, instance: Any):  # todo return type annotation
         '''get the bound field for this field on instance'''
         return NotImplementedError()
 
