@@ -18,54 +18,41 @@ Test field functionality.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple, List, NoReturn
+from typing import Tuple
 from unittest import TestCase, main
 
 from ..error import (MustNotBeCalled, FieldAlreadyBound,
                      InvalidPredicateExpression)
 from ..field import Field, BoundField, FieldManager, FieldWatcher
+from ..field_descriptor import FieldDescriptor
 from ..predicate import Predicate, _Reaction
 from ..predicate_types import Contains, Not, Or, And
 
 
-class Base(FieldManager):
-    field_a: Field[bool|int|None]
-    field_b: Field[bool|int|None]
-
-    def __init__(self,
-                 a: bool|int|None = None,
-                 b: bool|int|None = None) -> NoReturn:
-        raise Exception()
-
-    def _start(self)->None:
-        pass
-
-def create_class()->type[Base]:
-    @dataclass
-    class C(Base):
-        field_a: Field[bool|int|None] = Field(None, 'C', 'field_a')
-        field_b: Field[bool|int|None] = Field(None, 'C', 'field_b')
-    return C
-
 class TestField(TestCase):
 
     def test_class_field_eq_creates_predicate(self):
-        C = create_class()
-        predicate = C.field_a == True
+        class C:
+            field = Field[bool](False, 'C', 'field')
+
+        predicate = C.field == True
         self.assertIsInstance(predicate, Predicate)
-        self.assertEqual(list(predicate.fields), [C.field_a])
+        self.assertEqual(list(predicate.fields), [C.field])
 
     def test_del_field_not_allowed(self):
-        C = create_class()
-        c = C(True, False)
+        class C:
+            field = Field[bool](False, 'C', 'field')
+        c = C()
         with self.assertRaises(MustNotBeCalled):
-            del c.field_a
-            c.field_a
+            del c.field
+            self.assertFalse(c.field)
 
     def test_instance_field_equality(self):
-        C = create_class()
-        c = C(True, False)
-        self.assertTrue(c.field_a == True)
+        class C(FieldManager):
+            field = Field[bool](True, 'C', 'field')
+            def _start(self): ...
+        c = C()
+        self.assertTrue(c.field == True)
 
         # set a notification on c.field_a to call print
         reaction_called = False
@@ -74,28 +61,33 @@ class TestField(TestCase):
             nonlocal reaction_called
             reaction_called = True  # @UnusedVariable - it really is used
             self.assertEqual((instance, field, old, new),
-                             (c, C.field_a, True, False))
-            pass
-        C.field_a.reaction(reaction)
+                             (c, C.field, True, False))
+        C.field.reaction(reaction)
 
         # verify updated value is properly set and comparison works
-        c.field_a = False
-        self.assertTrue(c.field_a == False)
-        self.assertTrue(c.field_a != True)
+        c.field = False
+        self.assertTrue(c.field == False)
+        self.assertTrue(c.field != True)
         self.assertTrue(reaction_called)
 
     def test_edge_triggered_notify(self) -> None:
-        C = create_class()
-        changes: List[Tuple[bool, bool]] = list[Tuple[bool, bool]]()
-        def collect(instance, field: Field[bool], old: bool, new: bool):
+        class C(FieldManager):
+            field = Field[bool|None](None, 'C', 'field')
+            def _start(self): ...
+
+        changes = list[Tuple[bool|None, bool|None]]()
+        def collect(_: C,
+                    __: FieldDescriptor[bool|None],  # todo should be Field
+                    old: bool|None,
+                    new: bool|None):
             changes.append((old, new))
 
-        c: type[Base] = C()
-        C.field_a.reaction(collect)
+        c = C()
+        C.field.reaction(collect)
 
         for value in (True, False, False, True, True):
-            c.field_a = value
-        c.field_a = None
+            c.field = value
+        c.field = None
         self.assertEqual([(None, True),
                           (True, False),
                           (False, True),
@@ -103,8 +95,12 @@ class TestField(TestCase):
                          changes)
 
     def test_predicate_operators(self) -> None:
-        C = create_class()
-        c: Base = C(True, 0)
+        @dataclass
+        class C(FieldManager):
+            field_a: Field[bool|None] = Field(None, 'C', 'field_a')
+            field_b: Field[int|Tuple[bool]|None] = Field(None, 'C', 'field_b')
+            def _start(self): ...
+        c = C(True, 0)
         self.assertTrue((C.field_a == True).evaluate(c))
         self.assertFalse((C.field_a != True).evaluate(c))
         self.assertTrue((C.field_b < 1).evaluate(c))
@@ -134,52 +130,60 @@ class TestField(TestCase):
         self.assertTrue(Contains(C.field_b, C.field_a).evaluate(c))
 
     def test_field_already_bound(self) -> None:
-        C = create_class()
+        class C(FieldManager):
+            field = Field(0, 'C', 'field')
+            def _start(self): ...
         with self.assertRaises(FieldAlreadyBound):
-            C.field_a._bind(C())
+            C.field._bind(C())  # pylint: disable=protected-access
 
-    def test_bound_field(self) -> None:
-        C = create_class()
-        c1: Base = C()
-        c2: Base = C()
-        self.assertIsInstance(C.field_a[c1], BoundField)
-        self.assertIsNot(C.field_a[c1], C.field_a)
-        self.assertIsNot(C.field_a[c1], C.field_a[c2])
+    def test_field_manager_binds_fields(self) -> None:
+        class C(FieldManager):
+            field = Field(0, 'C', 'field')
+            def _start(self): ...
+        c1 = C()
+        c2 = C()
+        self.assertIsInstance(C.field[c1], BoundField)
+        self.assertIsNot(C.field[c1], C.field)
+        self.assertIsNot(C.field[c1], C.field[c2])
         with self.assertRaises(InvalidPredicateExpression):
             # The above assertIsNot are because comparing two fields creates
             # a predicate which is then evaluated for truthiness which is not
             # allowed because it is rarely what is intended. This demonstrates
             # why not to use assertNotEqaul to verify that the bound fields
             # are not the same.
-            self.assertNotEqual(C.field_a[c1], C.field_a[c2])
+            self.assertNotEqual(C.field[c1], C.field[c2])
 
     def test_bound_field_predicate(self) -> None:
-        C = create_class()
-        c: Base = C()
-        c_field_a = C.field_a[c]
-        self.assertIsInstance(c_field_a == 1, Predicate)
-        self.assertIsInstance(1 == c_field_a, Predicate)
+        class C(FieldManager):
+            field = Field(0, 'C', 'field')
+            def _start(self): ...
+        c = C()
+        c_field = C.field[c]
+        self.assertIsInstance(c_field == 1, Predicate)
+        self.assertIsInstance(1 == c_field, Predicate)
 
     def test_bound_field_reaction(self) -> None:
         called = False
-        def reaction(*args):
+        def reaction(*_):
             nonlocal called
-            called = True
+            called = True  # @UnusedVariable
             
-        C = create_class()
+        class C(FieldManager):
+            field = Field[bool|int|None](None, 'C', 'field')
+            def _start(self): ...
         
         # add an instance reaction and verify it is called
-        c: Base = C()  # todo why does c need to be told what it is, and why not C
-        C.field_a[c].reaction(reaction)
+        c = C()
+        C.field[c].reaction(reaction)
         self.assertFalse(called)
-        c.field_a = 1
+        c.field = 1
         self.assertTrue(called)
 
         # make sure another instance doesn't get called as well
         called = False
         c = C()
         self.assertFalse(called)
-        c.field_a = 1
+        c.field = 1
         self.assertFalse(called)
 
     def test_watcher__reactions_is_cached(self):
