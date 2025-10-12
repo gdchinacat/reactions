@@ -309,7 +309,7 @@ class FieldManager(Reactant, ABC, metaclass=FieldManagerMeta):
     '''
 
 
-class FieldWatcher[T: type](Reactant, ABC):
+class FieldWatcher[T: FieldManager](Reactant, ABC):
     '''
     Base class to allow subclasses to watch Fields on other classes.
 

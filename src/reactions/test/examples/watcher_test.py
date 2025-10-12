@@ -18,7 +18,7 @@ An example showing how a class can watch a state for changes.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Tuple
+from typing import List, Tuple, NoReturn
 from unittest import TestCase, main
 
 from ... import Field, FieldManager, FieldWatcher, And
@@ -74,8 +74,8 @@ class Test(TestCase):
     def test_automatic_predicate(self):
 
         class Watcher[T: type](FieldWatcher):
-            def __init__(self, *args, **kwargs):
-                super().__init__(*args, **kwargs)
+            def __init__(self, watched:Watched, *args, **kwargs):
+                super().__init__(watched, *args, **kwargs)
                 self.change_events: List[Tuple] = list()
 
             @ Watched.ticks != None
@@ -98,15 +98,16 @@ class Test(TestCase):
         self.assertEqual(watcher.change_events, expected)
 
     @asynctest
-    async def test_automatic_dispatches_to_correct_watcher(self):
+    async def test_automatic_dispatches_to_correct_watcher(self)->None:
         class Watched(FieldManager):
             field = Field(False)
+            def _start(self): ...
 
-        class Watcher[T](FieldWatcher):
+        class Watcher(FieldWatcher[Watched]):
             reacted: bool = False
             @ Watched.field == True
             async def _true(
-                self, watched: T, field: Field[bool], old:bool, new:bool):
+                self, watched: Watched, field: Field[bool], old:bool, new:bool):
                 assert self.watched is watched
                 self.reacted = True
 
