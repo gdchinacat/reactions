@@ -19,15 +19,32 @@ from __future__ import annotations
 
 import asyncio
 from functools import wraps
+from typing import Any, Callable
 
+def asynctest(func: Callable[..., Any]|None = None,
+              *,
+              timeout:float|None=1):
+    '''
+    Decorator to execute async test functions.
+    func - function to decorate
+    timeout - timeout to apply
+    May be used as a plain decorator:
+    @asynctest
+    def test_foo(..): ...
 
-def asynctest(func):
-    '''decorator to execute async test functions'''
-    @wraps(func)
-    def _asynctest(*args, **kwargs):
+    or with arguments:
+    @asynctest(timeout=2)
+    async def test_foo(...): ...
+    '''
+    def dec(func):
         @wraps(func)
-        async def async_test_runner():
-            async with asyncio.timeout(1):
-                await func(*args, **kwargs)
-        asyncio.run(async_test_runner())
-    return _asynctest
+        def _asynctest(*args, **kwargs):
+            @wraps(func)
+            async def async_test_runner():
+                async with asyncio.timeout(timeout):
+                    await func(*args, **kwargs)
+            asyncio.run(async_test_runner())
+        return _asynctest
+    if func is not None:
+        return dec(func)
+    return dec
