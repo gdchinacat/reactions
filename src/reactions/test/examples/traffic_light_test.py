@@ -104,18 +104,6 @@ class TrafficLight(FieldManager):
              old: int, new: int) -> None:  # @UnusedVariable
         
         if self.ticks != new:
-            # TODO - reactions can be called when their predicate is not true
-            #        if another reaction modifies the field between scheduling
-            #        and execution of this reaction. Specifically the reactions
-            #        to change the color reset ticks to zero in reaction to a
-            #        tick change and execute before this reaction since they
-            #        are defined before this one. When ticks changes both the
-            #        color changing reaction and this reaction are scheduled,
-            #        the color changing reaction resets ticks, then this
-            #        reaction executes. It isn't an error per se, but can be
-            #        unintuitive. The reaction was scheduled for *asynchronous*
-            #        execution, and the predicate was changed during that
-            #        asynchronous execution.
             # Don't increment the tick...the other reaction already handled it.
             return
         assert self.ticks != TICKS_PER_LIGHT

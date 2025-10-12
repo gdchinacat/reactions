@@ -47,35 +47,20 @@ class Counter(FieldManager):
 class ExternalStopTest(TestCase):
     
     def test_external_stop(self):
-        counter = Counter()
-        
         count_to = 5
+        counter = Counter()
 
-        # todo - Counter.count will apply the reaction any Counter instance
-        #        that reaches count_to. Not a problem with just one Counter
-        #        but if another Counter was being used concurrently (tests in
-        #        parallel) it could confuse this. Essentially the same problem
-        #        with globals because Couner.count is essentially a global.
-        #        Need a way to apply it to only counter.
-        #        @ Counter.count[counter] == count_to
-        #            - create a bound predicate where Counter instance is
-        #              the bound field and predicate is bound to counter?
-        @ Counter.count == count_to
+        @ Counter.count[counter] == count_to
         @staticmethod
-        async def stop(*_):
+        async def stop(instance, field, old, new):
+            # the Counter reaction to increment count has already executed by
+            # the time this one executes, so instance.count is one greater than
+            # the value that caused this reaction to execute.
+            self.assertEqual(instance.count, new + 1)
             counter.done = True
             
         counter.run()
 
-        # TODO - the change that makes stop predicate true has two reactions
-        #        on it, one to increment the count, one to set done=True. By
-        #        the time stop() is called the count is already one greater
-        #        than the value in the predicate. Account for this here. But,
-        #        this is counterintuitive and is likely to cause bugs that are
-        #        hard to track down. Is there a better way? Yes! Allow the
-        #        (what should be) bound field reaction to run before the Field
-        #        reactions. Instance reactions take precedence of class
-        #        reactions?
         assert counter.count == count_to + 1
 
 if __name__ == '__main__':
