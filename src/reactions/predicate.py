@@ -114,7 +114,7 @@ class Predicate(Evaluatable[bool], ABC):
         if self.evaluate(instance):
             logger.debug('%s TRUE for %s %s -> %s',
                          self, field, old, new)
-            
+
             # It is noticeably faster to just try to get __self__ than to check
             # inspect.ismethod(react). if reaction is a method the fastest is
             # to try/except AttributeError, but if it's not that is horrendous.
