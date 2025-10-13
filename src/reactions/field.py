@@ -88,7 +88,8 @@ class BoundField[T](Evaluatable[T], ComparisonPredicates):
 
 class Field[T](FieldDescriptor[T], ComparisonPredicates):
     '''
-    Field provides attribute change notification and predicates.
+    Field provides attribute change notification and predicates to configure
+    asynchronous callbacks when the condition becomes true.
 
     class State:
         field = Field(0)

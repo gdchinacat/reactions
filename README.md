@@ -158,6 +158,11 @@ The idea for this started as a sleepless sick night after reading
 https://www.reddit.com/r/Python/comments/1nmta0f/i_built_a_full_programming_language_interpreter/ . Thanks to u/HearMeOut-13 for
 the post that got my mind going down this path.
 
+# Python version support
+Python 3.14 is required.
+3.13 is trivial by commenting out some dataclass field doc arguments, but 3.14
+is what is tested against.
+
 # Glossary
 *state instance* - the instance whose field value changed
 *reacting instance* - the instance that is reacting to a field change. May be
