@@ -22,7 +22,7 @@ from asyncio import run
 from dataclasses import dataclass, field
 from logging import getLogger
 from types import MethodType
-from typing import Any, Tuple, Awaitable, Set, overload
+from typing import Any, Tuple, Awaitable, Set, overload, NoReturn
 
 from .error import FieldAlreadyBound
 from .executor import ReactionExecutor
@@ -310,7 +310,9 @@ class FieldManager(Reactant, ABC, metaclass=FieldManagerMeta):
     '''
 
 
-class FieldWatcher[T: FieldManager](Reactant, ABC):
+class FieldWatcher[T: FieldManager](Reactant,
+                                    CustomFieldReactionConfiguration,
+                                    ABC):
     '''
     Base class to allow subclasses to watch Fields on other classes.
 
@@ -332,29 +334,46 @@ class FieldWatcher[T: FieldManager](Reactant, ABC):
     instances are initialized.
     '''
 
-# todo not yet....next commit
-#    @overload
-#    def __init__(self, func: BoundReaction): ...
-#
-#    @overload
-#    def __init__(self,
-#                  watched: Any,
-#                  *args,
-#                 _reaction_executor=None,
-#                 **kwargs): ...
+    @overload
+    def __init__(self, reaction_or_watched: BoundReaction): ...
 
-    def __init__(self, watched, *args, _reaction_executor=None, **kwargs):
-        '''
-        Create a FieldWatcher.
-        '''
-        self.watched = watched
-        executor = _reaction_executor or self.watched._reaction_executor
-        super().__init__(*args, _reaction_executor=executor, **kwargs)
+    @overload
+    def __init__(self,
+                  reaction_or_watched: Any,
+                  *args,
+                 _reaction_executor=None,
+                 **kwargs): ...
 
-        # Configure the bound reactions.
-        for reaction in self._reactions:
-            reaction.predicate.configure_reaction(
-                MethodType(reaction.func, self), self.watched)
+    def __init__(self,
+                 reaction_or_watched: BoundReaction|Any,
+                 *args,
+                 _reaction_executor=None,
+                 **kwargs):
+        '''
+        Create a FieldWatcher or decorate a BoundReaction managed by
+        FieldWatcher.
+        '''
+        if callable(reaction_or_watched):
+            '''
+            Wrap the reaction so that it will not have instance field reactions
+            configured for it. It will be tracked as a reaction in _reactions
+            so that __init_subclass__ can configure the for the specific
+            instance. Strictly speaking CustomFieldReactionConfiguration could
+            be used instead of this, but doing so is not nearly as
+            understandable as this.
+            '''
+            CustomFieldReactionConfiguration.__init__(
+                self, reaction_or_watched, type(self).__init_subclass__)
+        else:
+            self.watched = reaction_or_watched
+            executor = _reaction_executor or self.watched._reaction_executor
+            Reactant.__init__(
+                self, *args, _reaction_executor=executor, **kwargs)
+
+            # Configure the bound reactions.
+            for reaction in self._reactions:
+                reaction.predicate.configure_reaction(
+                    MethodType(reaction.func, self), self.watched)
 
     @classmethod
     def __init_subclass__(cls)->None:
@@ -372,14 +391,7 @@ class FieldWatcher[T: FieldManager](Reactant, ABC):
         so subclasses don't have to implement this method.
         '''
 
-    @staticmethod
-    def configure(reaction: BoundReaction):
-        '''
-        Wrap the reaction so that it will not have instance field reactions
-        configured for it. It will be tracked as a reaction in _reactions
-        so that __init_subclass__ can configure the for the specific instance.
-        Strictly speaking CustomFieldReactionConfiguration could be used instead
-        of this, but doing so is not nearly as understandable as this.
-        '''
-        return CustomFieldReactionConfiguration(reaction,
-                                              FieldWatcher.__init_subclass__)
+    def __replace__(self, *args, **kwargs)->NoReturn:
+        # Base classes both implement __replace__, Until there is an actual
+        # need for this functionality it is not implemented.
+        raise NotImplementedError()

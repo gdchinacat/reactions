@@ -81,7 +81,7 @@ class _Reaction(ReactionMustNotBeCalled):
     The result of decorating a reaction function.
     '''
     predicate: Predicate
-    func: Reaction
+    func: Reaction|BoundReaction
 
 
 @dataclass(eq=True, frozen=True)
@@ -120,6 +120,18 @@ class Predicate(Evaluatable[bool], ABC):
         called on. For bound method reactions the object the reaction is bound
         to provides the executor, otherwise the instance.
         '''
+        # todo - I forgot to make a reaction async, and it didn't work as
+        # expected, but the behavior was pretty close to what I've been
+        # considering adding. When the non-async reaction was called to get the
+        # coroutine it executed the reaction synchronously. Of course things
+        # didn't work right, but I think skipping the put_nowait() if
+        # coroutine is None would be a trivial way to allow reactions to
+        # execute inline with the field update. The *big* concern here is the
+        # consistency guarantees that are based on coroutine execution would be
+        # broken. Either support this mode of synchronous reaction or disallow
+        # it. Also stack overflow is likely. Probably a bad idea in general,
+        # but wanted to document it until I get around to formalizing whatever
+        # I decide.
         logger.log(VERBOSE,
                    '%s notified that %s %s -> %s',
                    self, field, old, new)
@@ -141,7 +153,9 @@ class Predicate(Evaluatable[bool], ABC):
                                     field,
                                     old, new)
 
-    def __call__(self, func: Reaction) -> _Reaction:
+    def __call__(self,
+                 reaction_or_custom: Reaction|CustomFieldReactionConfiguration
+                 ) -> _Reaction:
         '''
         Predicates are decorators that arrange for the decorated method to be
         called when the predicate becomes True.
@@ -195,17 +209,18 @@ class Predicate(Evaluatable[bool], ABC):
         not configure reactions that need to be bound to specific instances
         (rather than the classes that fields are on).
         '''
-        if isinstance(func, CustomFieldReactionConfiguration):
-            implementation = func.implementation
-            func = func.reaction
+        reaction: Reaction|BoundReaction
+        if isinstance(reaction_or_custom, CustomFieldReactionConfiguration):
+            reaction = reaction_or_custom.reaction
             logger.info('changes to %s will use %s to '
                         'create bound reactions for %s',
-                        func, implementation,
                         ', '.join(str(f) for f in self.fields),
-                         func)
+                        reaction_or_custom.implementation,
+                        self)
         else:
-            self.configure_reaction(func)
-        return _Reaction(self, func)
+            reaction = reaction_or_custom
+            self.configure_reaction(reaction)
+        return _Reaction(self, reaction)
 
     def configure_reaction(self, func: Reaction,
                            instance:Any=None)->None:

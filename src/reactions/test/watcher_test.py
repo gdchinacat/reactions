@@ -13,24 +13,25 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 '''
-An example showing how a class can watch a state for changes.
+.field.FieldWatcher test
 '''
-# TODO - this should probably move up to .test rather than example, it's
-#        getting to be a bit messy for an example and contains things that
-#        *should not* be done by client code.
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import List, Tuple, NoReturn
+from dataclasses import dataclass
+from typing import List, Tuple
 from unittest import TestCase, main
 
-from ... import Field, FieldManager, FieldWatcher, And
-from ...executor import ReactionExecutor
-from ..async_helpers import asynctest
+from ..error import ReactionMustNotBeCalled
+from ..executor import ReactionExecutor
+from ..field import Field, FieldManager, FieldWatcher
+from ..predicate import _Reaction
+from ..predicate_types import And
+from .async_helpers import asynctest
 
 
 @dataclass
 class Watched(FieldManager):
+    '''class with fields to be watched'''
 
     last_tick: Field[int] = Field(1)
     ticks = Field(-1)
@@ -48,6 +49,7 @@ class Watched(FieldManager):
     #        working because it expects to pass a BaseField to reaction and
     #        reaction accepts more specific Field. Even then, the field type
     #        isn't validating properly. Needs a fair bit of work.
+    # todo - create a predicate_test for reaction type checking
     async def done(self, field: Field[bool], old: int, new:int):
         self.ticks = -1
         self.stop()
@@ -55,24 +57,7 @@ class Watched(FieldManager):
     def __repr__(self):
         return f'{type(self).__qualname__}({id(self)})'
 
-class Test(TestCase):
-
-    def test_manual_predicate(self):
-        watched = Watched()
-        change_events = []
-
-        @ Watched.ticks[watched] != None
-        async def watch(*args):
-            change_events.append(args)
-
-        watched.run()
-
-        # last_tick + 2 for changing ticks to -1
-        expected = [(watched, Watched.ticks, x - 1,
-                     x if x != watched.last_tick + 1 else -1)
-                    for x in range(watched.last_tick + 2)]
-
-        self.assertEqual(change_events, expected)
+class FieldWatcherTest(TestCase):
 
     def test_automatic_predicate(self):
 
@@ -82,7 +67,7 @@ class Test(TestCase):
                 self.change_events: List[Tuple] = list()
 
             @ Watched.ticks != None
-            @ FieldWatcher.configure  # todo - get rid of .configure
+            @ FieldWatcher
             async def _watch(self, watched: T, field, old, new):
                 assert isinstance(self, Watcher), f'got {type(self)=}'
                 assert isinstance(watched, Watched), f'got {type(watched)=}'
@@ -110,8 +95,7 @@ class Test(TestCase):
         class Watcher(FieldWatcher[Watched]):
             reacted: bool = False
             @ Watched.field == True
-            @ FieldWatcher.configure  # yuck...make this more readable
-            #  - Should FieldWatcher be a decorator *And* a base class?
+            @ FieldWatcher
             async def _true(
                 self, watched: Watched, field: Field[bool], old:bool, new:bool):
                 assert self.watched is watched
@@ -120,16 +104,50 @@ class Test(TestCase):
         executor = ReactionExecutor()
 
         watched1 = Watched(_reaction_executor=executor)
-        watcher1 = Watcher(watched=watched1, _reaction_executor=executor)
+        watcher1 = Watcher(watched1, _reaction_executor=executor)
 
         watched2 = Watched(_reaction_executor=executor)
-        watcher2 = Watcher(watched=watched2, _reaction_executor=executor)
+        watcher2 = Watcher(watched2, _reaction_executor=executor)
 
         async with executor:
             watched1.field = True
 
         self.assertTrue(watcher1.reacted)
         self.assertFalse(watcher2.reacted)
+
+    @asynctest
+    async def test_decorator_bound_reactions(self)->None:
+        '''test that bound reactions are handled properly'''
+        class State(FieldManager):
+            field = Field(False)
+            def _start(self): ...
+        class Watcher(FieldWatcher):
+            called = False
+            @ State.field == True
+            @ FieldWatcher
+            async def _true(self,
+                            state: State,
+                            field: Field,
+                            old: bool, new:bool):
+                self.called = True
+
+        self.assertIsInstance(Watcher._true, _Reaction)
+        self.assertRaises(ReactionMustNotBeCalled, Watcher._true)
+
+        # reactions that look like they are bound aren't added to the class
+        # field reactions.
+        self.assertEqual([], State.field.reactions)
+
+        state = State()
+        watcher = Watcher(state)
+
+        self.assertEqual([], State.field.reactions)
+        async with state:
+            state.field = True
+        self.assertTrue(watcher.called)
+
+        self.assertEqual([], State.field.reactions)
+
 
 if __name__ == "__main__":
     main()

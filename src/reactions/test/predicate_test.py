@@ -37,38 +37,35 @@ class PredicateTest(TestCase):
         reaction = predicate(reaction)
         self.assertEqual(predicate, reaction.predicate)
 
-    @asynctest
-    async def test_decorator_bound_reactions(self)->None:
-        '''test that bound reactions are handled properly'''
+    def test_predicate_decorator_non_self(self):
+        '''
+        Test that the predicate decorator works for plain functions not on the
+        state instance or a watcher class.
+        '''
+        start = 5
         class State(FieldManager):
-            field = Field(False)
-            def _start(self): ...
-        class Watcher(FieldWatcher):
-            called = False
-            @State.field == True
-            @ FieldWatcher.configure  # todo...make this more readable
-            async def _true(self,
-                            state: State,
-                            field: Field,
-                            old: bool, new:bool):
-                self.called = True
-
-        self.assertIsInstance(Watcher._true, _Reaction)
-        self.assertRaises(ReactionMustNotBeCalled, Watcher._true)
-
-        # reactions that look like they are bound aren't added to the class
-        # field reactions.
-        self.assertEqual([], State.field.reactions)
-
+            field = Field(-1)
+            @ field > 0
+            async def decrement(self, *_):
+                self.field -= 1
+                if self.field == 0:
+                    self.stop()
+            def _start(self): self.field = start
         state = State()
-        watcher = Watcher(state)
 
-        self.assertEqual([], State.field.reactions)
-        async with state:
-            state.field = True
-        self.assertTrue(watcher.called)
+        change_events = []
+        @ State.field[state] != None
+        async def watch(*args):
+            change_events.append(args)
 
-        self.assertEqual([], State.field.reactions)
+        state.run()
+
+        expected = ([(state, State.field, -1, start)] + # for _start
+                    [(state, State.field, x, x - 1)
+                     for x in range(start, 0, -1)])
+
+        self.assertEqual(change_events, expected)
+
 
 if __name__ == "__main__":
     main()
