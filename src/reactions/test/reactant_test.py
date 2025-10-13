@@ -21,7 +21,7 @@ from __future__ import annotations
 from asyncio import Future, CancelledError, sleep, Barrier
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import NoReturn, Tuple, AsyncIterator
+from typing import NoReturn, AsyncIterator
 from unittest import TestCase, main
 
 from .. import (ReactionMustNotBeCalled, ExecutorAlreadyStarted, Field,
@@ -66,7 +66,7 @@ class State(FieldManager):
 @asynccontextmanager
 async def running_state(skip_stop=False,
                         skip_await=False,
-                        ) -> AsyncIterator[Tuple[State, ReactionExecutor]]:
+                        ) -> AsyncIterator[tuple[State, ReactionExecutor]]:
     '''
     Async contexst manager to run the state before managed block and wait
     for it after the block. Context is (state, state_done_awaitable).

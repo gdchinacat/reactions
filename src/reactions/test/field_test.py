@@ -18,7 +18,6 @@ Test field functionality.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Tuple
 from unittest import TestCase, main
 
 from ..error import (MustNotBeCalled, FieldAlreadyBound,
@@ -75,7 +74,7 @@ class TestField(TestCase):
             field = Field[bool|None](None, 'C', 'field')
             def _start(self): ...
 
-        changes = list[Tuple[bool|None, bool|None]]()
+        changes = list[tuple[bool|None, bool|None]]()
         def collect(_: C,
                     __: FieldDescriptor[bool|None],  # todo should be Field
                     old: bool|None,
@@ -98,7 +97,7 @@ class TestField(TestCase):
         @dataclass
         class C(FieldManager):
             field_a: Field[bool|None] = Field(None, 'C', 'field_a')
-            field_b: Field[int|Tuple[bool]|None] = Field(None, 'C', 'field_b')
+            field_b: Field[int|tuple[bool]|None] = Field(None, 'C', 'field_b')
             def _start(self): ...
         c = C(True, 0)
         self.assertTrue((C.field_a == True).evaluate(c))

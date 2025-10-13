@@ -15,10 +15,11 @@
 '''
 .field.FieldWatcher test
 '''
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import Any
 from unittest import TestCase, main
 
 from ..error import ReactionMustNotBeCalled
@@ -64,7 +65,7 @@ class FieldWatcherTest(TestCase):
         class Watcher[T: type](FieldWatcher):
             def __init__(self, watched:Watched, *args, **kwargs):
                 super().__init__(watched, *args, **kwargs)
-                self.change_events: List[Tuple] = list()
+                self.change_events: list[tuple[Any, Field, int, int]] = list()
 
             @ Watched.ticks != None
             @ FieldWatcher

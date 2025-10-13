@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import logging
 from time import time
-from typing import List, Coroutine
+from typing import Coroutine
 from unittest import TestCase, main
 
 from ... import Field, And, FieldManager
@@ -65,7 +65,7 @@ class TrafficLight(FieldManager):
     than a regular space between ticks.
     '''
 
-    sequence: List[Color] = field(default_factory=list)
+    sequence: list[Color] = field(default_factory=list)
 
     def _start(self) -> None:
         self.ticks = 0

@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from itertools import count
-from typing import List, Any, Dict, Optional, Callable, Iterable, overload
+from typing import Any, Callable, Iterable, overload
 
 from .error import MustNotBeCalled
 
@@ -50,7 +50,7 @@ class Evaluatable[T](ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def evaluate(self, instance: Any) -> Optional[T]:
+    def evaluate(self, instance: Any) -> T|None:
         '''
         Get the value of the type on instance.
         Field returns the instance value of the field.
@@ -83,8 +83,8 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
 
     def __init__(self,
                  initial_value: T,
-                 classname: Optional[str] = None,
-                 attr: Optional[str] = None,
+                 classname: str|None = None,
+                 attr: str|None = None,
                  *args, **kwargs) -> None:
         '''
         initial_value: The initial value for the field.
@@ -107,7 +107,7 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
 
         # Reactions is the list of reactions on the unbound field. BoundField
         # references this in a copy-on-write manner.
-        self.reactions: List[FieldReaction] = []
+        self.reactions: list[FieldReaction] = []
 
     def reaction(self, reaction: FieldReaction):
         ''' Add a reaction to the list of reactions.'''

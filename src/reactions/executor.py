@@ -21,7 +21,7 @@ from asyncio import (Queue, Task, create_task, QueueShutDown, sleep,
                      get_event_loop, CancelledError)
 from itertools import count
 from logging import Logger, getLogger
-from typing import Any, Optional, Tuple, Awaitable
+from typing import Any, Awaitable
 
 from .error import ExecutorAlreadyStarted, ExecutorNotStarted
 from .field_descriptor import FieldDescriptor
@@ -57,13 +57,13 @@ class ReactionExecutor:
     management of tasks created by reactions is provided.
     '''
 
-    task: Optional[Task] = None
+    task: Task|None = None
     '''the task that is processing the queue to execute reactions'''
 
-    queue: Queue[Tuple[int, ReactionCoroutine, Any]]
+    queue: Queue[tuple[int, ReactionCoroutine, Any]]
     '''
     The queue of reactions to execute.
-    Tuple elements are:
+    tuple elements are:
         [0] - the id of the reaction (for logging)
         [1] - the coroutine that implements the reaction (*not* the coroutine
               function, but the coroutine the function returns)
@@ -125,7 +125,7 @@ class ReactionExecutor:
         self.task = create_task(self.execute_reactions())
         return self.task
 
-    def stop(self, timeout: Optional[float] = 2):
+    def stop(self, timeout: float|None = 2):
         '''stop the reaction queue with timeout (defaults to 2 seconds)'''
         if not self.task:
             raise ExecutorNotStarted()

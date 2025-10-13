@@ -22,7 +22,7 @@ from asyncio import run
 from dataclasses import dataclass, field
 from logging import getLogger
 from types import MethodType
-from typing import Any, Tuple, Awaitable, Set, overload, NoReturn
+from typing import Any, Awaitable, overload, NoReturn
 
 from .error import FieldAlreadyBound
 from .executor import ReactionExecutor
@@ -192,7 +192,7 @@ class FieldManagerMeta(ABCMeta, type):
     # _fields is initialized by FieldManagerMetaDict.__init__() since it needs
     # to be present during the nascent stages before __init__ is called to
     # initialize the instance.
-    _fields: Tuple[Field, ...]
+    _fields: tuple[Field, ...]
 
     @classmethod
     def __prepare__(cls, name, bases):
@@ -329,7 +329,7 @@ class FieldWatcher[T: FieldManager](Reactant,
     watched: T
     '''The instance being watched.'''
 
-    _reactions: Set[_Reaction]
+    _reactions: set[_Reaction]
     '''
     The reactions the class needs to register bound reactions for when
     instances are initialized.
