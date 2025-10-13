@@ -1,5 +1,5 @@
 # Copyright (C) 2025 Anthony (Lonnie) Hutchinson <chinacat@chinacat.org>
-#
+
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -22,12 +22,13 @@ from asyncio import run
 from dataclasses import dataclass, field
 from logging import getLogger
 from types import MethodType
-from typing import Any, Tuple, Awaitable, Iterable, Set
+from typing import Any, Tuple, Awaitable, Set, overload
 
 from .error import FieldAlreadyBound
 from .executor import ReactionExecutor
 from .field_descriptor import FieldDescriptor, FieldReaction, Evaluatable
-from .predicate import _Reaction
+from .predicate import (_Reaction, CustomFieldReactionConfiguration,
+                        BoundReaction)
 from .predicate_types import ComparisonPredicates
 
 
@@ -315,6 +316,11 @@ class FieldWatcher[T: FieldManager](Reactant, ABC):
 
     This associates specific instances of other classes with this class so that
     the reactions are routed to the proper instance.
+
+    Usage:
+            @ Watched.field == True
+            @ FieldWatcher
+            async def reaction(...
     '''
 
     watched: T
@@ -326,9 +332,20 @@ class FieldWatcher[T: FieldManager](Reactant, ABC):
     instances are initialized.
     '''
 
+# todo not yet....next commit
+#    @overload
+#    def __init__(self, func: BoundReaction): ...
+#
+#    @overload
+#    def __init__(self,
+#                  watched: Any,
+#                  *args,
+#                 _reaction_executor=None,
+#                 **kwargs): ...
+
     def __init__(self, watched, *args, _reaction_executor=None, **kwargs):
         '''
-        Create a FieldWatcher
+        Create a FieldWatcher.
         '''
         self.watched = watched
         executor = _reaction_executor or self.watched._reaction_executor
@@ -354,3 +371,15 @@ class FieldWatcher[T: FieldManager](Reactant, ABC):
         they use the watched reaction executor. This is implemented as a no op
         so subclasses don't have to implement this method.
         '''
+
+    @staticmethod
+    def configure(reaction: BoundReaction):
+        '''
+        Wrap the reaction so that it will not have instance field reactions
+        configured for it. It will be tracked as a reaction in _reactions
+        so that __init_subclass__ can configure the for the specific instance.
+        Strictly speaking CustomFieldReactionConfiguration could be used instead
+        of this, but doing so is not nearly as understandable as this.
+        '''
+        return CustomFieldReactionConfiguration(reaction,
+                                              FieldWatcher.__init_subclass__)

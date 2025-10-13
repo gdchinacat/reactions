@@ -46,6 +46,7 @@ class PredicateTest(TestCase):
         class Watcher(FieldWatcher):
             called = False
             @State.field == True
+            @ FieldWatcher.configure  # todo...make this more readable
             async def _true(self,
                             state: State,
                             field: Field,

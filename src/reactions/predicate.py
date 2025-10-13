@@ -20,12 +20,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import partial
-from inspect import getargs
-from typing import Any, Callable, Type, Iterable, Coroutine
+from typing import Any, Callable, Iterable, Coroutine
 import logging
 
-from .error import (InvalidPredicateExpression, ReactionMustNotBeCalled,
-                    InvalidReactionArgumentCount)
+from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
 from .field_descriptor import FieldDescriptor, Evaluatable
 from .logging_config import VERBOSE
 
@@ -57,10 +55,25 @@ type ReactionCoroutine = Coroutine[Any, Any, None]
 #                                     ReactionCoroutine]
 type Reaction[T] = Callable[[Any, FieldDescriptor[T], T, T],
                                      ReactionCoroutine]
+type BoundReaction[T] = Callable[[Any, Any, FieldDescriptor[T], T, T],
+                                     ReactionCoroutine]
 '''
 Reaction is the type for methods that predicates can decorate.
 '''
 
+@dataclass
+class CustomFieldReactionConfiguration[T]:
+    '''
+    Class to indicate to Predicate.__call__ that field reactions should not
+    be handled by the Predicate decorator. The decorator will still return a
+    _Reaction that references the reaction that can be used to do this
+    configuration.
+    '''
+    reaction: BoundReaction
+    implementation: T
+    '''
+    Opaque details about the custom implementation. Predicate decorator logs
+    this, and implementations are free to use as necessary.'''
 
 @dataclass(eq=True, frozen=True)
 class _Reaction(ReactionMustNotBeCalled):
@@ -176,31 +189,22 @@ class Predicate(Evaluatable[bool], ABC):
                @ field1 == 1
                @ field2 == 2
                Attempting this currently raises ReactionMustNotBeCalled.
+
+        Field reactions are not configured if the decorated func is an instance
+        of CustomFieldReactionConfiguration. This is used by FieldWatcher to
+        not configure reactions that need to be bound to specific instances
+        (rather than the classes that fields are on).
         '''
-        ##All reactions are configured, even those on different classes than
-        # the field that must be called through a bound field. func has not yet
-        # been added to the nascent class namespace so there really is no way
-        # to tell reliably which class it's on.
-        ##Reactions on the same class as the field dont need to take another
-        # instance. The number of positional args on the func is used to infer
-        # whether this reaction requires a bound reaction.
-        # todo - this argument code would be simpler if a proper change event
-        #        was created and passed on every field value change. That
-        #        hasn't been done because keeping he values off the heap has
-        #        performance improvements, but how much help is it to not
-        #        create a __slot__ed class to make this mess easier
-        args = getargs(func.__code__)
-        argc = len(args.args)
-        if argc != 5:  # todo special case (self, watched, field, old, new)
-            self.configure_reaction(func)
-        else:
-            # todo - the class func is on must be a FieldWatcher, but that is
-            #        not obvious how to enforce at this point since the class
-            #        hasn't been defined and it's nascent namespace isn't
-            #        available from the func.
-            logger.info('changes to %s will use bound reactions to call %s',
+        if isinstance(func, CustomFieldReactionConfiguration):
+            implementation = func.implementation
+            func = func.reaction
+            logger.info('changes to %s will use %s to '
+                        'create bound reactions for %s',
+                        func, implementation,
                         ', '.join(str(f) for f in self.fields),
                          func)
+        else:
+            self.configure_reaction(func)
         return _Reaction(self, func)
 
     def configure_reaction(self, func: Reaction,

@@ -15,6 +15,9 @@
 '''
 An example showing how a class can watch a state for changes.
 '''
+# TODO - this should probably move up to .test rather than example, it's
+#        getting to be a bit messy for an example and contains things that
+#        *should not* be done by client code.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -79,6 +82,7 @@ class Test(TestCase):
                 self.change_events: List[Tuple] = list()
 
             @ Watched.ticks != None
+            @ FieldWatcher.configure  # todo - get rid of .configure
             async def _watch(self, watched: T, field, old, new):
                 assert isinstance(self, Watcher), f'got {type(self)=}'
                 assert isinstance(watched, Watched), f'got {type(watched)=}'
@@ -106,6 +110,8 @@ class Test(TestCase):
         class Watcher(FieldWatcher[Watched]):
             reacted: bool = False
             @ Watched.field == True
+            @ FieldWatcher.configure  # yuck...make this more readable
+            #  - Should FieldWatcher be a decorator *And* a base class?
             async def _true(
                 self, watched: Watched, field: Field[bool], old:bool, new:bool):
                 assert self.watched is watched
