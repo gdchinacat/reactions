@@ -128,7 +128,8 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
         self.reactions.append(reaction)
 
     @abstractmethod
-    def _bind(self, instance: Any) -> None:
+    def _bind(self, nascent_instance: Any) -> None:
+        '''_bind the fields for the nascent_instance'''
         raise NotImplementedError()
 
     def set_names(self, classname: str, attr: str) -> None:

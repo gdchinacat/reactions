@@ -22,7 +22,7 @@ from asyncio import run
 from collections.abc import Awaitable, Iterable, MutableMapping
 from logging import getLogger
 from types import MethodType, TracebackType
-from typing import overload, NoReturn
+from typing import overload, NoReturn, cast
 
 from .error import FieldAlreadyBound
 from .executor import ReactionExecutor
@@ -118,11 +118,13 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
         '''
         Get/create/set a Field specific to the instance.
 
-        This allows reations specific to the instance. For example:
+        This allows reactions specific to the instance. For example:
         (Watched.field[state] >= 5)(watcher.watch_field)
         '''
-        return getattr(instance, self._attr_bound)
-    __getitem__ = bound_field  # todo type error, why?
+        bound_field = getattr(instance, self._attr_bound)
+        return cast(BoundField[T], bound_field)
+
+    __getitem__ = bound_field
 
     def _bind(self, nascent_instance: object) -> None:
         '''
@@ -257,19 +259,23 @@ class Reactant():
 
     @overload
     def __init__(self,
-                 *args,
+                 *args: object,
                  executor: ReactionExecutor|None = None,
-                 **kwargs) -> None: ...
+                 **kwargs: object) -> None: ...
 
     @overload
-    def __init__(self, *args, **kwargs) -> None: ...
+    def __init__(self,
+                 *args: object,
+                 **kwargs: object) -> None: ...
 
     def __init__(self,
-                 *args,
-                 executor: ReactionExecutor|None = None,
-                 **kwargs) -> None:
+                 *args: object,
+                 #executor: ReactionExecutor|None = None,
+                 **kwargs: object) -> None:
+        self.executor = (cast(ReactionExecutor|None,
+                              kwargs.pop('executor', None))
+                         or ReactionExecutor())
         super().__init__(*args, **kwargs)
-        self.executor = executor or ReactionExecutor()
 
     @abstractmethod
     def _start(self) -> None:
@@ -360,48 +366,52 @@ class FieldWatcher[Tw: FieldManager](
     instances are initialized.
     '''
 
+    # todo move overloads into .pyi
     @overload
     def __init__(self,
-                 reaction_or_watched: BoundReaction,  # todo predicate typing
+                 reaction_or_watched: BoundReaction,
                  ) -> None:
         '''Reaction decorator to indicate FieldWatcher manages field reaction
         configuration.'''
 
     @overload
     def __init__(self,
-                  reaction_or_watched: Tw,
-                  *args: object,
+                 reaction_or_watched: Tw,
+                 *args: object,
                  executor: ReactionExecutor|None = None,
                  **kwargs: object) -> None: ...
 
     @overload
-    def __init__(self, reaction_or_watched: Tw, *args, **kwargs) -> None: ...
+    def __init__(self,
+                 reaction_or_watched: Tw,
+                 *args: object,
+                 **kwargs: object
+                 ) -> None: ...
 
     def __init__(self,
-                 reaction_or_watched: BoundReaction|Tw,  # todo typing
+                 reaction_or_watched: BoundReaction|Tw,
                  *args: object,
-                 executor: ReactionExecutor|None = None,
+                 #executor: ReactionExecutor|None = None,
                  **kwargs: object) -> None:
         '''
         Create a FieldWatcher or decorate a BoundReaction managed by
         FieldWatcher.
         '''
         if callable(reaction_or_watched):
-            '''
-            Wrap the reaction so that it will not have instance field reactions
-            configured for it. It will be tracked as a reaction in _reactions
-            so that __init_subclass__ can configure the for the specific
-            instance. Strictly speaking CustomFieldReactionConfiguration could
-            be used instead of this, but doing so is not nearly as
-            understandable as this.
-            '''
+            # Wrap the reaction so that it will not have instance field
+            # reactions configured for it. It will be tracked as a reaction in
+            # _reactions so that __init_subclass__ can configure the for the
+            # specific instance. Strictly speaking
+            # CustomFieldReactionConfiguration could be used instead of this,
+            # but doing so is not nearly as understandable as this.
             reaction = reaction_or_watched  # for clarity
             super().__init__(reaction)
         else:
             self.watched = reaction_or_watched
+            executor = kwargs.pop('executor', self.watched.executor)
             super().__init__(None, # CustomFieldReactionConfiguration.reaction
                              *args,
-                             executor=executor or self.watched.executor,
+                             executor=executor,
                              **kwargs)
 
             # Configure the bound reactions.

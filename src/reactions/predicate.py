@@ -209,6 +209,7 @@ class Predicate(Evaluatable[bool], ABC):
         '''
         reaction: Reaction|BoundReaction
         if isinstance(reaction_or_custom, CustomFieldReactionConfiguration):
+            assert reaction_or_custom.reaction
             reaction = reaction_or_custom.reaction
             logger.info('changes to %s will use %s to '
                         'create bound reactions for %s',
