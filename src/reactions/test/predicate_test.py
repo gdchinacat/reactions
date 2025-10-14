@@ -19,8 +19,7 @@ from __future__ import annotations
 
 from unittest import TestCase, main
 
-from .. import Field, ReactionMustNotBeCalled, FieldManager, FieldWatcher
-from ..predicate import _Reaction
+from .. import Field, FieldManager
 from .async_helpers import asynctest
 
 
@@ -31,13 +30,13 @@ class PredicateTest(TestCase):
         '''test the object returned by decorating a reaction is correct'''
         class State:
             field = Field(False)
-        def reaction(state:State,
-                     field: Field[int],
-                     old: int,
-                     new: int) -> None: # pylint: disable=unused-argument
+        async def reaction(state:State,
+                           field: Field[int],
+                           old: int,
+                           new: int) -> None: # pylint: disable=unused-argument
             pass
         predicate = State.field == True
-        reaction = predicate(reaction)
+        reaction = predicate(reaction)  # todo predicate typing
         self.assertEqual(predicate, reaction.predicate)
 
     def test_predicate_decorator_non_self(self) -> None:
@@ -49,7 +48,7 @@ class PredicateTest(TestCase):
         class State(FieldManager):
             field = Field(-1)
             @ field > 0
-            async def decrement(self, *_) -> None:
+            async def decrement(self, *_: object) -> None:
                 self.field -= 1
                 if self.field == 0:
                     self.stop()
@@ -58,8 +57,9 @@ class PredicateTest(TestCase):
 
         change_events: list[tuple[State, Field[int], int, int]] = []
         @ State.field[state] != None
-        async def watch(*args) -> None:
-            change_events.append(args)
+        async def watch(state: State, field: Field[int],
+                        old: int, new: int) -> None:
+            change_events.append((state, field, old, new))
 
         state.run()
 

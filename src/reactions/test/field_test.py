@@ -165,7 +165,7 @@ class TestField(TestCase):
 
     def test_bound_field_reaction(self) -> None:
         called = False
-        def reaction(*_) -> None:
+        def reaction(*_: object) -> None:
             nonlocal called
             called = True  # @UnusedVariable
 
@@ -191,10 +191,13 @@ class TestField(TestCase):
         class Watched(FieldManager):
             field = Field(False)
             def _start(self) -> None: ...
-        class Watcher(FieldWatcher):
+        class Watcher(FieldWatcher[Watched]):
             _false: Any
             @ Watched.field == True
-            async def _true(self, watched, field, old, new) -> None: ...
+            async def _true(self,
+                            watched: Watched,
+                            field: Field[bool],
+                            old: bool, new: bool) -> None: ...
 
         watched = Watched()
 

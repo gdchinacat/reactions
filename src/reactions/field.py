@@ -22,8 +22,8 @@ from asyncio import run
 from collections.abc import Awaitable, Iterable, MutableMapping
 from dataclasses import dataclass, field
 from logging import getLogger
-from types import MethodType
-from typing import Any, overload, NoReturn
+from types import MethodType, TracebackType
+from typing import overload, NoReturn
 
 from .error import FieldAlreadyBound
 from .executor import ReactionExecutor
@@ -40,7 +40,7 @@ __all__ = ['Field', 'FieldManager', 'FieldWatcher']
 logger = getLogger('reactions.field')
 
 
-class BoundField[T](_BoundField, Evaluatable[T], ComparisonPredicates):
+class BoundField[T](_BoundField[T], Evaluatable[T], ComparisonPredicates):
     '''
     A field bound to a specific instance.
 
@@ -50,9 +50,9 @@ class BoundField[T](_BoundField, Evaluatable[T], ComparisonPredicates):
     '''
 
     def __init__(self,
-                 nascent_instance: Any,
+                 nascent_instance: object,
                  field: Field[T],
-                 *args, **kwargs) -> None:
+                 *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
         self.field: Field[T] = field
         self.instance = nascent_instance
@@ -62,7 +62,7 @@ class BoundField[T](_BoundField, Evaluatable[T], ComparisonPredicates):
         # are configured.
         self.reactions = field.reactions
 
-    def reaction(self, reaction: FieldReaction) -> None:
+    def reaction(self, reaction: FieldReaction[T]) -> None:
         '''Add a reaction for when this bound field changes value.'''
         # ensure the bound field is using a private reactions list
         if self.reactions is self.field.reactions:
@@ -70,7 +70,7 @@ class BoundField[T](_BoundField, Evaluatable[T], ComparisonPredicates):
 
         self.reactions.append(reaction)
 
-    def react(self, instance:Any, field:FieldDescriptor[T],
+    def react(self, instance:object, field:FieldDescriptor[T],
               old:T, new:T) -> None:
         """React to field change events by dispatching them to the reactions"""
         for reaction in self.reactions:
@@ -82,10 +82,10 @@ class BoundField[T](_BoundField, Evaluatable[T], ComparisonPredicates):
     __repr__ = __str__
 
     @property
-    def fields(self) -> Iterable[Field]:
+    def fields(self) -> Iterable[Field[T]]:
         yield self.field
 
-    def evaluate(self, instance:Any)->T:
+    def evaluate(self, instance:object)->T:
         return self.field.evaluate(instance)
 
 class Field[T](FieldDescriptor[T], ComparisonPredicates):
@@ -115,7 +115,7 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
         '''make Field hashable/immutable'''
         return id(self)
 
-    def bound_field(self, instance: Any) -> BoundField[T]:
+    def bound_field(self, instance: object) -> BoundField[T]:
         '''
         Get/create/set a Field specific to the instance.
 
@@ -125,7 +125,7 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
         return getattr(instance, self._attr_bound)
     __getitem__ = bound_field  # todo type error, why?
 
-    def _bind(self, nascent_instance)->None:
+    def _bind(self, nascent_instance: object) -> None:
         '''
         Create a BoundField on instance.
         nascent_instance:
@@ -148,14 +148,14 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
         setattr(nascent_instance, self._attr_bound, bound_field)
 
     def react(self,
-              instance: Any,
+              instance: object,
               field: FieldDescriptor[T],
               old: T,
               new: T) -> None:
         raise NotImplementedError('reactions should be on bound field')
 
 
-class FieldManagerMetaDict(dict[str, Any]):
+class FieldManagerMetaDict(dict[str, object]):
     '''
     A dict that is used by FieldManagerMeta for class creation. It names Field
     members and tracks them in a list of the class.
@@ -167,12 +167,12 @@ class FieldManagerMetaDict(dict[str, Any]):
 
     def __init__(self, classname: str) -> None:
         self.classname = classname
-        self['_fields'] = tuple[Field]()
+        self['_fields'] = tuple[tuple[Field[object]]]()
 
-    def __setitem__(self, attr: str, value: Any)->None:
+    def __setitem__(self, attr: str, value: object)->None:
         if isinstance(value, Field):
             value.set_names(self.classname, attr)
-            self['_fields'] = self['_fields'] + (value,)
+            self['_fields'] = self['_fields'] + (value,)  # type: ignore 
         super().__setitem__(attr, value)
 
 
@@ -194,16 +194,16 @@ class FieldManagerMeta(ABCMeta, type):
     # _fields is initialized by FieldManagerMetaDict.__init__() since it needs
     # to be present during the nascent stages before __init__ is called to
     # initialize the instance.
-    _fields: tuple[Field, ...]
+    _fields: tuple[Field[object], ...]
 
     @classmethod
     def __prepare__(metacls, name: str, bases: tuple[type, ...], \
                     # pylint: disable=unused-argument
-                    /, **kwargs: Any
+                    /, **kwargs: object
                     ) -> MutableMapping[str, object]:
         return FieldManagerMetaDict(name)
 
-    def __setattr__(self, attr: str, value: Any) -> None:
+    def __setattr__(self, attr: str, value: object) -> None:
         '''
         call set_names() on Field attributes
         '''
@@ -212,7 +212,10 @@ class FieldManagerMeta(ABCMeta, type):
             self._fields = self._fields + (value,)  # pylint: disable=no-member
         super().__setattr__(attr, value)
 
-    def __new__[T: type](cls: T, name, bases, namespace) -> T:
+    def __new__[T: type](cls: T,
+                         name: str,
+                         bases: tuple[type, ...],
+                         namespace: dict[str, object]) -> T:
         '''Create a new instance of a class managed by FieldManagerMeta.'''
         if BoundFieldCreatorMixin not in bases:
             bases = bases + (BoundFieldCreatorMixin,)
@@ -231,9 +234,9 @@ class BoundFieldCreatorMixin:
     dispatch to the bound field rather than having to check if the Field or the 
     bound field should be called.
     '''
-    _fields: Iterable[Field]
+    _fields: Iterable[Field[object]]
 
-    def __new__(cls, *_, **__) -> BoundFieldCreatorMixin:
+    def __new__(cls, *_: object, **__: object) -> BoundFieldCreatorMixin:
         nascent = super().__new__(cls)
         for field_ in nascent._fields:
             field_._bind(nascent)
@@ -264,7 +267,7 @@ class Reactant():
         Subclasses must implement this to start the state machine execution.
         '''
 
-    async def start(self) -> Awaitable:
+    async def start(self) -> Awaitable[None]:
         '''
          Start processing the state machine. Returns a future that indicates
          when the state machine has entered a terminal state. If an exception
@@ -291,7 +294,7 @@ class Reactant():
         '''
         self._reaction_executor.stop(timeout)
 
-    async def astop(self, *_) -> None:
+    async def astop(self, *_: object) -> None:
         '''
         Async stop:
         (done == True)(Reactant.astop)
@@ -301,10 +304,13 @@ class Reactant():
     def cancel(self) -> None:
         self.stop(0)
 
-    async def __aenter__(self)->Awaitable:
+    async def __aenter__(self)->Awaitable[None]:
         return await self.start()
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> bool:
+    async def __aexit__(self,
+                        exc_type: type[BaseException]|None,
+                        exc_val: BaseException|None,
+                        exc_tb: TracebackType|None) -> bool:
         self.stop()
         await self._reaction_executor
         return False
@@ -319,9 +325,10 @@ class FieldManager(Reactant, ABC, metaclass=FieldManagerMeta):
     '''
 
 
-class FieldWatcher[T: FieldManager](Reactant,
-                                    CustomFieldReactionConfiguration,
-                                    ABC):
+class FieldWatcher[T: FieldManager](
+        Reactant,
+        CustomFieldReactionConfiguration['FieldWatcher[T]'],
+        ABC):
     '''
     Base class to allow subclasses to watch Fields on other classes.
 
@@ -344,20 +351,22 @@ class FieldWatcher[T: FieldManager](Reactant,
     '''
 
     @overload
-    def __init__(self, reaction_or_watched: BoundReaction) -> None: ...
+    def __init__(self,
+                 reaction_or_watched: BoundReaction,  # todo predicate typing
+                 ) -> None: ...
 
     @overload
     def __init__(self,
-                  reaction_or_watched: Any,
-                  *args,
-                 _reaction_executor=None,
-                 **kwargs) -> None: ...
+                  reaction_or_watched: T,
+                  *args: object,
+                 _reaction_executor: ReactionExecutor|None = None,
+                 **kwargs: object) -> None: ...
 
     def __init__(self,
-                 reaction_or_watched: BoundReaction|Any,
-                 *args,
-                 _reaction_executor=None,
-                 **kwargs) -> None:
+                 reaction_or_watched: BoundReaction|T,  # todo typing
+                 *args: object,
+                 _reaction_executor: ReactionExecutor|None = None,
+                 **kwargs: object) -> None:
         '''
         Create a FieldWatcher or decorate a BoundReaction managed by
         FieldWatcher.
@@ -371,8 +380,9 @@ class FieldWatcher[T: FieldManager](Reactant,
             be used instead of this, but doing so is not nearly as
             understandable as this.
             '''
-            CustomFieldReactionConfiguration.__init__(
-                self, reaction_or_watched, type(self).__init_subclass__)
+            CustomFieldReactionConfiguration.__init__(  # todo typing (_GenericAlias.__init__ too many params)
+                # todo typing
+                self, reaction_or_watched, self)
         else:
             self.watched = reaction_or_watched
             executor = _reaction_executor or self.watched._reaction_executor
@@ -400,7 +410,7 @@ class FieldWatcher[T: FieldManager](Reactant,
         so subclasses don't have to implement this method.
         '''
 
-    def __replace__(self, *args, **kwargs)->NoReturn:
+    def __replace__(self, *args: object, **kwargs: object) -> NoReturn:
         # Base classes both implement __replace__, Until there is an actual
         # need for this functionality it is not implemented.
         raise NotImplementedError()

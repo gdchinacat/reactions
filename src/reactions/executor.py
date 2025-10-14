@@ -15,6 +15,7 @@
 '''
 Asynchronous reaction executor.
 '''
+
 from __future__ import annotations
 
 from asyncio import (Queue, Task, create_task, QueueShutDown, sleep,
@@ -22,7 +23,8 @@ from asyncio import (Queue, Task, create_task, QueueShutDown, sleep,
 from collections.abc import Awaitable, Generator
 from itertools import count
 from logging import Logger, getLogger
-from typing import Any, ClassVar
+from types import TracebackType
+from typing import ClassVar
 
 from .error import ExecutorAlreadyStarted, ExecutorNotStarted
 from .field_descriptor import FieldDescriptor
@@ -58,10 +60,10 @@ class ReactionExecutor:
     management of tasks created by reactions is provided.
     '''
 
-    task: Task|None = None
+    task: Task[None]|None = None
     '''the task that is processing the queue to execute reactions'''
 
-    queue: Queue[tuple[int, ReactionCoroutine, Any]]
+    queue: Queue[tuple[int, ReactionCoroutine, object]]
     '''
     The queue of reactions to execute.
     tuple elements are:
@@ -71,7 +73,7 @@ class ReactionExecutor:
         [2] - the args (used only for logging)
     '''
 
-    _ids: ClassVar[count] = count()
+    _ids: ClassVar[count[int]] = count()
     '''
     _ids assigns a unique id to each reaction handled by the executor. It is
     used only for informational purposes, but this may change if there is a
@@ -80,13 +82,13 @@ class ReactionExecutor:
     analysis.
     '''
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
         self.queue = Queue()
 
     def react[T](self,
-                 reaction: Reaction,
-                 instance,
+                 reaction: Reaction,  # todo predicate typing
+                 instance: object,
                  field: FieldDescriptor[T],
                  old: T, new: T) -> None:
         '''reaction that asynchronously executes the reaction'''
@@ -119,7 +121,7 @@ class ReactionExecutor:
     # to the task and raised to waiters.
     ###########################################################################
 
-    def start(self) -> Awaitable:
+    def start(self) -> Awaitable[None]:
         '''start the task to execute the queued reactions'''
         if self.task is not None:
             raise ExecutorAlreadyStarted()
@@ -178,14 +180,17 @@ class ReactionExecutor:
             finally:
                 self.queue.task_done()
 
-    async def __aenter__(self)->Awaitable:
+    async def __aenter__(self)->Awaitable[None]:
         return self.start()
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+    async def __aexit__(self,
+                        exc_type: type[BaseException]|None,
+                        exc_val: BaseException|None,
+                        exc_tb: TracebackType|None) -> None:
         self.stop()
         await self
 
-    def __await__(self) -> Generator[Task]:
+    def __await__(self) -> Generator[Task[None]]:
         '''wait for the task to complete'''
         if not self.task:
             raise ExecutorNotStarted()

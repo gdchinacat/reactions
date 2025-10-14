@@ -21,7 +21,6 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable, Coroutine
 from dataclasses import dataclass
 from functools import partial
-from typing import Any
 import logging
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
@@ -35,7 +34,7 @@ __all__ = ['Constant']
 logger = logging.getLogger("reactions.predicate")
 
 
-type ReactionCoroutine = Coroutine[Any, Any, None]
+type ReactionCoroutine = Coroutine[object, object, None]
 # Callable arguments behavior is contravariant to ensure type safety.
 # todo  - make FieldDescriptor[T] arg covariant so client code can declare
 #         reactions as taking Field[T] rather than FieldDescriptor[T].
@@ -50,13 +49,13 @@ type ReactionCoroutine = Coroutine[Any, Any, None]
 #        more plumbing to get that to work. For now, the errors on the
 #        reaction decoration is preferable, so commented out to leave a trace
 #        for maybe how to do this.
-#type _T = Any
+#type _T = object
 #type B = FieldDescriptor[_T]
-#type Reaction[_T, F: B] = Callable[[Any, F, _T, _T],
+#type Reaction[_T, F: B] = Callable[[object, F, _T, _T],
 #                                     ReactionCoroutine]
-type Reaction[T] = Callable[[Any, FieldDescriptor[T], T, T],
+type Reaction[T] = Callable[[object, FieldDescriptor[T], T, T],
                                      ReactionCoroutine]
-type BoundReaction[T] = Callable[[Any, Any, FieldDescriptor[T], T, T],
+type BoundReaction[T] = Callable[[object, object, FieldDescriptor[T], T, T],
                                      ReactionCoroutine]
 '''
 Reaction is the type for methods that predicates can decorate.
@@ -70,7 +69,7 @@ class CustomFieldReactionConfiguration[T]:
     _Reaction that references the reaction that can be used to do this
     configuration.
     '''
-    reaction: BoundReaction
+    reaction: BoundReaction[object]  # todo predicate typing
     implementation: T
     '''
     Opaque details about the custom implementation. Predicate decorator logs
@@ -108,10 +107,10 @@ class Predicate(Evaluatable[bool], ABC):
     '''
 
     def react(self,
-              instance: Any,
+              instance: object,
               field: FieldDescriptor,
-              old: Any,
-              new: Any,
+              old: object,
+              new: object,
               *,
               reaction: Reaction) -> None:
         '''
@@ -148,6 +147,8 @@ class Predicate(Evaluatable[bool], ABC):
 
             # Objects that react must provide an executor. This is typically
             # done by deriving from FieldManager or FieldWatcher.
+            # todo type safety for getting executor...just hoping it's there
+            #      isn't great.
             reaction_executor = executor_instance._reaction_executor
             reaction_executor.react(reaction,
                                     instance,
@@ -224,7 +225,7 @@ class Predicate(Evaluatable[bool], ABC):
         return _Reaction(self, reaction)
 
     def configure_reaction(self, func: Reaction,
-                           instance:Any=None)->None:
+                           instance:object=None)->None:
         '''configure the reaction on the fields'''
         # Add a reaction on all the fields to call self.react() with
         # func as the reaction function.
@@ -239,17 +240,17 @@ class Constant[T](Evaluatable[T]):
     '''An Evaluatable that always evaluates to it's value.'''
     value: T
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         return self.value == other
 
     def __str__(self) -> str:
         return str(self.value)
 
-    def evaluate(self, _) -> T:
+    def evaluate(self, _: object) -> T:
         return self.value
 
     @InvalidPredicateExpression
-    def __bool__(self): ...
+    def __bool__(self) -> None: ...
 
     @property
     def fields(self) -> Iterable[FieldDescriptor]:
@@ -273,7 +274,7 @@ class UnaryPredicate(OperatorPredicate, ABC):
     '''Predicate that has a single operand.'''
     expression: Evaluatable
 
-    def __init__(self, expression: Evaluatable | Any) -> None:
+    def __init__(self, expression: Evaluatable | object) -> None:
         if not isinstance(expression, Evaluatable):
             expression = Constant(expression)
         self.expression = expression
@@ -282,7 +283,7 @@ class UnaryPredicate(OperatorPredicate, ABC):
     def fields(self) -> Iterable[FieldDescriptor]:
         yield from self.expression.fields
 
-    def evaluate(self, instance) -> bool:
+    def evaluate(self, instance: object) -> bool:
         return self.operator(self.expression.evaluate(instance))
 
     def __str__(self) -> str:
@@ -295,8 +296,8 @@ class BinaryPredicate(OperatorPredicate, ABC):
     right: Evaluatable
 
     def __init__(self,
-                 left: Evaluatable | Any,
-                 right: Evaluatable | Any) -> None:
+                 left: Evaluatable | object,
+                 right: Evaluatable | object) -> None:
         # Everything that isn't an Evaluatable is treated as a constant.
         # This may need to be reevaluated, but it helps with the fields()
         # logic for now.
@@ -311,7 +312,7 @@ class BinaryPredicate(OperatorPredicate, ABC):
         yield from self.left.fields
         yield from self.right.fields
 
-    def evaluate(self, instance) -> bool:
+    def evaluate(self, instance: object) -> bool:
         return self.operator(self.left.evaluate(instance),
                              self.right.evaluate(instance))
 

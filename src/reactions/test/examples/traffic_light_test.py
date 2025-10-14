@@ -151,7 +151,7 @@ class TrafficLightTest(TestCase):
 
             logger.info(f'awaiting {len(awaitables)} traffic lights')
             for traffic_light, awaitable in awaitables:
-                self.assertIsNone(await awaitable)
+                await awaitable
                 self.assertEqual(expected, traffic_light.sequence)
                 self.assertEqual(traffic_light.cycles, CYCLES)
             logger.info(f'done')

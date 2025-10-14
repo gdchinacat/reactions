@@ -17,15 +17,20 @@ Helpers for async testing.
 '''
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from functools import wraps
-from typing import Any
 import asyncio
+from typing import ParamSpec
 
 
-def asynctest(func: Callable[..., Any]|None = None,
+TestParams = ParamSpec("TestParams")
+AsyncTestMethod = Callable[TestParams, Coroutine[None, None, None]]
+TestMethod = Callable[TestParams, None]
+TestMethodDecorator = Callable[[AsyncTestMethod[None]], TestMethod[None]]
+
+def asynctest(func: AsyncTestMethod[...]|None,
               *,
-              timeout:float|None=1) -> Callable:
+              timeout:float|None=1) -> TestMethod[...]|TestMethodDecorator:
     '''
     Decorator to execute async test functions.
     func - function to decorate
@@ -38,9 +43,9 @@ def asynctest(func: Callable[..., Any]|None = None,
     @asynctest(timeout=2)
     async def test_foo(...): ...
     '''
-    def dec(func) -> Callable:
+    def dec(func: AsyncTestMethod[...]) -> TestMethod[...]:
         @wraps(func)
-        def _asynctest(*args, **kwargs) -> None:
+        def _asynctest(*args: object, **kwargs: object) -> None:
             @wraps(func)
             async def async_test_runner() -> None:
                 async with asyncio.timeout(timeout):

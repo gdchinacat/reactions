@@ -65,8 +65,8 @@ class State(FieldManager):
 
 
 @asynccontextmanager
-async def running_state(skip_stop=False,
-                        skip_await=False,
+async def running_state(skip_stop: bool = False,
+                        skip_await: bool = False,
                         ) -> AsyncIterator[tuple[State, ReactionExecutor]]:
     '''
     Async contexst manager to run the state before managed block and wait
@@ -142,7 +142,7 @@ class ReactantTest(TestCase):
         '''fields added to a Reactant subclass after definition are named'''
         obj = object()
         class _State(State):
-            foo: Field
+            foo: Field[object]
         _State.foo = Field(obj)
 
         # Verify that it got named and tracked properly.
@@ -168,7 +168,7 @@ class ReactantTest(TestCase):
         class State(FieldManager):
             field = Field(False)
             @ field  == True
-            async def field_(self, *_) -> None:
+            async def field_(self, *_: object) -> None:
                 await barrier.wait()
             def _start(self) -> None: ...
 

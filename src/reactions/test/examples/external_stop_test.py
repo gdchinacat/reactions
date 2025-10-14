@@ -35,7 +35,7 @@ class Counter(FieldManager):
     (done == True)(FieldManager.astop)
 
     @ count >= 0
-    async def _count(self, *_) -> None:
+    async def _count(self, *_: object) -> None:
         '''keep counting until done'''
         if not self.done:
             self.count += 1
@@ -51,7 +51,9 @@ class ExternalStopTest(TestCase):
         counter = Counter()
 
         @ Counter.count[counter] == count_to
-        async def stop(instance, field, old, new):
+        async def stop(instance: Counter,
+                       field: Field[int],
+                       old: int, new: int) -> None:
             # the Counter reaction to increment count has already executed by
             # the time this one executes, so instance.count is one greater than
             # the value that caused this reaction to execute.

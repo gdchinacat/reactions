@@ -19,7 +19,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 from unittest import TestCase, main
 
 from ..error import ReactionMustNotBeCalled
@@ -42,7 +41,7 @@ class Watched(FieldManager):
 
     @ And(ticks != -1,
           ticks != last_tick)
-    async def tick(self, *_) -> None:
+    async def tick(self, *_: object) -> None:
         self.ticks += 1
 
     @ ticks == last_tick
@@ -63,13 +62,19 @@ class FieldWatcherTest(TestCase):
     def test_automatic_predicate(self) -> None:
 
         class Watcher(FieldWatcher[Watched]):
-            def __init__(self, watched:Watched, *args, **kwargs) -> None:
-                super().__init__(watched, *args, **kwargs)
-                self.change_events: list[tuple[Any, Field, int, int]] = list()
+            def __init__(self, watched: Watched,
+                         *args: object,
+                         **kwargs: object) -> None:
+                super().__init__(watched, *args, **kwargs)  # todo typing
+                self.change_events: list[
+                    tuple[Watched, Field[int], int, int]] = list()
 
             @ Watched.ticks != None
-            @ FieldWatcher
-            async def _watch(self, watched: Watched, field, old, new) -> None:
+            @ FieldWatcher  # todo typing
+            async def _watch(self,
+                             watched: Watched,
+                             field: Field[int],
+                             old: int, new: int) -> None:
                 assert isinstance(self, Watcher), f'got {type(self)=}'
                 assert isinstance(watched, Watched), f'got {type(watched)=}'
                 self.change_events.append((watched, field, old, new))
@@ -125,13 +130,13 @@ class FieldWatcherTest(TestCase):
         class State(FieldManager):
             field = Field(False)
             def _start(self) -> None: ...
-        class Watcher(FieldWatcher):
+        class Watcher(FieldWatcher[Watched]):
             called = False
             @ State.field == True
-            @ FieldWatcher
+            @ FieldWatcher  # todo typing
             async def _true(self,
                             state: State,
-                            field: Field,
+                            field: Field[bool],
                             old: bool, new:bool) -> None:
                 self.called = True
 
@@ -143,7 +148,7 @@ class FieldWatcherTest(TestCase):
         self.assertEqual([], State.field.reactions)
 
         state = State()
-        watcher = Watcher(state)
+        watcher = Watcher(state)  # todo typing
 
         self.assertEqual([], State.field.reactions)
         async with state:

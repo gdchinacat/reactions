@@ -89,7 +89,7 @@ class ComparisonPredicates:
     ##########################################################################
     # Predicate creation operators
     #
-    # type: ignore[override]
+    # _type: ignore[override]
     #       suppress override errors on on __eq__ and __ne__ because the
     #       builtin being overridden returns bool and these do not, so the
     #       error is valid. However, this is what the implementation needs to
@@ -98,38 +98,38 @@ class ComparisonPredicates:
     # TODO - the returned predicates need to have the type of the field that
     #        created them in their type so that when they are called the type
     #        of field the PredicateReaction accepts will match.
-    def __contains__(self, other) -> NoReturn:
+    def __contains__(self, other: object) -> NoReturn:
         '''not implemented'''
         raise NotImplementedError('use Contains(self, other) instead')
 
-    def __and__(self, other) -> Predicate:
+    def __and__(self, other: object) -> Predicate:
         '''create an And (&) predicate for the field'''
         return BinaryAnd(self, other)
 
-    def __or__(self, other) -> Predicate:
+    def __or__(self, other: object) -> Predicate:
         '''create an Or (|) predicate for the field'''
         return BinaryOr(self, other)
 
-    def __eq__(self, other) -> Predicate:  # type: ignore[override]
+    def __eq__(self, other: object) -> Predicate:  # type: ignore[override]
         '''create an Eq (==) predicate for the field'''
         return Eq(self, other)
 
-    def __ne__(self, other) -> Predicate:  # type: ignore[override]
+    def __ne__(self, other: object) -> Predicate:  # type: ignore[override]
         '''create an Eq predicate for the field'''
         return Ne(self, other)
 
-    def __lt__(self, other) -> Predicate:
+    def __lt__(self, other: object) -> Predicate:
         '''create an Lt (<) predicate for the field'''
         return Lt(self, other)
 
-    def __le__(self, other) -> Predicate:
+    def __le__(self, other: object) -> Predicate:
         '''create an Le (<=) predicate for the field'''
         return Le(self, other)
 
-    def __gt__(self, other) -> Predicate:
+    def __gt__(self, other: object) -> Predicate:
         '''create an Gt (>) predicate for the field'''
         return Gt(self, other)
 
-    def __ge__(self, other) -> Predicate:
+    def __ge__(self, other: object) -> Predicate:
         '''create an Ge (>=) predicate for the field'''
         return Ge(self, other)

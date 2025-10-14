@@ -47,7 +47,7 @@ class Evaluatable[T](ABC):
 
     @property
     @abstractmethod
-    def fields(self) -> Iterable[FieldDescriptor]:
+    def fields(self) -> Iterable[FieldDescriptor[Any]]:
         raise NotImplementedError
 
     @abstractmethod
@@ -68,7 +68,7 @@ class _BoundField[T](ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def reaction(self, reaction: FieldReaction) -> None:
+    def reaction(self, reaction: FieldReaction[T]) -> None:
         ''' Add a reaction to the list of reactions.'''
         raise NotImplementedError()
 
@@ -98,8 +98,8 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
                  initial_value: T,
                  classname: str|None = None,
                  attr: str|None = None,
-                 *args,  # todo moving this before the kwargs breaks things
-                 **kwargs) -> None:
+                 *args: Any,  # todo moving this before the kwargs breaks things
+                 **kwargs: Any) -> None:
         '''
         initial_value: The initial value for the field.
         classname: the name of the class this is a member of (display only)
@@ -121,9 +121,9 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
 
         # Reactions is the list of reactions on the unbound field. BoundField
         # references this in a copy-on-write manner.
-        self.reactions: list[FieldReaction] = []
+        self.reactions: list[FieldReaction[T]] = []
 
-    def reaction(self, reaction: FieldReaction) -> None:
+    def reaction(self, reaction: FieldReaction[T]) -> None:
         ''' Add a reaction to the list of reactions.'''
         self.reactions.append(reaction)
 
@@ -152,7 +152,7 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
         '''
         return id(self)
 
-    def evaluate(self, instance)->T:
+    def evaluate(self, instance: Any) -> T:
         try:
             return getattr(instance, self._attr)
         except AttributeError:
@@ -173,8 +173,8 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
                                         owner: Any)->T: ...
 
     def __get__[Tf: FieldDescriptor[T]](self: Tf,
-                                        instance,
-                                        owner: Any|None)->T|Tf:
+                                        instance: Any,
+                                        owner: Any|None) -> T|Tf:
         '''
         Get the value of the field.
 
@@ -199,7 +199,7 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
         assert owner is not None
         return self
 
-    def __set__(self, instance, value: T) -> None:
+    def __set__(self, instance: Any, value: T) -> None:
         # See comment in __get__ for handling field access. Ignore this call
         # if value is self.
         if value is self:
@@ -221,7 +221,7 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
         None, "removal of state attributes is not permitted")
 
     @property
-    def fields(self) -> Iterable[FieldDescriptor]:
+    def fields(self) -> Iterable[FieldDescriptor[T]]:
         yield self
 
     def __str__(self) -> str:
