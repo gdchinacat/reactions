@@ -22,7 +22,7 @@ from asyncio import (Queue, Task, create_task, QueueShutDown, sleep,
 from collections.abc import Awaitable, Generator
 from itertools import count
 from logging import Logger, getLogger
-from typing import Any
+from typing import Any, ClassVar
 
 from .error import ExecutorAlreadyStarted, ExecutorNotStarted
 from .field_descriptor import FieldDescriptor
@@ -71,7 +71,7 @@ class ReactionExecutor:
         [2] - the args (used only for logging)
     '''
 
-    _ids: count = count()
+    _ids: ClassVar[count] = count()
     '''
     _ids assigns a unique id to each reaction handled by the executor. It is
     used only for informational purposes, but this may change if there is a
