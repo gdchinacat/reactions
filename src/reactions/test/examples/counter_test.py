@@ -14,13 +14,11 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from __future__ import annotations
 
-from dataclasses import dataclass
 from unittest import TestCase, main
 
 from ... import Field, FieldManager, And
 
 
-@dataclass
 class Counter(FieldManager):
     '''
     Simple model that implements a counter.
@@ -35,6 +33,10 @@ class Counter(FieldManager):
     # annotations are required for dataclass to include in __init__
     count_to: Field[int] = Field(0)
     count: Field[int] = Field(-1)
+
+    def __init__(self, count_to: int = 0):
+        super().__init__()
+        self.count_to = count_to
 
     def _start(self) -> None:
         '''Start counting.'''

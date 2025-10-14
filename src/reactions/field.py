@@ -20,7 +20,6 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod, ABC
 from asyncio import run
 from collections.abc import Awaitable, Iterable, MutableMapping
-from dataclasses import dataclass, field
 from logging import getLogger
 from types import MethodType, TracebackType
 from typing import overload, NoReturn
@@ -242,7 +241,6 @@ class BoundFieldCreatorMixin:
             field_._bind(nascent)
         return nascent
 
-@dataclass
 class Reactant():
     '''
     Mixin to give a class a reaction executor and methods to manage its
@@ -254,12 +252,24 @@ class Reactant():
     Reactants are asynchronous context managers that start on enter and stop
     on exit.
     '''
-    _executor: ReactionExecutor = field(
-        default_factory=ReactionExecutor, kw_only=True,
-        doc=
-        '''
-        The ReactionExecutor that predicates will use to execute reactions.
-        ''')
+    executor: ReactionExecutor
+    '''The ReactionExecutor that predicates will use to execute reactions.'''
+
+    @overload
+    def __init__(self,
+                 *args,
+                 executor: ReactionExecutor|None = None,
+                 **kwargs) -> None: ...
+
+    @overload
+    def __init__(self, *args, **kwargs) -> None: ...
+
+    def __init__(self,
+                 *args,
+                 executor: ReactionExecutor|None = None,
+                 **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.executor = executor or ReactionExecutor()
 
     @abstractmethod
     def _start(self) -> None:
@@ -274,9 +284,9 @@ class Reactant():
          caused termination of the state it is available as the futures
          exception.
          '''
-        self._executor.start()
+        self.executor.start()
         self._start()
-        return self._executor
+        return self.executor
 
     def run(self)->None:
         '''run and wait until complete'''
@@ -292,7 +302,7 @@ class Reactant():
             timeout - time in seconds to wait for the shutdown to complete
                       normally before canceling the task.
         '''
-        self._executor.stop(timeout)
+        self.executor.stop(timeout)
 
     async def astop(self, *_: object) -> None:
         '''
@@ -312,7 +322,7 @@ class Reactant():
                         exc_val: BaseException|None,
                         exc_tb: TracebackType|None) -> bool:
         self.stop()
-        await self._executor
+        await self.executor
         return False
 
 
@@ -361,7 +371,7 @@ class FieldWatcher[Tw: FieldManager](
     def __init__(self,
                   reaction_or_watched: Tw,
                   *args: object,
-                 _executor: ReactionExecutor|None = None,
+                 executor: ReactionExecutor|None = None,
                  **kwargs: object) -> None: ...
 
     @overload
@@ -370,7 +380,7 @@ class FieldWatcher[Tw: FieldManager](
     def __init__(self,
                  reaction_or_watched: BoundReaction|Tw,  # todo typing
                  *args: object,
-                 _executor: ReactionExecutor|None = None,
+                 executor: ReactionExecutor|None = None,
                  **kwargs: object) -> None:
         '''
         Create a FieldWatcher or decorate a BoundReaction managed by
@@ -385,14 +395,17 @@ class FieldWatcher[Tw: FieldManager](
             be used instead of this, but doing so is not nearly as
             understandable as this.
             '''
+            # todo call super with None for other class fields
             CustomFieldReactionConfiguration.__init__(  # todo typing (_GenericAlias.__init__ too many params)
-                # todo typing
                 self, reaction_or_watched, self)
         else:
             self.watched = reaction_or_watched
-            executor = _executor or self.watched._executor
-            Reactant.__init__(
-                self, *args, _executor=executor, **kwargs)
+            # todo call super with None for other class fields
+            Reactant.__init__(self,
+                              None, None, # reaction, implementation
+                              *args,
+                              executor=executor or self.watched.executor,
+                              **kwargs)
 
             # Configure the bound reactions.
             for reaction in self._reactions:

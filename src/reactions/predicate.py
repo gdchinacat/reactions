@@ -69,7 +69,7 @@ class CustomFieldReactionConfiguration[T]:
     _Reaction that references the reaction that can be used to do this
     configuration.
     '''
-    reaction: BoundReaction[object]  # todo predicate typing
+    reaction: BoundReaction[object]|None  # todo predicate typing
     implementation: T
     '''
     Opaque details about the custom implementation. Predicate decorator logs
@@ -149,7 +149,7 @@ class Predicate(Evaluatable[bool], ABC):
             # done by deriving from FieldManager or FieldWatcher.
             # todo type safety for getting executor...just hoping it's there
             #      isn't great.
-            reaction_executor = executor_instance._executor
+            reaction_executor = executor_instance.executor
             reaction_executor.react(reaction,
                                     instance,
                                     field,

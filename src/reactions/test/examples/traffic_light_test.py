@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 from collections.abc import Coroutine
-from dataclasses import dataclass, field
 from enum import Enum
 from time import time
 from unittest import TestCase, main
@@ -44,7 +43,6 @@ class Color(Enum):
 type IntOrColor = Field[int] | Field[Color]
 
 
-@dataclass
 class TrafficLight(FieldManager):
     '''
     simple model that implements a traffic light:
@@ -65,7 +63,11 @@ class TrafficLight(FieldManager):
     than a regular space between ticks.
     '''
 
-    sequence: list[Color] = field(default_factory=list)
+    sequence: list[Color]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sequence = []
 
     def _start(self) -> None:
         self.ticks = 0

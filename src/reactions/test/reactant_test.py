@@ -21,7 +21,6 @@ from __future__ import annotations
 from asyncio import Future, CancelledError, sleep, Barrier
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
 from typing import NoReturn
 from unittest import TestCase, main
 
@@ -30,16 +29,19 @@ from .. import (ReactionMustNotBeCalled, ExecutorAlreadyStarted, Field,
 from .async_helpers import asynctest
 
 
-@dataclass
 class State(FieldManager):
     '''
     Kitchen sink state machine for testing various aspects of State.
     '''
 
     exception = Field[Exception|None](None)
-    infinite_loop  = Field(False)
+    infinite_loop = Field(False)
 
-    infinite_loop_running: Future[None] = field(default_factory=Future)
+    infinite_loop_running: Future[None]
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self.infinite_loop_running = Future()
 
     def _start(self) -> None:
         pass
@@ -74,7 +76,7 @@ async def running_state(skip_stop: bool = False,
     async with running_state() as state:
     '''
     executor = ReactionExecutor()
-    state = State(_executor=executor)
+    state = State(executor=executor)
     executor.start()
     try:
         yield state, executor

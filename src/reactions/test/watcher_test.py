@@ -18,7 +18,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from unittest import TestCase, main
 
 from ..error import ReactionMustNotBeCalled
@@ -29,12 +28,19 @@ from ..predicate_types import And
 from .async_helpers import asynctest
 
 
-@dataclass
 class Watched(FieldManager):
     '''class with fields to be watched'''
 
     last_tick: Field[int] = Field(1)
     ticks = Field(-1)
+
+    def __init__(self,
+                 *args: object,
+                 last_tick: int|None = None,
+                 **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        if last_tick is not None:
+            self.last_tick = last_tick
 
     def _start(self) -> None:
         self.ticks = 0
@@ -81,7 +87,7 @@ class FieldWatcherTest(TestCase):
 
         watched = Watched()
         watcher = Watcher(watched=watched,
-                          _executor=watched._executor)
+                          executor=watched.executor)
 
         watched.run()
 
@@ -112,11 +118,11 @@ class FieldWatcherTest(TestCase):
 
         executor = ReactionExecutor()
 
-        watched1 = Watched(_executor=executor)
-        watcher1 = Watcher(watched1, _executor=executor)
+        watched1 = Watched(executor=executor)
+        watcher1 = Watcher(watched1, executor=executor)
 
-        watched2 = Watched(_executor=executor)
-        watcher2 = Watcher(watched2, _executor=executor)
+        watched2 = Watched(executor=executor)
+        watcher2 = Watcher(watched2, executor=executor)
 
         async with executor:
             watched1.field = True
