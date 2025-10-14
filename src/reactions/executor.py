@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from asyncio import (Queue, Task, create_task, QueueShutDown, sleep,
                      get_event_loop, CancelledError)
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Generator
 from itertools import count
 from logging import Logger, getLogger
 from typing import Any
@@ -184,7 +184,7 @@ class ReactionExecutor:
         self.stop()
         await self
 
-    def __await__(self):
+    def __await__(self) -> Generator[Task]:
         '''wait for the task to complete'''
         if not self.task:
             raise ExecutorNotStarted()

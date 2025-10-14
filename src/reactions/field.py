@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod, ABC
 from asyncio import run
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Iterable
 from dataclasses import dataclass, field
 from logging import getLogger
 from types import MethodType
@@ -81,7 +81,7 @@ class BoundField[T](Evaluatable[T], ComparisonPredicates):
     __repr__ = __str__
 
     @property
-    def fields(self):
+    def fields(self) -> Iterable[Field]:
         yield self.field
 
     def evaluate(self, instance:Any)->T:

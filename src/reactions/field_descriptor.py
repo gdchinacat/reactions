@@ -47,7 +47,7 @@ class Evaluatable[T](ABC):
 
     @property
     @abstractmethod
-    def fields(self)->Iterable[FieldDescriptor]:
+    def fields(self) -> Iterable[FieldDescriptor]:
         raise NotImplementedError
 
     @abstractmethod
@@ -209,7 +209,7 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
         None, "removal of state attributes is not permitted")
 
     @property
-    def fields(self):
+    def fields(self) -> Iterable[FieldDescriptor]:
         yield self
 
     def __str__(self):
