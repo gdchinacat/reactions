@@ -149,7 +149,7 @@ class Predicate(Evaluatable[bool], ABC):
             # done by deriving from FieldManager or FieldWatcher.
             # todo type safety for getting executor...just hoping it's there
             #      isn't great.
-            reaction_executor = executor_instance._reaction_executor
+            reaction_executor = executor_instance._executor
             reaction_executor.react(reaction,
                                     instance,
                                     field,

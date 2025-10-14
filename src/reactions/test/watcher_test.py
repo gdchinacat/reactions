@@ -81,7 +81,7 @@ class FieldWatcherTest(TestCase):
 
         watched = Watched()
         watcher = Watcher(watched=watched,
-                          _reaction_executor=watched._reaction_executor)
+                          _executor=watched._executor)
 
         watched.run()
 
@@ -112,11 +112,11 @@ class FieldWatcherTest(TestCase):
 
         executor = ReactionExecutor()
 
-        watched1 = Watched(_reaction_executor=executor)
-        watcher1 = Watcher(watched1, _reaction_executor=executor)
+        watched1 = Watched(_executor=executor)
+        watcher1 = Watcher(watched1, _executor=executor)
 
-        watched2 = Watched(_reaction_executor=executor)
-        watcher2 = Watcher(watched2, _reaction_executor=executor)
+        watched2 = Watched(_executor=executor)
+        watcher2 = Watcher(watched2, _executor=executor)
 
         async with executor:
             watched1.field = True

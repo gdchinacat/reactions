@@ -254,7 +254,7 @@ class Reactant():
     Reactants are asynchronous context managers that start on enter and stop
     on exit.
     '''
-    _reaction_executor: ReactionExecutor = field(
+    _executor: ReactionExecutor = field(
         default_factory=ReactionExecutor, kw_only=True,
         doc=
         '''
@@ -274,9 +274,9 @@ class Reactant():
          caused termination of the state it is available as the futures
          exception.
          '''
-        self._reaction_executor.start()
+        self._executor.start()
         self._start()
-        return self._reaction_executor
+        return self._executor
 
     def run(self)->None:
         '''run and wait until complete'''
@@ -292,7 +292,7 @@ class Reactant():
             timeout - time in seconds to wait for the shutdown to complete
                       normally before canceling the task.
         '''
-        self._reaction_executor.stop(timeout)
+        self._executor.stop(timeout)
 
     async def astop(self, *_: object) -> None:
         '''
@@ -312,7 +312,7 @@ class Reactant():
                         exc_val: BaseException|None,
                         exc_tb: TracebackType|None) -> bool:
         self.stop()
-        await self._reaction_executor
+        await self._executor
         return False
 
 
@@ -361,7 +361,7 @@ class FieldWatcher[Tw: FieldManager](
     def __init__(self,
                   reaction_or_watched: Tw,
                   *args: object,
-                 _reaction_executor: ReactionExecutor|None = None,
+                 _executor: ReactionExecutor|None = None,
                  **kwargs: object) -> None: ...
 
     @overload
@@ -370,7 +370,7 @@ class FieldWatcher[Tw: FieldManager](
     def __init__(self,
                  reaction_or_watched: BoundReaction|Tw,  # todo typing
                  *args: object,
-                 _reaction_executor: ReactionExecutor|None = None,
+                 _executor: ReactionExecutor|None = None,
                  **kwargs: object) -> None:
         '''
         Create a FieldWatcher or decorate a BoundReaction managed by
@@ -390,9 +390,9 @@ class FieldWatcher[Tw: FieldManager](
                 self, reaction_or_watched, self)
         else:
             self.watched = reaction_or_watched
-            executor = _reaction_executor or self.watched._reaction_executor
+            executor = _executor or self.watched._executor
             Reactant.__init__(
-                self, *args, _reaction_executor=executor, **kwargs)
+                self, *args, _executor=executor, **kwargs)
 
             # Configure the bound reactions.
             for reaction in self._reactions:

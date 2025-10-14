@@ -74,7 +74,7 @@ async def running_state(skip_stop: bool = False,
     async with running_state() as state:
     '''
     executor = ReactionExecutor()
-    state = State(_reaction_executor=executor)
+    state = State(_executor=executor)
     executor.start()
     try:
         yield state, executor
