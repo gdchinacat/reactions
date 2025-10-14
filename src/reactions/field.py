@@ -353,7 +353,9 @@ class FieldWatcher[Tw: FieldManager](
     @overload
     def __init__(self,
                  reaction_or_watched: BoundReaction,  # todo predicate typing
-                 ) -> None: ...
+                 ) -> None:
+        '''Reaction decorator to indicate FieldWatcher manages field reaction
+        configuration.'''
 
     @overload
     def __init__(self,
@@ -361,6 +363,9 @@ class FieldWatcher[Tw: FieldManager](
                   *args: object,
                  _reaction_executor: ReactionExecutor|None = None,
                  **kwargs: object) -> None: ...
+
+    @overload
+    def __init__(self, reaction_or_watched: Tw, *args, **kwargs) -> None: ...
 
     def __init__(self,
                  reaction_or_watched: BoundReaction|Tw,  # todo typing

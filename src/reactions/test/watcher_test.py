@@ -130,7 +130,7 @@ class FieldWatcherTest(TestCase):
         class State(FieldManager):
             field = Field(False)
             def _start(self) -> None: ...
-        class Watcher(FieldWatcher[Watched]):
+        class Watcher(FieldWatcher[State]):
             called = False
             @ State.field == True
             @ FieldWatcher  # todo typing
