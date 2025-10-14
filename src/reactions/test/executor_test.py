@@ -28,11 +28,12 @@ from .async_helpers import asynctest
 class ExecutorTest(TestCase):
 
     @asynctest
-    async def test_executor_context_manager(self):
+    async def test_executor_context_manager(self) -> None:
         executor = ReactionExecutor()
         async with executor:
             with self.assertRaises(ExecutorAlreadyStarted):
                 executor.start()
+        assert executor.task
         self.assertTrue(executor.task.done())
 
 

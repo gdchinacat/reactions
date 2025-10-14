@@ -35,18 +35,18 @@ class Counter(FieldManager):
     (done == True)(FieldManager.astop)
 
     @ count >= 0
-    async def _count(self, *_):
+    async def _count(self, *_) -> None:
         '''keep counting until done'''
         if not self.done:
             self.count += 1
 
-    def _start(self):
+    def _start(self) -> None:
         '''start the counter by transitioning from quiescent state'''
         self.count = 0
 
 class ExternalStopTest(TestCase):
 
-    def test_external_stop(self):
+    def test_external_stop(self) -> None:
         count_to = 5
         counter = Counter()
 

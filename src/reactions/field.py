@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod, ABC
 from asyncio import run
-from collections.abc import Awaitable, Iterable
+from collections.abc import Awaitable, Iterable, MutableMapping
 from dataclasses import dataclass, field
 from logging import getLogger
 from types import MethodType
@@ -27,7 +27,8 @@ from typing import Any, overload, NoReturn
 
 from .error import FieldAlreadyBound
 from .executor import ReactionExecutor
-from .field_descriptor import FieldDescriptor, FieldReaction, Evaluatable
+from .field_descriptor import (FieldDescriptor, FieldReaction, Evaluatable,
+                               _BoundField)
 from .predicate import (_Reaction, CustomFieldReactionConfiguration,
                         BoundReaction)
 from .predicate_types import ComparisonPredicates
@@ -39,7 +40,7 @@ __all__ = ['Field', 'FieldManager', 'FieldWatcher']
 logger = getLogger('reactions.field')
 
 
-class BoundField[T](Evaluatable[T], ComparisonPredicates):
+class BoundField[T](_BoundField, Evaluatable[T], ComparisonPredicates):
     '''
     A field bound to a specific instance.
 
@@ -61,7 +62,7 @@ class BoundField[T](Evaluatable[T], ComparisonPredicates):
         # are configured.
         self.reactions = field.reactions
 
-    def reaction(self, reaction: FieldReaction):
+    def reaction(self, reaction: FieldReaction) -> None:
         '''Add a reaction for when this bound field changes value.'''
         # ensure the bound field is using a private reactions list
         if self.reactions is self.field.reactions:
@@ -70,12 +71,12 @@ class BoundField[T](Evaluatable[T], ComparisonPredicates):
         self.reactions.append(reaction)
 
     def react(self, instance:Any, field:FieldDescriptor[T],
-              old:T, new:T):
+              old:T, new:T) -> None:
         """React to field change events by dispatching them to the reactions"""
         for reaction in self.reactions:
             reaction(instance, field, old, new)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (f'{self.field.classname}({id(self.instance)})'
                 f'.{self.field}')
     __repr__ = __str__
@@ -96,7 +97,7 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
         field = Field(0)
 
         @ field >= 0
-        async def count(self, *):
+        async def count(self, *_) -> None:
         self.field += 1
 
     An attribute may need to be a Field to use it in predicates even if the
@@ -106,15 +107,15 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
     order to evaluate the instance value it should be made a Field.
     '''
 
-    def set_names(self, classname:str, attr:str):
+    def set_names(self, classname:str, attr:str) -> None:
         super().set_names(classname, attr)
         self._attr_bound: str = self._attr + '_bound'   # bound field
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         '''make Field hashable/immutable'''
         return id(self)
 
-    def __getitem__(self, instance):
+    def bound_field(self, instance: Any) -> BoundField[T]:
         '''
         Get/create/set a Field specific to the instance.
 
@@ -122,7 +123,7 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
         (Watched.field[state] >= 5)(watcher.watch_field)
         '''
         return getattr(instance, self._attr_bound)
-    bound_field = __getitem__
+    __getitem__ = bound_field  # todo type error, why?
 
     def _bind(self, nascent_instance)->None:
         '''
@@ -150,7 +151,7 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
               instance: Any,
               field: FieldDescriptor[T],
               old: T,
-              new: T):
+              new: T) -> None:
         raise NotImplementedError('reactions should be on bound field')
 
 
@@ -196,10 +197,13 @@ class FieldManagerMeta(ABCMeta, type):
     _fields: tuple[Field, ...]
 
     @classmethod
-    def __prepare__(cls, name, bases):
+    def __prepare__(metacls, name: str, bases: tuple[type, ...], \
+                    # pylint: disable=unused-argument
+                    /, **kwargs: Any
+                    ) -> MutableMapping[str, object]:
         return FieldManagerMetaDict(name)
 
-    def __setattr__(self, attr: str, value: Any):
+    def __setattr__(self, attr: str, value: Any) -> None:
         '''
         call set_names() on Field attributes
         '''
@@ -208,11 +212,11 @@ class FieldManagerMeta(ABCMeta, type):
             self._fields = self._fields + (value,)  # pylint: disable=no-member
         super().__setattr__(attr, value)
 
-    def __new__(cls, name, bases, namespace):
+    def __new__[T: type](cls: T, name, bases, namespace) -> T:
         '''Create a new instance of a class managed by FieldManagerMeta.'''
         if BoundFieldCreatorMixin not in bases:
             bases = bases + (BoundFieldCreatorMixin,)
-        ret = super().__new__(cls, name, bases, namespace)
+        ret: T = super().__new__(cls, name, bases, namespace)
         return ret
 
 class BoundFieldCreatorMixin:
@@ -227,7 +231,9 @@ class BoundFieldCreatorMixin:
     dispatch to the bound field rather than having to check if the Field or the 
     bound field should be called.
     '''
-    def __new__(cls, *_, **__):
+    _fields: Iterable[Field]
+
+    def __new__(cls, *_, **__) -> BoundFieldCreatorMixin:
         nascent = super().__new__(cls)
         for field_ in nascent._fields:
             field_._bind(nascent)
@@ -271,7 +277,7 @@ class Reactant():
 
     def run(self)->None:
         '''run and wait until complete'''
-        async def _run():
+        async def _run() -> None:
             awaitable = await self.start()
             await awaitable
         run(_run())
@@ -298,9 +304,10 @@ class Reactant():
     async def __aenter__(self)->Awaitable:
         return await self.start()
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> bool:
         self.stop()
         await self._reaction_executor
+        return False
 
 
 
@@ -386,7 +393,7 @@ class FieldWatcher[T: FieldManager](Reactant,
                              if isinstance(value, _Reaction))
         logger.info('%s has bound reactions: %s', cls, cls._reactions)
 
-    def _start(self):
+    def _start(self) -> None:
         '''
         FieldWatcher implementations typically don't have a start action since
         they use the watched reaction executor. This is implemented as a no op

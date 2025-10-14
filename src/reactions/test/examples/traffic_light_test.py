@@ -133,14 +133,14 @@ class TrafficLight(FieldManager):
                 self._next_tick_time += 2 * TIME_PER_TICK
         return asyncio.sleep(delay)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'{self.__class__.__qualname__}({id(self)})'
 
 class TrafficLightTest(TestCase):
 
-    def test_traffic_light(self):
+    def test_traffic_light(self) -> None:
         expected = [Color.GREEN, Color.YELLOW, Color.RED] * CYCLES
-        async def _run():
+        async def _run() -> None:
             logger.info(f'Creating {NUMBER_OF_TRAFFIC_LIGHTS} traffic lights')
             traffic_lights = [TrafficLight()
                               for _ in range(NUMBER_OF_TRAFFIC_LIGHTS)]

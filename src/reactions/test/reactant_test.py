@@ -88,7 +88,7 @@ async def running_state(skip_stop=False,
 class ReactantTest(TestCase):
 
     @asynctest
-    async def test_reaction_exception_terminates_reactor(self):
+    async def test_reaction_exception_terminates_reactor(self) -> None:
         class _Exception(Exception): ...
         async with running_state(skip_await=True) as (state, executor):
             state.exception = _Exception()
@@ -96,14 +96,14 @@ class ReactantTest(TestCase):
                 await executor
 
     @asynctest
-    async def test_already_started(self):
+    async def test_already_started(self) -> None:
         async with running_state() as (_, executor):
             # trying to start it a second time raises error
             with self.assertRaises(ExecutorAlreadyStarted):
                 executor.start()
 
     @asynctest
-    async def test_stop(self):
+    async def test_stop(self) -> None:
         '''test that stop can be called multiple times in various states'''
         async with running_state(skip_stop=True,
                                  skip_await=True) as (_, executor):
@@ -117,13 +117,13 @@ class ReactantTest(TestCase):
             executor.stop()
 
     @asynctest
-    async def test_calling_reaction_not_allowed(self):
+    async def test_calling_reaction_not_allowed(self) -> None:
         async with running_state() as (state, _):
             with self.assertRaises(ReactionMustNotBeCalled):
                 state._exception()
 
     @asynctest
-    async def test_reaction_infinite_interruptable_loop(self):
+    async def test_reaction_infinite_interruptable_loop(self) -> None:
         async with running_state(skip_stop=True,
                                  skip_await=True) as (state, executor):
             state.infinite_loop = True
@@ -133,15 +133,16 @@ class ReactantTest(TestCase):
             with self.assertRaises(CancelledError):
                 await executor
 
-    def test_defined_state_fields_are_named(self):
+    def test_defined_state_fields_are_named(self) -> None:
         self.assertEqual('State', State.exception.classname)
         self.assertEqual('exception', State.exception.attr)
 
     @asynctest  # not really necessary but for State.inifinite_loop needing it
-    async def test_added_fields_are_named(self):
+    async def test_added_fields_are_named(self) -> None:
         '''fields added to a Reactant subclass after definition are named'''
         obj = object()
-        class _State(State): ...
+        class _State(State):
+            foo: Field
         _State.foo = Field(obj)
 
         # Verify that it got named and tracked properly.
@@ -158,7 +159,7 @@ class ReactantTest(TestCase):
         self.assertIs(obj, state.foo)
 
     @asynctest
-    async def test_private_executors(self):
+    async def test_private_executors(self) -> None:
         '''test that each Reactant has its own executor'''
 
         # Have reactions on state instances with different reaction executors
@@ -167,8 +168,9 @@ class ReactantTest(TestCase):
         class State(FieldManager):
             field = Field(False)
             @ field  == True
-            async def field_(self, *_):
+            async def field_(self, *_) -> None:
                 await barrier.wait()
+            def _start(self) -> None: ...
 
         state1, state2 = State(), State()
 

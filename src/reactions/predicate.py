@@ -282,7 +282,7 @@ class UnaryPredicate(OperatorPredicate, ABC):
     def fields(self) -> Iterable[FieldDescriptor]:
         yield from self.expression.fields
 
-    def evaluate(self, instance):
+    def evaluate(self, instance) -> bool:
         return self.operator(self.expression.evaluate(instance))
 
     def __str__(self) -> str:
@@ -311,7 +311,7 @@ class BinaryPredicate(OperatorPredicate, ABC):
         yield from self.left.fields
         yield from self.right.fields
 
-    def evaluate(self, instance):
+    def evaluate(self, instance) -> bool:
         return self.operator(self.left.evaluate(instance),
                              self.right.evaluate(instance))
 

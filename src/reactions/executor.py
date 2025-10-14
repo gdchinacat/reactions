@@ -126,7 +126,7 @@ class ReactionExecutor:
         self.task = create_task(self.execute_reactions())
         return self.task
 
-    def stop(self, timeout: float|None = 2):
+    def stop(self, timeout: float|None = 2) -> None:
         '''stop the reaction queue with timeout (defaults to 2 seconds)'''
         if not self.task:
             raise ExecutorNotStarted()
@@ -137,7 +137,8 @@ class ReactionExecutor:
 
         # Create a callback to cancel the task if a timeout is specified.
         if timeout is not None:
-            def _cancel_task():
+            def _cancel_task() -> None:
+                assert self.task is not None
                 if not self.task.done():
                     logger.error('%s cancelled after shutdown '
                                  'took more than %.2fs', self, timeout)
@@ -180,7 +181,7 @@ class ReactionExecutor:
     async def __aenter__(self)->Awaitable:
         return self.start()
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         self.stop()
         await self
 

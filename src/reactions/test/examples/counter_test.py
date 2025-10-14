@@ -54,7 +54,7 @@ class Counter(FieldManager):
 
 class CounterTest(TestCase):
 
-    def test_count(self):
+    def test_count(self) -> None:
         counter = Counter(5)
         counter.run()
 

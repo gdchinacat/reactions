@@ -34,13 +34,13 @@ class Watched(FieldManager):
     stop_predicate(FieldManager.astop)
     '''call FieldManager.astop when the stop predicate becomes True'''
 
-    def _start(self):
+    def _start(self) -> None:
         '''start the count by changing field to 0'''
         self.field = 0
 
     @ And(field != -1,
           Not(stop_predicate))
-    async def increment(self, *_):
+    async def increment(self, *_) -> None:
         '''increment the field value until the stop predicate is true'''
         self.field += 1
 
@@ -57,7 +57,7 @@ class Watcher(FieldWatcher[Watched]):
                                   watched: Watched,
                                   field: Field,
                                   old: int,
-                                  new: int):
+                                  new: int) -> None:
         # for test, just make sure the old and new values are correct
         if self.last_value is not None:
             assert self.last_value == old

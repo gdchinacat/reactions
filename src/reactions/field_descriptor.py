@@ -60,6 +60,18 @@ class Evaluatable[T](ABC):
         raise NotImplementedError()
 
 
+class _BoundField[T](ABC):
+    '''Base class for BoundField (used for typing)'''
+    @abstractmethod
+    def react(self,instance: Any, field: FieldDescriptor[T], old: T, new: T
+              ) -> None:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def reaction(self, reaction: FieldReaction) -> None:
+        ''' Add a reaction to the list of reactions.'''
+        raise NotImplementedError()
+
 class FieldDescriptor[T](Evaluatable[T], ABC):
     '''
     An instrumented field.
@@ -86,7 +98,8 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
                  initial_value: T,
                  classname: str|None = None,
                  attr: str|None = None,
-                 *args, **kwargs) -> None:
+                 *args,  # todo moving this before the kwargs breaks things
+                 **kwargs) -> None:
         '''
         initial_value: The initial value for the field.
         classname: the name of the class this is a member of (display only)
@@ -110,15 +123,15 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
         # references this in a copy-on-write manner.
         self.reactions: list[FieldReaction] = []
 
-    def reaction(self, reaction: FieldReaction):
+    def reaction(self, reaction: FieldReaction) -> None:
         ''' Add a reaction to the list of reactions.'''
         self.reactions.append(reaction)
 
     @abstractmethod
-    def _bind(self, instance: Any)->None:
+    def _bind(self, instance: Any) -> None:
         raise NotImplementedError()
 
-    def set_names(self, classname: str, attr: str):
+    def set_names(self, classname: str, attr: str) -> None:
         '''
         Update the field with classname and attr.
         This is not implemented using __set_name__ because that happens when
@@ -132,7 +145,7 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
         self.attr = attr
         self._attr: str = '_' + self.attr               # private
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         '''
         Make Field 'immutable' so that they can be used in sets. The id() of
         the field is its hash.
@@ -186,7 +199,7 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
         assert owner is not None
         return self
 
-    def __set__(self, instance, value: T):
+    def __set__(self, instance, value: T) -> None:
         # See comment in __get__ for handling field access. Ignore this call
         # if value is self.
         if value is self:
@@ -194,16 +207,15 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
         old: T = self.evaluate(instance)
         if value != old:
             setattr(instance, self._attr, value)
-            # todo - bound_field doesn't return a type with react()
             self.bound_field(instance).react(instance, self, old, value)
 
     # end Descriptor protocol.
     ###########################################################################
 
     @abstractmethod
-    def bound_field(self, instance: Any):  # todo return type annotation
+    def bound_field(self, instance: Any) -> _BoundField[T]:
         '''get the bound field for this field on instance'''
-        return NotImplementedError()
+        raise NotImplementedError()
 
     __delete__ = MustNotBeCalled(
         None, "removal of state attributes is not permitted")
@@ -212,7 +224,7 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
     def fields(self) -> Iterable[FieldDescriptor]:
         yield self
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.classname}.{self.attr}"
     __repr__ = __str__
 

@@ -37,12 +37,12 @@ class Watched(FieldManager):
     last_tick: Field[int] = Field(1)
     ticks = Field(-1)
 
-    def _start(self):
+    def _start(self) -> None:
         self.ticks = 0
 
     @ And(ticks != -1,
           ticks != last_tick)
-    async def tick(self, *_):
+    async def tick(self, *_) -> None:
         self.ticks += 1
 
     @ ticks == last_tick
@@ -51,25 +51,25 @@ class Watched(FieldManager):
     #        reaction accepts more specific Field. Even then, the field type
     #        isn't validating properly. Needs a fair bit of work.
     # todo - create a predicate_test for reaction type checking
-    async def done(self, field: Field[bool], old: int, new:int):
+    async def done(self, field: Field[bool], old: int, new:int) -> None:
         self.ticks = -1
         self.stop()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'{type(self).__qualname__}({id(self)})'
 
 class FieldWatcherTest(TestCase):
 
-    def test_automatic_predicate(self):
+    def test_automatic_predicate(self) -> None:
 
-        class Watcher[T: type](FieldWatcher):
+        class Watcher(FieldWatcher[Watched]):
             def __init__(self, watched:Watched, *args, **kwargs) -> None:
                 super().__init__(watched, *args, **kwargs)
                 self.change_events: list[tuple[Any, Field, int, int]] = list()
 
             @ Watched.ticks != None
             @ FieldWatcher
-            async def _watch(self, watched: T, field, old, new):
+            async def _watch(self, watched: Watched, field, old, new) -> None:
                 assert isinstance(self, Watcher), f'got {type(self)=}'
                 assert isinstance(watched, Watched), f'got {type(watched)=}'
                 self.change_events.append((watched, field, old, new))
@@ -91,14 +91,17 @@ class FieldWatcherTest(TestCase):
     async def test_automatic_dispatches_to_correct_watcher(self)->None:
         class Watched(FieldManager):
             field = Field(False)
-            def _start(self): ...
+            def _start(self) -> None: ...
 
         class Watcher(FieldWatcher[Watched]):
             reacted: bool = False
             @ Watched.field == True
             @ FieldWatcher
-            async def _true(
-                self, watched: Watched, field: Field[bool], old:bool, new:bool):
+            async def _true(self,
+                            watched: Watched,
+                            field: Field[bool],
+                            old: bool,
+                            new: bool) -> None:
                 assert self.watched is watched
                 self.reacted = True
 
@@ -121,7 +124,7 @@ class FieldWatcherTest(TestCase):
         '''test that bound reactions are handled properly'''
         class State(FieldManager):
             field = Field(False)
-            def _start(self): ...
+            def _start(self) -> None: ...
         class Watcher(FieldWatcher):
             called = False
             @ State.field == True
@@ -129,7 +132,7 @@ class FieldWatcherTest(TestCase):
             async def _true(self,
                             state: State,
                             field: Field,
-                            old: bool, new:bool):
+                            old: bool, new:bool) -> None:
                 self.called = True
 
         self.assertIsInstance(Watcher._true, _Reaction)

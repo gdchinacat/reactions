@@ -25,7 +25,7 @@ import asyncio
 
 def asynctest(func: Callable[..., Any]|None = None,
               *,
-              timeout:float|None=1):
+              timeout:float|None=1) -> Callable:
     '''
     Decorator to execute async test functions.
     func - function to decorate
@@ -38,11 +38,11 @@ def asynctest(func: Callable[..., Any]|None = None,
     @asynctest(timeout=2)
     async def test_foo(...): ...
     '''
-    def dec(func):
+    def dec(func) -> Callable:
         @wraps(func)
-        def _asynctest(*args, **kwargs):
+        def _asynctest(*args, **kwargs) -> None:
             @wraps(func)
-            async def async_test_runner():
+            async def async_test_runner() -> None:
                 async with asyncio.timeout(timeout):
                     await func(*args, **kwargs)
             asyncio.run(async_test_runner())

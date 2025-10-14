@@ -31,13 +31,16 @@ class PredicateTest(TestCase):
         '''test the object returned by decorating a reaction is correct'''
         class State:
             field = Field(False)
-        def reaction(state, field, old, new): # pylint: disable=unused-argument
+        def reaction(state:State,
+                     field: Field[int],
+                     old: int,
+                     new: int) -> None: # pylint: disable=unused-argument
             pass
         predicate = State.field == True
         reaction = predicate(reaction)
         self.assertEqual(predicate, reaction.predicate)
 
-    def test_predicate_decorator_non_self(self):
+    def test_predicate_decorator_non_self(self) -> None:
         '''
         Test that the predicate decorator works for plain functions not on the
         state instance or a watcher class.
@@ -46,16 +49,16 @@ class PredicateTest(TestCase):
         class State(FieldManager):
             field = Field(-1)
             @ field > 0
-            async def decrement(self, *_):
+            async def decrement(self, *_) -> None:
                 self.field -= 1
                 if self.field == 0:
                     self.stop()
-            def _start(self): self.field = start
+            def _start(self) -> None: self.field = start
         state = State()
 
-        change_events = []
+        change_events: list[tuple[State, Field[int], int, int]] = []
         @ State.field[state] != None
-        async def watch(*args):
+        async def watch(*args) -> None:
             change_events.append(args)
 
         state.run()
