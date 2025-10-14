@@ -19,7 +19,8 @@ from __future__ import annotations
 
 from unittest import TestCase, main
 
-from .. import Field, FieldManager
+from ..field import Field, FieldManager, FieldManagerMeta
+from ..executor import ReactionExecutor
 from .async_helpers import asynctest
 
 
@@ -68,6 +69,29 @@ class PredicateTest(TestCase):
                      for x in range(start, 0, -1)])
 
         self.assertEqual(change_events, expected)
+
+    @asynctest
+    async def test_bare_instance(self) -> None:
+        '''
+        Test that predicate decorations work on bare instances as long
+        as they provide an executor.
+        '''
+        # todo remove the requirement to use FieldManagerMeta.
+        class State:# todo (metaclass=FieldManagerMeta):
+            field = Field(False)
+            @field == True
+            async def _true(self, field: Field[bool],
+                            old: bool, new: bool) -> None:
+                self.called = True
+            def __init__(self):
+                self.executor = ReactionExecutor()
+                self.called = False
+
+        state = State()
+        async with state.executor:
+            state.field = True
+            state.executor.stop()
+        self.assertTrue(state.called)
 
 
 if __name__ == "__main__":

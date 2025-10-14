@@ -20,16 +20,44 @@ from __future__ import annotations
 
 from asyncio import (Queue, Task, create_task, QueueShutDown, sleep,
                      get_event_loop, CancelledError)
-from collections.abc import Awaitable, Generator
+from collections.abc import Awaitable, Generator, Coroutine
 from itertools import count
 from logging import Logger, getLogger
 from types import TracebackType
-from typing import ClassVar
+from typing import ClassVar, Protocol, Callable
 
 from .error import ExecutorAlreadyStarted, ExecutorNotStarted
 from .field_descriptor import FieldDescriptor
 from .logging_config import VERBOSE
-from .predicate import ReactionCoroutine, Reaction
+
+
+type ReactionCoroutine = Coroutine[object, object, None]
+# Callable arguments behavior is contravariant to ensure type safety.
+# todo  - make FieldDescriptor[T] arg covariant so client code can declare
+#         reactions as taking Field[T] rather than FieldDescriptor[T].
+#         -- or --
+#         Is there someway to make the predicates created by Field take a
+#         Reaction that takes Field? This is probably better from
+#         a type safety perspective since it doesn't violate type safety :)
+# TODO - this _T, B, etc makes errors go away, but specifying different types
+#        for T on the reaction (Field[T], T, T) don't show as errors either,
+#        is kinda the whole point. The reactions should be type checked against
+#        the fields that generated the predicates. Probably need a whole lot
+#        more plumbing to get that to work. For now, the errors on the
+#        reaction decoration is preferable, so commented out to leave a trace
+#        for maybe how to do this.
+#type _T = object
+#type B = FieldDescriptor[_T]
+#type Reaction[_T, F: B] = Callable[[object, F, _T, _T],
+#                                     ReactionCoroutine]
+type Reaction[T] = Callable[[object, FieldDescriptor[T], T, T],
+                                     ReactionCoroutine]
+'''
+Reaction is the type for methods that predicates can decorate.
+'''
+type BoundReaction[T] = Callable[[object, object, FieldDescriptor[T], T, T],
+                                     ReactionCoroutine]
+
 
 
 __all__ = ['ReactionExecutor']
@@ -180,7 +208,7 @@ class ReactionExecutor:
             finally:
                 self.queue.task_done()
 
-    async def __aenter__(self)->Awaitable[None]:
+    async def __aenter__(self) -> Awaitable[None]:
         return self.start()
 
     async def __aexit__(self,
@@ -195,3 +223,13 @@ class ReactionExecutor:
         if not self.task:
             raise ExecutorNotStarted()
         yield from self.task
+
+
+class HasExecutor(Protocol):
+    '''
+    Protocol that has a ReactionExecutor member.
+    User state classes don't need to extend Reactant, but they *do* need to
+    provide a way to execute their reactions. This Protocol provides that
+    functionality, but they do not need to extend it, just have an executor.
+    '''
+    executor: ReactionExecutor

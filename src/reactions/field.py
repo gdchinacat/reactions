@@ -25,11 +25,10 @@ from types import MethodType, TracebackType
 from typing import overload, NoReturn, cast
 
 from .error import FieldAlreadyBound
-from .executor import ReactionExecutor
+from .executor import ReactionExecutor, BoundReaction
 from .field_descriptor import (FieldDescriptor, FieldReaction, Evaluatable,
                                _BoundField)
-from .predicate import (_Reaction, CustomFieldReactionConfiguration,
-                        BoundReaction)
+from .predicate import _Reaction, CustomFieldReactionConfiguration
 from .predicate_types import ComparisonPredicates
 
 
@@ -126,7 +125,7 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
 
     __getitem__ = bound_field
 
-    def _bind(self, nascent_instance: object) -> None:
+    def _bind(self, nascent_instance: object) -> BoundField[T]:
         '''
         Create a BoundField on instance.
         nascent_instance:
@@ -147,6 +146,7 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
                 f'id(instance)={id(nascent_instance)}')
         bound_field = BoundField[T](nascent_instance, self)
         setattr(nascent_instance, self._attr_bound, bound_field)
+        return bound_field
 
     def react(self,
               instance: object,

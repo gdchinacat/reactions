@@ -128,7 +128,7 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
         self.reactions.append(reaction)
 
     @abstractmethod
-    def _bind(self, nascent_instance: Any) -> None:
+    def _bind(self, nascent_instance: Any) -> _BoundField[T]:
         '''_bind the fields for the nascent_instance'''
         raise NotImplementedError()
 
@@ -208,7 +208,13 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
         old: T = self.evaluate(instance)
         if value != old:
             setattr(instance, self._attr, value)
-            self.bound_field(instance).react(instance, self, old, value)
+            try:
+                bound_field = self.bound_field(instance)
+            except AttributeError:
+                # _bind the field on first access if the class doesn't do it
+                # during initialization.
+                bound_field = self._bind(instance)
+            bound_field.react(instance, self, old, value)
 
     # end Descriptor protocol.
     ###########################################################################

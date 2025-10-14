@@ -18,12 +18,13 @@ Predicates implement comparison checks.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable, Coroutine
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import partial
 import logging
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
+from .executor import HasExecutor, Reaction, BoundReaction
 from .field_descriptor import FieldDescriptor, Evaluatable
 from .logging_config import VERBOSE
 
@@ -33,33 +34,6 @@ __all__ = ['Constant']
 
 logger = logging.getLogger("reactions.predicate")
 
-
-type ReactionCoroutine = Coroutine[object, object, None]
-# Callable arguments behavior is contravariant to ensure type safety.
-# todo  - make FieldDescriptor[T] arg covariant so client code can declare
-#         reactions as taking Field[T] rather than FieldDescriptor[T].
-#         -- or --
-#         Is there someway to make the predicates created by Field take a
-#         Reaction that takes Field? This is probably better from
-#         a type safety perspective since it doesn't violate type safety :)
-# TODO - this _T, B, etc makes errors go away, but specifying different types
-#        for T on the reaction (Field[T], T, T) don't show as errors either,
-#        is kinda the whole point. The reactions should be type checked against
-#        the fields that generated the predicates. Probably need a whole lot
-#        more plumbing to get that to work. For now, the errors on the
-#        reaction decoration is preferable, so commented out to leave a trace
-#        for maybe how to do this.
-#type _T = object
-#type B = FieldDescriptor[_T]
-#type Reaction[_T, F: B] = Callable[[object, F, _T, _T],
-#                                     ReactionCoroutine]
-type Reaction[T] = Callable[[object, FieldDescriptor[T], T, T],
-                                     ReactionCoroutine]
-type BoundReaction[T] = Callable[[object, object, FieldDescriptor[T], T, T],
-                                     ReactionCoroutine]
-'''
-Reaction is the type for methods that predicates can decorate.
-'''
 
 @dataclass
 class CustomFieldReactionConfiguration[T]:
@@ -103,7 +77,7 @@ class Predicate(Evaluatable[bool], ABC):
     '''
 
     def react(self,
-              instance: object,
+              instance: HasExecutor,
               field: FieldDescriptor,
               old: object,
               new: object,
@@ -136,16 +110,18 @@ class Predicate(Evaluatable[bool], ABC):
             logger.debug('%s TRUE for %s %s -> %s',
                          self, field, old, new)
 
+            # Eitehr the reaction or the instance provides the executor.
             # It is noticeably faster to just try to get __self__ than to check
             # inspect.ismethod(react). if reaction is a method the fastest is
             # to try/except AttributeError, but if it's not that is horrendous.
-            executor_instance = getattr(reaction, '__self__', instance)
+            executor_provider: HasExecutor = getattr(reaction, '__self__',
+                                                     instance)
 
             # Objects that react must provide an executor. This is typically
             # done by deriving from FieldManager or FieldWatcher.
             # todo type safety for getting executor...just hoping it's there
             #      isn't great.
-            reaction_executor = executor_instance.executor
+            reaction_executor = executor_provider.executor
             reaction_executor.react(reaction,
                                     instance,
                                     field,
