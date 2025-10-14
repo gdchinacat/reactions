@@ -70,10 +70,6 @@ class CustomFieldReactionConfiguration[T]:
     configuration.
     '''
     reaction: BoundReaction[object]|None  # todo predicate typing
-    implementation: T
-    '''
-    Opaque details about the custom implementation. Predicate decorator logs
-    this, and implementations are free to use as necessary.'''
 
 @dataclass(eq=True, frozen=True)
 class _Reaction(ReactionMustNotBeCalled):
@@ -217,8 +213,7 @@ class Predicate(Evaluatable[bool], ABC):
             logger.info('changes to %s will use %s to '
                         'create bound reactions for %s',
                         ', '.join(str(f) for f in self.fields),
-                        reaction_or_custom.implementation,
-                        self)
+                        reaction_or_custom, self)
         else:
             reaction = reaction_or_custom
             self.configure_reaction(reaction)

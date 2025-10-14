@@ -397,12 +397,12 @@ class FieldWatcher[Tw: FieldManager](
             '''
             # todo call super with None for other class fields
             CustomFieldReactionConfiguration.__init__(  # todo typing (_GenericAlias.__init__ too many params)
-                self, reaction_or_watched, self)
+                self, reaction_or_watched)
         else:
             self.watched = reaction_or_watched
             # todo call super with None for other class fields
             Reactant.__init__(self,
-                              None, None, # reaction, implementation
+                              None, # CustomFieldReactionConfiguration.reaction
                               *args,
                               executor=executor or self.watched.executor,
                               **kwargs)
