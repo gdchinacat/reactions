@@ -325,9 +325,9 @@ class FieldManager(Reactant, ABC, metaclass=FieldManagerMeta):
     '''
 
 
-class FieldWatcher[T: FieldManager](
+class FieldWatcher[Tw: FieldManager](
         Reactant,
-        CustomFieldReactionConfiguration['FieldWatcher[T]'],
+        CustomFieldReactionConfiguration['FieldWatcher[Tw]'],
         ABC):
     '''
     Base class to allow subclasses to watch Fields on other classes.
@@ -341,7 +341,7 @@ class FieldWatcher[T: FieldManager](
             async def reaction(...
     '''
 
-    watched: T
+    watched: Tw
     '''The instance being watched.'''
 
     _reactions: set[_Reaction]
@@ -357,13 +357,13 @@ class FieldWatcher[T: FieldManager](
 
     @overload
     def __init__(self,
-                  reaction_or_watched: T,
+                  reaction_or_watched: Tw,
                   *args: object,
                  _reaction_executor: ReactionExecutor|None = None,
                  **kwargs: object) -> None: ...
 
     def __init__(self,
-                 reaction_or_watched: BoundReaction|T,  # todo typing
+                 reaction_or_watched: BoundReaction|Tw,  # todo typing
                  *args: object,
                  _reaction_executor: ReactionExecutor|None = None,
                  **kwargs: object) -> None:
