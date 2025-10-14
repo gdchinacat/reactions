@@ -19,10 +19,11 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod, ABC
 from asyncio import run
+from collections.abc import Awaitable
 from dataclasses import dataclass, field
 from logging import getLogger
 from types import MethodType
-from typing import Any, Awaitable, overload, NoReturn
+from typing import Any, overload, NoReturn
 
 from .error import FieldAlreadyBound
 from .executor import ReactionExecutor

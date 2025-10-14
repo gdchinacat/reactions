@@ -19,9 +19,10 @@ State machine test.
 from __future__ import annotations
 
 from asyncio import Future, CancelledError, sleep, Barrier
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import NoReturn, AsyncIterator
+from typing import NoReturn
 from unittest import TestCase, main
 
 from .. import (ReactionMustNotBeCalled, ExecutorAlreadyStarted, Field,

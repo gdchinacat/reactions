@@ -18,9 +18,10 @@ Predicates implement comparison checks.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterable, Coroutine
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Callable, Iterable, Coroutine
+from typing import Any
 import logging
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled

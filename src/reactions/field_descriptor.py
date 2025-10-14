@@ -24,8 +24,9 @@ track and call the reactions when field values change.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Iterable
 from itertools import count
-from typing import Any, Callable, Iterable, overload
+from typing import Any, overload
 
 from .error import MustNotBeCalled
 

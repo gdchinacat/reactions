@@ -14,13 +14,13 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from __future__ import annotations
 
-import asyncio
+from collections.abc import Coroutine
 from dataclasses import dataclass, field
 from enum import Enum
-import logging
 from time import time
-from typing import Coroutine
 from unittest import TestCase, main
+import asyncio
+import logging
 
 from ... import Field, And, FieldManager
 

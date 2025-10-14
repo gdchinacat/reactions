@@ -15,7 +15,8 @@
 '''
 Error definitions.
 '''
-from typing import Any, Callable, NoReturn
+from collections.abc import Callable
+from typing import Any, NoReturn
 
 
 __all__ = ['MustNotBeCalled', 'ReactionMustNotBeCalled',

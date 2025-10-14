@@ -19,9 +19,10 @@ from __future__ import annotations
 
 from asyncio import (Queue, Task, create_task, QueueShutDown, sleep,
                      get_event_loop, CancelledError)
+from collections.abc import Awaitable
 from itertools import count
 from logging import Logger, getLogger
-from typing import Any, Awaitable
+from typing import Any
 
 from .error import ExecutorAlreadyStarted, ExecutorNotStarted
 from .field_descriptor import FieldDescriptor
