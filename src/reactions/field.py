@@ -51,7 +51,7 @@ class BoundField[T](Evaluatable[T], ComparisonPredicates):
     def __init__(self,
                  nascent_instance: Any,
                  field: Field[T],
-                 *args, **kwargs):
+                 *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.field: Field[T] = field
         self.instance = nascent_instance
@@ -164,7 +164,7 @@ class FieldManagerMetaDict(dict[str, Any]):
     instance creation. It is a tuple to discourage modification.
     '''
 
-    def __init__(self, classname: str):
+    def __init__(self, classname: str) -> None:
         self.classname = classname
         self['_fields'] = tuple[Field]()
 
@@ -337,20 +337,20 @@ class FieldWatcher[T: FieldManager](Reactant,
     '''
 
     @overload
-    def __init__(self, reaction_or_watched: BoundReaction): ...
+    def __init__(self, reaction_or_watched: BoundReaction) -> None: ...
 
     @overload
     def __init__(self,
                   reaction_or_watched: Any,
                   *args,
                  _reaction_executor=None,
-                 **kwargs): ...
+                 **kwargs) -> None: ...
 
     def __init__(self,
                  reaction_or_watched: BoundReaction|Any,
                  *args,
                  _reaction_executor=None,
-                 **kwargs):
+                 **kwargs) -> None:
         '''
         Create a FieldWatcher or decorate a BoundReaction managed by
         FieldWatcher.

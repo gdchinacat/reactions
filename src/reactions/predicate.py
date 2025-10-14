@@ -273,7 +273,7 @@ class UnaryPredicate(OperatorPredicate, ABC):
     '''Predicate that has a single operand.'''
     expression: Evaluatable
 
-    def __init__(self, expression: Evaluatable | Any):
+    def __init__(self, expression: Evaluatable | Any) -> None:
         if not isinstance(expression, Evaluatable):
             expression = Constant(expression)
         self.expression = expression
@@ -296,7 +296,7 @@ class BinaryPredicate(OperatorPredicate, ABC):
 
     def __init__(self,
                  left: Evaluatable | Any,
-                 right: Evaluatable | Any):
+                 right: Evaluatable | Any) -> None:
         # Everything that isn't an Evaluatable is treated as a constant.
         # This may need to be reevaluated, but it helps with the fields()
         # logic for now.

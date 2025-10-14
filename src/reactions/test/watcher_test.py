@@ -63,7 +63,7 @@ class FieldWatcherTest(TestCase):
     def test_automatic_predicate(self):
 
         class Watcher[T: type](FieldWatcher):
-            def __init__(self, watched:Watched, *args, **kwargs):
+            def __init__(self, watched:Watched, *args, **kwargs) -> None:
                 super().__init__(watched, *args, **kwargs)
                 self.change_events: list[tuple[Any, Field, int, int]] = list()
 

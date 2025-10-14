@@ -29,7 +29,7 @@ class MustNotBeCalled(RuntimeError):
     Raised by methods that are easy to call when they really aren't what should
     be called.
     '''
-    def __init__(self, func: Callable[..., Any]|None, *args, **kwargs):
+    def __init__(self, func: Callable[..., Any]|None, *args, **kwargs) -> None:
         if func:
             # subclasses don't have to pass func if they already handled it.
             super().__init__(f'{func} must not be called', *args, **kwargs)
@@ -60,7 +60,7 @@ class ReactionMustNotBeCalled(MustNotBeCalled):
               def reaction(self: C, bound_field: BoundField[C, T], old, new): ...
               (foo==1)(react)
     '''
-    def __init__(self, func: Callable, *args, **kwargs):
+    def __init__(self, func: Callable, *args, **kwargs) -> None:
         super().__init__(None, f"{func.__qualname__} is a reaction method and "
                          "can not be called directly.", *args, **kwargs)
 
