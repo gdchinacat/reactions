@@ -395,17 +395,14 @@ class FieldWatcher[Tw: FieldManager](
             be used instead of this, but doing so is not nearly as
             understandable as this.
             '''
-            # todo call super with None for other class fields
-            CustomFieldReactionConfiguration.__init__(  # todo typing (_GenericAlias.__init__ too many params)
-                self, reaction_or_watched)
+            reaction = reaction_or_watched  # for clarity
+            super().__init__(reaction)
         else:
             self.watched = reaction_or_watched
-            # todo call super with None for other class fields
-            Reactant.__init__(self,
-                              None, # CustomFieldReactionConfiguration.reaction
-                              *args,
-                              executor=executor or self.watched.executor,
-                              **kwargs)
+            super().__init__(None, # CustomFieldReactionConfiguration.reaction
+                             *args,
+                             executor=executor or self.watched.executor,
+                             **kwargs)
 
             # Configure the bound reactions.
             for reaction in self._reactions:
