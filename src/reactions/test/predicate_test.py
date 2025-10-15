@@ -78,7 +78,7 @@ class PredicateTest(TestCase):
         '''
         class State:
             field = Field(False)
-            @field == True
+            @ field == True
             async def _true(self, field: Field[bool],
                             old: bool, new: bool) -> None:
                 self.called = True
