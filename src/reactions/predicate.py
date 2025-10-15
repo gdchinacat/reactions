@@ -25,7 +25,7 @@ import logging
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
 from .executor import HasExecutor, Reaction, BoundReaction
-from .field_descriptor import FieldDescriptor, Evaluatable
+from .field_descriptor import FieldDescriptor, Evaluatable, Tf, Ti
 from .logging_config import VERBOSE
 
 
@@ -77,7 +77,7 @@ class Predicate(Evaluatable[bool], ABC):
     '''
 
     def react(self,
-              instance: HasExecutor,
+              instance: HasExecutor,  # todo typing shoudld be Ti?
               field: FieldDescriptor,
               old: object,
               new: object,
@@ -197,7 +197,7 @@ class Predicate(Evaluatable[bool], ABC):
         return _Reaction(self, reaction)
 
     def configure_reaction(self, func: Reaction,
-                           instance:object=None)->None:
+                           instance: Ti = None) -> None:
         '''configure the reaction on the fields'''
         # Add a reaction on all the fields to call self.react() with
         # func as the reaction function.
@@ -255,7 +255,7 @@ class UnaryPredicate(OperatorPredicate, ABC):
     def fields(self) -> Iterable[FieldDescriptor]:
         yield from self.expression.fields
 
-    def evaluate(self, instance: object) -> bool:
+    def evaluate(self, instance: Ti) -> bool:
         return self.operator(self.expression.evaluate(instance))
 
     def __str__(self) -> str:
@@ -284,7 +284,7 @@ class BinaryPredicate(OperatorPredicate, ABC):
         yield from self.left.fields
         yield from self.right.fields
 
-    def evaluate(self, instance: object) -> bool:
+    def evaluate(self, instance: Ti) -> bool:
         return self.operator(self.left.evaluate(instance),
                              self.right.evaluate(instance))
 

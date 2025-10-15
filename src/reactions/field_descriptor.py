@@ -177,12 +177,12 @@ class FieldDescriptor[Tf](Evaluatable[Tf], ABC):
     # Descriptor protocol for intercepting field updates
     ###########################################################################
     @overload
-    def __get__(self: Self,
+    def __get__(self: Self,             # access field on class
                 instance: None,
                 owner: type) -> Self: ...
 
     @overload
-    def __get__(self: Self,
+    def __get__(self: Self,             # access field on instance
                 instance: Ti,
                 owner: type) -> Tf: ...
 

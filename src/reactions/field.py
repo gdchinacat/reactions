@@ -50,7 +50,7 @@ class BoundField[Tf](_BoundField[Tf], Evaluatable[Tf], ComparisonPredicates):
     '''
 
     def __init__(self,
-                 nascent_instance: object,
+                 nascent_instance: Ti,
                  field: Field[Tf],
                  *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
@@ -87,7 +87,7 @@ class BoundField[Tf](_BoundField[Tf], Evaluatable[Tf], ComparisonPredicates):
     def fields(self) -> Iterable[Field[Tf]]:
         yield self.field
 
-    def evaluate(self, instance:object) -> Tf:
+    def evaluate(self, instance: Ti) -> Tf:
         return self.field.evaluate(instance)
 
 class Field[T](FieldDescriptor[T], ComparisonPredicates):
@@ -117,7 +117,7 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
         '''make Field hashable/immutable'''
         return id(self)
 
-    def bound_field(self, instance: object) -> BoundField[T]:
+    def bound_field(self, instance: Ti) -> BoundField[T]:
         '''
         Get/create/set a Field specific to the instance.
 
@@ -130,7 +130,7 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
 
     __getitem__ = bound_field
 
-    def _bind(self, nascent_instance: object) -> BoundField[T]:
+    def _bind(self, nascent_instance: Ti) -> BoundField[T]:
         '''
         Create a BoundField on instance.
         nascent_instance:
@@ -158,7 +158,7 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
         return bound_field
 
     def react(self,
-              instance: object,
+              instance: Ti,
               field: FieldDescriptor[T],
               old: T,
               new: T) -> None:

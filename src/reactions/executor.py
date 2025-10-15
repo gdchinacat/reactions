@@ -27,7 +27,7 @@ from types import TracebackType
 from typing import ClassVar, Protocol, Callable
 
 from .error import ExecutorAlreadyStarted, ExecutorNotStarted
-from .field_descriptor import FieldDescriptor
+from .field_descriptor import FieldDescriptor, Ti
 from .logging_config import VERBOSE
 
 
@@ -116,7 +116,7 @@ class ReactionExecutor:
 
     def react[T](self,
                  reaction: Reaction,  # todo predicate typing
-                 instance: object,
+                 instance: Ti,
                  field: FieldDescriptor[T],
                  old: T, new: T) -> None:
         '''reaction that asynchronously executes the reaction'''
