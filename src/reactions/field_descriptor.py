@@ -168,12 +168,7 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
         return id(self)
 
     def evaluate(self, instance: Any) -> T:
-        try:
-            value = getattr(instance, self._attr)
-            return value
-        except AttributeError:
-            setattr(instance, self._attr, self.initial_value)
-            return self.initial_value
+        return getattr(instance, self._attr, self.initial_value)
 
     ###########################################################################
     # Descriptor protocol for intercepting field updates
