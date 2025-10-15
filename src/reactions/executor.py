@@ -27,7 +27,7 @@ from types import TracebackType
 from typing import ClassVar, Protocol, Callable
 
 from .error import ExecutorAlreadyStarted, ExecutorNotStarted
-from .field_descriptor import FieldDescriptor, Ti
+from .field_descriptor import FieldDescriptor, Tf, Ti
 from .logging_config import VERBOSE
 
 
@@ -50,12 +50,12 @@ type ReactionCoroutine = Coroutine[object, object, None]
 #type B = FieldDescriptor[_T]
 #type Reaction[_T, F: B] = Callable[[object, F, _T, _T],
 #                                     ReactionCoroutine]
-type Reaction[T] = Callable[[object, FieldDescriptor[T], T, T],
+type Reaction[Tf] = Callable[[object, FieldDescriptor[Tf], Tf, Tf],
                                      ReactionCoroutine]
 '''
 Reaction is the type for methods that predicates can decorate.
 '''
-type BoundReaction[T] = Callable[[object, object, FieldDescriptor[T], T, T],
+type BoundReaction[Tf] = Callable[[object, object, FieldDescriptor[Tf], Tf, Tf],
                                      ReactionCoroutine]
 
 
