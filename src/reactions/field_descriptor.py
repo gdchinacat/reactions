@@ -93,7 +93,7 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
     and call them when the Fields they are composed of change.
     '''
 
-    _field_count: ClassVar[count] = count()  # class member for assigning default attr names
+    _field_count: ClassVar[count[int]] = count()  # class member for assigning default attr names
 
     def __init__(self,
                  initial_value: T,
