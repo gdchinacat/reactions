@@ -29,7 +29,7 @@ from reactions.error import FieldConfigurationError
 from .error import FieldAlreadyBound
 from .executor import ReactionExecutor, BoundReaction
 from .field_descriptor import (FieldDescriptor, FieldReaction, Evaluatable,
-                               _BoundField)
+                               _BoundField, Ti, Tf)
 from .predicate import _Reaction, CustomFieldReactionConfiguration
 from .predicate_types import ComparisonPredicates
 
@@ -40,7 +40,7 @@ __all__ = ['Field', 'FieldManager', 'FieldWatcher']
 logger = getLogger('reactions.field')
 
 
-class BoundField[T](_BoundField[T], Evaluatable[T], ComparisonPredicates):
+class BoundField[Tf](_BoundField[Tf], Evaluatable[Tf], ComparisonPredicates):
     '''
     A field bound to a specific instance.
 
@@ -51,10 +51,10 @@ class BoundField[T](_BoundField[T], Evaluatable[T], ComparisonPredicates):
 
     def __init__(self,
                  nascent_instance: object,
-                 field: Field[T],
+                 field: Field[Tf],
                  *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
-        self.field: Field[T] = field
+        self.field = field
         self.instance = nascent_instance
 
         # reactions is the list of reactions to call. Initialixe as a reference
@@ -62,7 +62,7 @@ class BoundField[T](_BoundField[T], Evaluatable[T], ComparisonPredicates):
         # are configured.
         self.reactions = field.reactions
 
-    def reaction(self, reaction: FieldReaction[T]) -> None:
+    def reaction(self, reaction: FieldReaction[Tf]) -> None:
         '''Add a reaction for when this bound field changes value.'''
         # ensure the bound field is using a private reactions list
         if self.reactions is self.field.reactions:
@@ -70,8 +70,10 @@ class BoundField[T](_BoundField[T], Evaluatable[T], ComparisonPredicates):
 
         self.reactions.append(reaction)
 
-    def react(self, instance:object, field:FieldDescriptor[T],
-              old:T, new:T) -> None:
+    def react(self,
+              instance: Ti,
+              field:FieldDescriptor[Tf],
+              old:Tf, new: Tf) -> None:
         """React to field change events by dispatching them to the reactions"""
         for reaction in self.reactions:
             reaction(instance, field, old, new)
@@ -82,10 +84,10 @@ class BoundField[T](_BoundField[T], Evaluatable[T], ComparisonPredicates):
     __repr__ = __str__
 
     @property
-    def fields(self) -> Iterable[Field[T]]:
+    def fields(self) -> Iterable[Field[Tf]]:
         yield self.field
 
-    def evaluate(self, instance:object)->T:
+    def evaluate(self, instance:object) -> Tf:
         return self.field.evaluate(instance)
 
 class Field[T](FieldDescriptor[T], ComparisonPredicates):
@@ -404,7 +406,7 @@ class FieldWatcher[Tw: FieldManager](
     # todo move overloads into .pyi
     @overload
     def __init__(self,
-                 reaction_or_watched: BoundReaction,
+                 reaction_or_watched: BoundReaction[Tf],
                  ) -> None:
         '''Reaction decorator to indicate FieldWatcher manages field reaction
         configuration.'''
@@ -423,8 +425,8 @@ class FieldWatcher[Tw: FieldManager](
                  **kwargs: object
                  ) -> None: ...
 
-    def __init__(self,
-                 reaction_or_watched: BoundReaction|Tw,
+    def __init__[T](self,  # todo predicate typing BoundReaction get rid of generic type T on method
+                 reaction_or_watched: BoundReaction[T]|Tw,
                  *args: object,
                  #executor: ReactionExecutor|None = None,
                  **kwargs: object) -> None:

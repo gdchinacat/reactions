@@ -59,7 +59,7 @@ class TestField(TestCase):
 
         # set a notification on c.field_a to call print
         reaction_called = False
-        def reaction(instance: C, field: FieldDescriptor[bool],  # todo Field
+        def reaction(instance: C, field: Field[bool],
                      old: bool, new: bool) -> None:
             nonlocal reaction_called
             reaction_called = True  # @UnusedVariable - it really is used
@@ -80,7 +80,7 @@ class TestField(TestCase):
 
         changes = list[tuple[bool|None, bool|None]]()
         def collect(_: C,
-                    __: FieldDescriptor[bool|None],  # todo should be Field
+                    __: Field[bool|None],
                     old: bool|None,
                     new: bool|None) -> None:
             changes.append((old, new))
@@ -174,8 +174,6 @@ class TestField(TestCase):
         class C(FieldManager):
             field = Field[bool|int|None](None, 'C', 'field')
             def _start(self) -> None: ...
-        from typing import reveal_type
-        reveal_type(C.field)
 
         # add an instance reaction and verify it is called
         c = C()
