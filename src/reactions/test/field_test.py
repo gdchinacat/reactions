@@ -227,35 +227,14 @@ class TestField(TestCase):
         reactions = watcher._reactions  # pylint: disable=protected-access
         self.assertEqual(2, len(reactions))
 
-    def test_field_access_prevents_field_name_collisions(self):
+    def test___set_name___prevents_field_name_collisions(self):
         '''
         '''
-        class State:
-            field = Field(False, 'State', 'field')
-            @field == False
-            async def _field(self, *_: object) -> None: ...
-        state = State()
-        with self.assertRaises(AssertionError):  # todo proper error
-            # The first opportunity to detect is when the field is first
-            # accessed. This currently raises an AssertionError beccause the
-            # field evaluation finds the Field.attr attribute but it is a
-            # _Reactionr rather than a bool. That just happened to be the way
-            # the State was implementd...had the class said "_field = True"
-            # no exception would have been raised and the Field would would
-            # work with he wrong initial value.
-            # The effort to clean up cast(..., getattr()) has opened a can of
-            # worms (it was always there, just ignored till now). Name mangling
-            # is the typical solution for cooperative field management, but
-            # that doesn't work with descriptors using dynamic attributes
-            # through getattr/setattr.
-            # The attr names could be based on the id() of the Field, but that
-            # makes debugging difficult since they aren't named in usable
-            # manner.
-            # Since this is only an issue for field classes that don't use
-            # the FieldManager* functionality it will be left as is for now
-            # with this note that the protection isn't great, should be
-            # improved, and is not reported in a good manner. To ponder...
-            _ = state.field
+        with self.assertRaises(FieldConfigurationError):
+            class _:
+                field = Field(False, '_', 'field')
+                @field == False
+                async def _field(self, *_: object) -> None: ...
 
     def test_field_manager_meta_prevents_field_name_collisions(self):
         '''

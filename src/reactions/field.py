@@ -21,7 +21,7 @@ from abc import ABCMeta, abstractmethod, ABC
 from asyncio import run
 from collections.abc import Awaitable, Iterable, MutableMapping
 from logging import getLogger
-from types import MethodType, TracebackType
+from types import MethodType, TracebackType, MappingProxyType
 from typing import overload, NoReturn, cast
 
 from reactions.error import FieldConfigurationError
@@ -162,14 +162,21 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
               new: T) -> None:
         raise NotImplementedError('reactions should be on bound field')
 
-    @staticmethod
-    def validate_fields_against_members(namespace: dict[str, object]) -> None:
+    @classmethod
+    def validate_fields_against_members(
+            cls, namespace: dict[str, object]|MappingProxyType[str, object]
+            ) -> None:
         '''
         Check that none of the fields will clobber attributes with their
         implementation attributes.
         Raises FieldConfigurationError if there is a conflict.
         '''
-        fields = namespace['_fields']
+        try:
+            fields = namespace['_fields']
+        except KeyError:
+            # bare class, find fields by iterating contents of class dict
+            fields  = [x for x in namespace.values() if isinstance(x, Field)]
+
         assert isinstance(fields, Iterable)
         fields = cast(Iterable[Field[object]], fields)
         attr_field_names = {

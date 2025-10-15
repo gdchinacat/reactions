@@ -26,6 +26,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from itertools import count
+from types import MappingProxyType
 from typing import Any, overload, ClassVar
 
 from .error import MustNotBeCalled
@@ -147,6 +148,21 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
         self.classname = classname
         self.attr = attr
         self._attr: str = '_' + self.attr               # private
+
+    def __set_name__(self, owner: type, name: str) -> None:
+        '''
+        Fallback to set name and validate conflicts for classes that do not
+        use FieldManagerMeta.
+        '''
+        self.validate_fields_against_members(owner.__dict__)
+
+    @classmethod
+    @abstractmethod
+    def validate_fields_against_members(
+            cls,
+            namespace: dict[str, object]|MappingProxyType[str, object]
+            ) -> None:
+        raise NotImplementedError()
 
     def __hash__(self) -> int:
         '''
