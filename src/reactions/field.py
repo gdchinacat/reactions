@@ -1,5 +1,4 @@
 # Copyright (C) 2025 Anthony (Lonnie) Hutchinson <chinacat@chinacat.org>
-
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
@@ -15,6 +14,7 @@
 '''
 The public facing Field implementation.
 '''
+
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod, ABC
@@ -23,6 +23,8 @@ from collections.abc import Awaitable, Iterable, MutableMapping
 from logging import getLogger
 from types import MethodType, TracebackType
 from typing import overload, NoReturn, cast
+
+from reactions.error import FieldConfigurationError
 
 from .error import FieldAlreadyBound
 from .executor import ReactionExecutor, BoundReaction
@@ -76,7 +78,7 @@ class BoundField[T](_BoundField[T], Evaluatable[T], ComparisonPredicates):
 
     def __str__(self) -> str:
         return (f'{self.field.classname}({id(self.instance)})'
-                f'.{self.field}')
+                f'.{self.field.attr}')
     __repr__ = __str__
 
     @property
@@ -121,7 +123,8 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
         (Watched.field[state] >= 5)(watcher.watch_field)
         '''
         bound_field = getattr(instance, self._attr_bound)
-        return cast(BoundField[T], bound_field)
+        assert isinstance(bound_field, BoundField)
+        return bound_field
 
     __getitem__ = bound_field
 
@@ -139,6 +142,10 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
             exist and if they do the values have not been initialized, what
             isn't so obvious is *do not* call str() or repr() on instance
             as they are likely to fail before the object is initialized.
+
+            Note: nascent_instance is not guaranteed to be nascent since the
+            fields for bare classes are bound on access rather than
+            instance initialization.
         '''
         if (hasattr(nascent_instance, self._attr_bound)):
             raise FieldAlreadyBound(
@@ -154,6 +161,24 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
               old: T,
               new: T) -> None:
         raise NotImplementedError('reactions should be on bound field')
+
+    @staticmethod
+    def validate_fields_against_members(namespace: dict[str, object]) -> None:
+        '''
+        Check that none of the fields will clobber attributes with their
+        implementation attributes.
+        Raises FieldConfigurationError if there is a conflict.
+        '''
+        fields = namespace['_fields']
+        assert isinstance(fields, Iterable)
+        fields = cast(Iterable[Field[object]], fields)
+        attr_field_names = {
+            name for field in fields
+                 for name in (field._attr, field._attr_bound)}  # pylint: disable=protected-access
+        conflicts = attr_field_names & namespace.keys()
+        if conflicts:
+            raise FieldConfigurationError(
+                f'conflicting members: {", ".join(conflicts)}')
 
 
 class FieldManagerMetaDict(dict[str, object]):
@@ -195,7 +220,7 @@ class FieldManagerMeta(ABCMeta, type):
     # _fields is initialized by FieldManagerMetaDict.__init__() since it needs
     # to be present during the nascent stages before __init__ is called to
     # initialize the instance.
-    _fields: tuple[Field[object], ...]
+    _fields: tuple[Field[object], ...] = tuple()
 
     @classmethod
     def __prepare__(metacls, name: str, bases: tuple[type, ...], \
@@ -218,10 +243,12 @@ class FieldManagerMeta(ABCMeta, type):
                          bases: tuple[type, ...],
                          namespace: dict[str, object]) -> T:
         '''Create a new instance of a class managed by FieldManagerMeta.'''
+        Field.validate_fields_against_members(namespace)
         if BoundFieldCreatorMixin not in bases:
             bases = bases + (BoundFieldCreatorMixin,)
         ret: T = super().__new__(cls, name, bases, namespace)
         return ret
+
 
 class BoundFieldCreatorMixin:
     '''
@@ -272,9 +299,10 @@ class Reactant():
                  *args: object,
                  #executor: ReactionExecutor|None = None,
                  **kwargs: object) -> None:
-        self.executor = (cast(ReactionExecutor|None,
-                              kwargs.pop('executor', None))
-                         or ReactionExecutor())
+        # todo - taking executor as a kwarg causes type errors on the overloads
+        executor = kwargs.pop('executor', None)
+        assert executor is None or isinstance(executor, ReactionExecutor)
+        self.executor = executor or ReactionExecutor()
         super().__init__(*args, **kwargs)
 
     @abstractmethod

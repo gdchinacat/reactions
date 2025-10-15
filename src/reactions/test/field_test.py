@@ -19,12 +19,14 @@ Test field functionality.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import NoneType
 from typing import Any
 from unittest import TestCase, main
 
 from ..error import (MustNotBeCalled, FieldAlreadyBound,
-                     InvalidPredicateExpression)
-from ..field import Field, BoundField, FieldManager, FieldWatcher
+                     InvalidPredicateExpression, FieldConfigurationError)
+from ..field import (Field, BoundField, FieldManager, FieldWatcher,
+                     FieldManagerMeta)
 from ..field_descriptor import FieldDescriptor
 from ..predicate import Predicate, _Reaction
 from ..predicate_types import Contains, Not, Or, And
@@ -73,7 +75,8 @@ class TestField(TestCase):
 
     def test_edge_triggered_notify(self) -> None:
         class C(FieldManager):
-            field = Field[bool|None](None, 'C', 'field')
+            field = Field[bool|None](None, 'C', 'field',
+                                     type_=(bool, NoneType))
             def _start(self) -> None: ...
 
         changes = list[tuple[bool|None, bool|None]]()
@@ -98,8 +101,10 @@ class TestField(TestCase):
     def test_predicate_operators(self) -> None:
         @dataclass
         class C(FieldManager):
-            field_a: Field[bool|None] = Field(None, 'C', 'field_a')
-            field_b: Field[int|tuple[bool]|None] = Field(None, 'C', 'field_b')
+            field_a: Field[bool|None] = Field(None, 'C', 'field_a',
+                                              type_=(bool, NoneType))
+            field_b: Field[int|tuple[bool]|None] = Field(
+                None, 'C', 'field_b', type_=(int, tuple, bool, NoneType))
             def _start(self) -> None: ...
         c = C(True, 0)
         self.assertTrue((C.field_a == True).evaluate(c))
@@ -221,6 +226,48 @@ class TestField(TestCase):
         Watcher.__init_subclass__()  # don't do this outside tests.
         reactions = watcher._reactions  # pylint: disable=protected-access
         self.assertEqual(2, len(reactions))
+
+    def test_field_access_prevents_field_name_collisions(self):
+        '''
+        '''
+        class State:
+            field = Field(False, 'State', 'field')
+            @field == False
+            async def _field(self, *_: object) -> None: ...
+        state = State()
+        with self.assertRaises(AssertionError):  # todo proper error
+            # The first opportunity to detect is when the field is first
+            # accessed. This currently raises an AssertionError beccause the
+            # field evaluation finds the Field.attr attribute but it is a
+            # _Reactionr rather than a bool. That just happened to be the way
+            # the State was implementd...had the class said "_field = True"
+            # no exception would have been raised and the Field would would
+            # work with he wrong initial value.
+            # The effort to clean up cast(..., getattr()) has opened a can of
+            # worms (it was always there, just ignored till now). Name mangling
+            # is the typical solution for cooperative field management, but
+            # that doesn't work with descriptors using dynamic attributes
+            # through getattr/setattr.
+            # The attr names could be based on the id() of the Field, but that
+            # makes debugging difficult since they aren't named in usable
+            # manner.
+            # Since this is only an issue for field classes that don't use
+            # the FieldManager* functionality it will be left as is for now
+            # with this note that the protection isn't great, should be
+            # improved, and is not reported in a good manner. To ponder...
+            _ = state.field
+
+    def test_field_manager_meta_prevents_field_name_collisions(self):
+        '''
+        FieldDescriptor adds attributes to the class it is managing fields on.
+        When a class derives from FieldManager the definition of the class
+        should fail if the Fields will use attributes that are already used.
+        '''
+        with self.assertRaises(FieldConfigurationError):
+            class _(metaclass=FieldManagerMeta):
+                field = Field(False)
+                @field == False
+                async def _field(self, *_: object) -> None: ...
 
 
 if __name__ == '__main__':

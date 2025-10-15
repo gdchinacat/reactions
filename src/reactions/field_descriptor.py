@@ -26,7 +26,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from itertools import count
-from typing import Any, overload
+from typing import Any, overload, ClassVar
 
 from .error import MustNotBeCalled
 
@@ -92,20 +92,21 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
     and call them when the Fields they are composed of change.
     '''
 
-    _field_count = count()  # class member for assigning default attr names
+    _field_count: ClassVar[count] = count()  # class member for assigning default attr names
 
     def __init__(self,
                  initial_value: T,
                  classname: str|None = None,
                  attr: str|None = None,
+                 type_: type|tuple[type, ...]|None = None,
                  *args: Any,  # todo moving this before the kwargs breaks things
                  **kwargs: Any) -> None:
         '''
         initial_value: The initial value for the field.
         classname: the name of the class this is a member of (display only)
         attr: the name of the attribute
-        instance: the instance the field is attached to, None for Fields on
-                  classes.
+        type_: the isinstance type arg for the field (if None will be inferred
+               from initial_value).
         *args, **kwargs: play nice with super()
 
         classname and attr are optional and will have meaningless values
@@ -118,6 +119,7 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
         self.set_names(classname or '<no class associated>',
                        attr or f'field_{next(self._field_count)}')
         self.initial_value: T = initial_value
+        self.type_ = type_ or type(initial_value)
 
         # Reactions is the list of reactions on the unbound field. BoundField
         # references this in a copy-on-write manner.
@@ -155,7 +157,11 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
 
     def evaluate(self, instance: Any) -> T:
         try:
-            return getattr(instance, self._attr)
+            value = getattr(instance, self._attr)
+            assert isinstance(value, self.type_), (
+                   f'{self} value {value} is not an instance of {self.type_} '
+                   f'it is {type(value)})')
+            return value
         except AttributeError:
             setattr(instance, self._attr, self.initial_value)
             return self.initial_value

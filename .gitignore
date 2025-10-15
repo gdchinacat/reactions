@@ -5,3 +5,4 @@
 **/.pytest_cache/
 .project
 .pydevproject
+src/reactions/playground.py

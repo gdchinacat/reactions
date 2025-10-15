@@ -23,19 +23,18 @@ from __future__ import annotations
 from unittest import TestCase, main
 
 from ... import Field, FieldManager
-from ..async_helpers import asynctest
 
 
 class Counter(FieldManager):
-    done = Field[bool](False) # field to  indicate state should stop
-    count = Field[int](-1)    # start in a quiescent state
+    done = Field(False) # field to  indicate state should stop
+    count = Field(-1)    # start in a quiescent state
 
     # Manual application of predicate decorator to stop the state machine when
     # done.
     (done == True)(FieldManager.astop)
 
     @ count >= 0
-    async def _count(self, *_: object) -> None:
+    async def count_(self, *_: object) -> None:
         '''keep counting until done'''
         if not self.done:
             self.count += 1

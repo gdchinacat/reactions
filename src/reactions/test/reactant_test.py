@@ -21,6 +21,7 @@ from __future__ import annotations
 from asyncio import Future, CancelledError, sleep, Barrier
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from types import NoneType
 from typing import NoReturn
 from unittest import TestCase, main
 
@@ -34,7 +35,7 @@ class State(FieldManager):
     Kitchen sink state machine for testing various aspects of State.
     '''
 
-    exception = Field[Exception|None](None)
+    exception = Field[Exception|None](None, type_=(Exception, NoneType))
     infinite_loop = Field(False)
 
     infinite_loop_running: Future[None]
@@ -47,7 +48,7 @@ class State(FieldManager):
         pass
 
     @ exception != None
-    async def _exception(self,
+    async def exception_(self,
                          field: Field[Exception],
                          old: Exception|None,
                          new: Exception|None) -> None:
@@ -122,7 +123,7 @@ class ReactantTest(TestCase):
     async def test_calling_reaction_not_allowed(self) -> None:
         async with running_state() as (state, _):
             with self.assertRaises(ReactionMustNotBeCalled):
-                state._exception()
+                state.exception_()
 
     @asynctest
     async def test_reaction_infinite_interruptable_loop(self) -> None:
