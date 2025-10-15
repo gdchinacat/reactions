@@ -75,8 +75,7 @@ class TestField(TestCase):
 
     def test_edge_triggered_notify(self) -> None:
         class C(FieldManager):
-            field = Field[bool|None](None, 'C', 'field',
-                                     type_=(bool, NoneType))
+            field = Field[bool|None](None, 'C', 'field')
             def _start(self) -> None: ...
 
         changes = list[tuple[bool|None, bool|None]]()
@@ -101,10 +100,8 @@ class TestField(TestCase):
     def test_predicate_operators(self) -> None:
         @dataclass
         class C(FieldManager):
-            field_a: Field[bool|None] = Field(None, 'C', 'field_a',
-                                              type_=(bool, NoneType))
-            field_b: Field[int|tuple[bool]|None] = Field(
-                None, 'C', 'field_b', type_=(int, tuple, bool, NoneType))
+            field_a: Field[bool|None] = Field(None, 'C', 'field_a')
+            field_b: Field[int|tuple[bool]|None] = Field(None, 'C', 'field_b')
             def _start(self) -> None: ...
         c = C(True, 0)
         self.assertTrue((C.field_a == True).evaluate(c))

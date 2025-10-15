@@ -35,7 +35,7 @@ class State(FieldManager):
     Kitchen sink state machine for testing various aspects of State.
     '''
 
-    exception = Field[Exception|None](None, type_=(Exception, NoneType))
+    exception = Field[Exception|None](None)
     infinite_loop = Field(False)
 
     infinite_loop_running: Future[None]
