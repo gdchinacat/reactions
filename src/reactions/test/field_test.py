@@ -20,7 +20,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from types import NoneType
-from typing import Any
 from unittest import TestCase, main
 
 from ..error import (MustNotBeCalled, FieldAlreadyBound,
@@ -194,7 +193,7 @@ class TestField(TestCase):
             field = Field(False)
             def _start(self) -> None: ...
         class Watcher(FieldWatcher[Watched]):
-            _false: Any
+            _false: object
             @ Watched.field == True
             async def _true(self,
                             watched: Watched,

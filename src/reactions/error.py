@@ -16,7 +16,7 @@
 Error definitions.
 '''
 from collections.abc import Callable
-from typing import Any, NoReturn
+from typing import NoReturn
 
 
 __all__ = ['MustNotBeCalled', 'ReactionMustNotBeCalled',
@@ -29,15 +29,15 @@ class MustNotBeCalled(RuntimeError):
     Raised by methods that are easy to call when they really aren't what should
     be called.
     '''
-    def __init__(self, func: Callable[..., Any]|None,
-                 *args: Any, **kwargs: Any) -> None:
+    def __init__(self, func: Callable[..., object]|None,
+                 *args: object, **kwargs: object) -> None:
         if func:
             # subclasses don't have to pass func if they already handled it.
             super().__init__(f'{func} must not be called', *args, **kwargs)
         else:
             super().__init__(*args, **kwargs)
 
-    def __call__(self, *args: Any, **kwargs: Any) -> NoReturn:
+    def __call__(self, *args: object, **kwargs: object) -> NoReturn:
         '''raises self to indicate a MustNotBeCalled was in fact called'''
         raise self
 
@@ -62,9 +62,9 @@ class ReactionMustNotBeCalled(MustNotBeCalled):
               (foo==1)(react)
     '''
     def __init__(self,
-                 func: Callable[..., Any],
-                 *args: Any,
-                 **kwargs: Any) -> None:
+                 func: Callable[..., object],
+                 *args: object,
+                 **kwargs: object) -> None:
         super().__init__(None, f"{func.__qualname__} is a reaction method and "
                          "can not be called directly.", *args, **kwargs)
 
