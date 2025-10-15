@@ -27,7 +27,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from itertools import count
 from types import MappingProxyType
-from typing import Any, overload, ClassVar
+from typing import Any, overload, ClassVar, Self
 
 from .error import MustNotBeCalled
 
@@ -174,18 +174,18 @@ class FieldDescriptor[T](Evaluatable[T], ABC):
     # Descriptor protocol for intercepting field updates
     ###########################################################################
     @overload
-    def __get__[Tf: FieldDescriptor[T]](self: Tf,
-                                        instance: None,
-                                        owner: Any)->Tf: ...
+    def __get__(self: Self,
+                instance: None,
+                owner: type) -> Self: ...
 
     @overload
-    def __get__[Tf: FieldDescriptor[T]](self: Tf,
-                                        instance: Any,
-                                        owner: Any)->T: ...
+    def __get__(self: Self,
+                instance: Any,
+                owner: type) -> T: ...
 
-    def __get__[Tf: FieldDescriptor[T]](self: Tf,
-                                        instance: Any,
-                                        owner: Any|None) -> T|Tf:
+    def __get__(self: Self,
+                instance: Any,
+                owner: type|None) -> Self|T:
         '''
         Get the value of the field.
 

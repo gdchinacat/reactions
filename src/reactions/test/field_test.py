@@ -174,6 +174,8 @@ class TestField(TestCase):
         class C(FieldManager):
             field = Field[bool|int|None](None, 'C', 'field')
             def _start(self) -> None: ...
+        from typing import reveal_type
+        reveal_type(C.field)
 
         # add an instance reaction and verify it is called
         c = C()
