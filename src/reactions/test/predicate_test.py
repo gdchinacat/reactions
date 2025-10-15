@@ -76,14 +76,13 @@ class PredicateTest(TestCase):
         Test that predicate decorations work on bare instances as long
         as they provide an executor.
         '''
-        # todo remove the requirement to use FieldManagerMeta.
-        class State:# todo (metaclass=FieldManagerMeta):
+        class State:
             field = Field(False)
             @field == True
             async def _true(self, field: Field[bool],
                             old: bool, new: bool) -> None:
                 self.called = True
-            def __init__(self):
+            def __init__(self) -> None:
                 self.executor = ReactionExecutor()
                 self.called = False
 
