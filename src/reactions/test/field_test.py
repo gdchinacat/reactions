@@ -213,7 +213,7 @@ class TestField(TestCase):
 
         # add another reaction to Watcher.
         @ Watched.field == False
-        async def _false(self, watched, field, old, new) -> None: ...
+        async def _false(*_: object) -> None: ...
         self.assertIsInstance(_false, _Reaction)
         Watcher._false = _false  # unsupported, don't do this outside tests
 
@@ -227,7 +227,7 @@ class TestField(TestCase):
         reactions = watcher._reactions  # pylint: disable=protected-access
         self.assertEqual(2, len(reactions))
 
-    def test___set_name___prevents_field_name_collisions(self):
+    def test___set_name___prevents_field_name_collisions(self) -> None:
         '''
         '''
         with self.assertRaises(FieldConfigurationError):
@@ -236,7 +236,7 @@ class TestField(TestCase):
                 @field == False
                 async def _field(self, *_: object) -> None: ...
 
-    def test_field_manager_meta_prevents_field_name_collisions(self):
+    def test_field_manager_meta_prevents_field_name_collisions(self) -> None:
         '''
         FieldDescriptor adds attributes to the class it is managing fields on.
         When a class derives from FieldManager the definition of the class
