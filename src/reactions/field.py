@@ -29,7 +29,7 @@ from reactions.error import FieldConfigurationError
 from .error import FieldAlreadyBound
 from .executor import ReactionExecutor, BoundReaction
 from .field_descriptor import (FieldDescriptor, FieldReaction, Evaluatable,
-                               _BoundField, Ti, Tf)
+                               FieldChange, _BoundField, Ti, Tf)
 from .predicate import _Reaction, CustomFieldReactionConfiguration
 from .predicate_types import ComparisonPredicates
 
@@ -70,13 +70,10 @@ class BoundField[Tf](_BoundField[Tf], Evaluatable[Tf], ComparisonPredicates):
 
         self.reactions.append(reaction)
 
-    def react(self,
-              instance: Ti,
-              field:FieldDescriptor[Tf],
-              old:Tf, new: Tf) -> None:
+    def react(self, change: FieldChange[Ti, Tf]) -> None:
         """React to field change events by dispatching them to the reactions"""
         for reaction in self.reactions:
-            reaction(instance, field, old, new)
+            reaction(change)
 
     def __str__(self) -> str:
         return (f'{self.field.classname}({id(self.instance)})'

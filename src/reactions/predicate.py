@@ -26,7 +26,7 @@ import logging
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
 from .executor import HasExecutor, Reaction, BoundReaction
-from .field_descriptor import FieldDescriptor, Evaluatable, Tf, Ti
+from .field_descriptor import FieldDescriptor, Evaluatable, FieldChange, Tf, Ti
 from .logging_config import VERBOSE
 
 
@@ -82,13 +82,7 @@ class Predicate[Tp](Evaluatable[bool], ABC):
     Predicates objects are immutable and hashable.
     '''
 
-    def react(self,
-              instance: HasExecutor,  # todo typing shoudld be Ti?
-              field: FieldDescriptor,
-              old: object,
-              new: object,
-              *,
-              reaction: Reaction) -> None:
+    def react(self, change: FieldChange[Tf], *, reaction: Reaction) -> None:
         '''
         React to a field value changing. If the result of evaluating this
         predicate is True the reaction will be scheduled for execution.
@@ -108,20 +102,17 @@ class Predicate[Tp](Evaluatable[bool], ABC):
         # it. Also stack overflow is likely. Probably a bad idea in general,
         # but wanted to document it until I get around to formalizing whatever
         # I decide.
-        logger.log(VERBOSE,
-                   '%s notified that %s %s -> %s',
-                   self, field, old, new)
+        logger.log(VERBOSE, '%s notified that %s', self, change)
 
-        if self.evaluate(instance):
-            logger.debug('%s TRUE for %s %s -> %s',
-                         self, field, old, new)
+        if self.evaluate(change.instance):
+            logger.debug('%s TRUE for %s', self, change)
 
             # Eitehr the reaction or the instance provides the executor.
             # It is noticeably faster to just try to get __self__ than to check
             # inspect.ismethod(react). if reaction is a method the fastest is
             # to try/except AttributeError, but if it's not that is horrendous.
             executor_provider: HasExecutor = getattr(reaction, '__self__',
-                                                     instance)
+                                                     change.instance)
 
             # Objects that react must provide an executor. This is typically
             # done by deriving from FieldManager or FieldWatcher.
@@ -129,9 +120,7 @@ class Predicate[Tp](Evaluatable[bool], ABC):
             #      isn't great.
             reaction_executor = executor_provider.executor
             reaction_executor.react(reaction,
-                                    instance,
-                                    field,
-                                    old, new)
+                                    *change.tuple) # todo plumb change
 
     def __call__(self,
                  reaction_or_custom: Reaction|CustomFieldReactionConfiguration

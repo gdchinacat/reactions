@@ -26,7 +26,7 @@ from ..error import (MustNotBeCalled, FieldAlreadyBound,
                      InvalidPredicateExpression, FieldConfigurationError)
 from ..field import (Field, BoundField, FieldManager, FieldWatcher,
                      FieldManagerMeta)
-from ..field_descriptor import FieldDescriptor
+from ..field_descriptor import FieldDescriptor, FieldChange
 from ..predicate import Predicate, _Reaction
 from ..predicate_types import Contains, Not, Or, And
 
@@ -58,12 +58,12 @@ class TestField(TestCase):
 
         # set a notification on c.field_a to call print
         reaction_called = False
-        def reaction(instance: C, field: Field[bool],
-                     old: bool, new: bool) -> None:
+        def reaction(change: FieldChange[bool]) -> None:
             nonlocal reaction_called
             reaction_called = True  # @UnusedVariable - it really is used
-            self.assertEqual((instance, field, old, new),
-                             (c, C.field, True, False))
+            self.assertEqual(
+                (change.instance, change.field, change.old, change.new),
+                (c, C.field, True, False))
         C.field.reaction(reaction)
 
         # verify updated value is properly set and comparison works
@@ -78,11 +78,8 @@ class TestField(TestCase):
             def _start(self) -> None: ...
 
         changes = list[tuple[bool|None, bool|None]]()
-        def collect(_: C,
-                    __: Field[bool|None],
-                    old: bool|None,
-                    new: bool|None) -> None:
-            changes.append((old, new))
+        def collect(change: FieldChange[bool|None]) -> None:
+            changes.append((change.old, change.new))
 
         c = C()
         C.field.reaction(collect)

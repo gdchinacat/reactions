@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from itertools import count
 from types import MappingProxyType
 from typing import overload, ClassVar, Self, TypeVar
@@ -38,7 +39,7 @@ __all__ = ['FieldReaction']
 type Ti = object  # Type of an instance of a class with Field members
 Tf = TypeVar('Tf')  # the type a field contains
 
-type FieldReaction[Tf] = Callable[[Ti, "FieldDescriptor[Tf]", Tf, Tf], None]
+type FieldReaction[Tf] = Callable[[FieldChange[Ti, Tf]], None]
 '''A method that is called when a field changes.'''
 
 
@@ -64,15 +65,31 @@ class Evaluatable[Tf](ABC):
         raise NotImplementedError()
 
 
+@dataclass(slots=True)
+class FieldChange[Ti, Tf]:
+    instance: Ti
+    field: FieldDescriptor[Tf]
+    old: Tf
+    new: Tf
+
+    def __str__(self) -> str:
+        # todo template string?
+        return f'{self.instance}.{self.field} {self.old} -> {self.new}'
+
+    @property
+    def tuple(self) -> tuple[Ti, FieldDescriptor[Tf], Tf, Tf]:
+        # todo deprecated - exists solely to ease introduction of FieldChange
+        return (self.instance, self.field, self.old, self.new)
+
+
 class _BoundField[Tf](ABC):
     '''Base class for BoundField (used for typing)'''
     @abstractmethod
-    def react(self, instance: Ti,
-              field: FieldDescriptor[Tf], old: Tf, new: Tf) -> None:
+    def react(self, change: FieldChange[Ti, Tf]) -> None:
         raise NotImplementedError()
 
     @abstractmethod
-    def reaction(self, reaction: FieldReaction) -> None:
+    def reaction(self, reaction: FieldReaction[Tf]) -> None:
         ''' Add a reaction to the list of reactions.'''
         raise NotImplementedError()
 
@@ -123,9 +140,9 @@ class FieldDescriptor[Tf](Evaluatable[Tf], ABC):
 
         # Reactions is the list of reactions on the unbound field. BoundField
         # references this in a copy-on-write manner.
-        self.reactions: list[FieldReaction] = []
+        self.reactions: list[FieldReaction[Tf]] = []
 
-    def reaction(self, reaction: FieldReaction) -> None:
+    def reaction(self, reaction: FieldReaction[Tf]) -> None:
         ''' Add a reaction to the list of reactions.'''
         self.reactions.append(reaction)
 
@@ -227,7 +244,8 @@ class FieldDescriptor[Tf](Evaluatable[Tf], ABC):
                 # _bind the field on first access if the class doesn't do it
                 # during initialization.
                 bound_field = self._bind(instance)
-            bound_field.react(instance, self, old, value)
+            change = FieldChange(instance, self, old, value)
+            bound_field.react(change)
 
     # end Descriptor protocol.
     ###########################################################################
