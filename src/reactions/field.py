@@ -368,7 +368,7 @@ class FieldManager(Reactant, ABC, metaclass=FieldManagerMeta):
     '''
 
 
-class FieldWatcher[Tw: FieldManager](
+class FieldWatcher[Tw: FieldManager](  # todo relax so Tw can be bare class
         Reactant,
         CustomFieldReactionConfiguration['FieldWatcher[Tw]'],
         ABC):
