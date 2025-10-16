@@ -32,11 +32,7 @@ class PredicateTest(TestCase):
         '''test the object returned by decorating a reaction is correct'''
         class State:
             field = Field(False)
-        async def reaction(state:State,
-                           field: Field[int],
-                           old: int,
-                           new: int) -> None: # pylint: disable=unused-argument
-            pass
+        async def reaction(*_: object) -> None: ...
         predicate = State.field == True
         reaction = predicate(reaction)  # todo predicate typing
         self.assertEqual(predicate, reaction.predicate)

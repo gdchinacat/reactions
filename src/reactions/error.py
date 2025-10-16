@@ -58,8 +58,8 @@ class ReactionMustNotBeCalled(MustNotBeCalled):
         - there is a trivial workaround...invoke the decorator manually on a
           function definition that will be included and is very explicit about
           what the function semantics are:
-              def reaction(self, bound_field: BoundField[C, T], old, new): ...
-              (foo==1)(react)
+              async def reaction(self, change: FieldChange): ...
+              (foo==1)(reaction)
     '''
     def __init__(self,
                  func: Callable[..., object],

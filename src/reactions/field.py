@@ -71,6 +71,7 @@ class BoundField[Tf](_BoundField[Tf], Evaluatable[Tf], ComparisonPredicates):
         self.reactions.append(reaction)
 
     def react(self, change: FieldChange[Ti, Tf]) -> None:
+
         """React to field change events by dispatching them to the reactions"""
         for reaction in self.reactions:
             reaction(change)
@@ -152,14 +153,6 @@ class Field[Tf](FieldDescriptor[Tf], ComparisonPredicates):
         bound_field = BoundField[Tf](nascent_instance, self)
         setattr(nascent_instance, self._attr_bound, bound_field)
         return bound_field
-
-    def react(self,
-              instance: Ti,
-              field: FieldDescriptor[Tf],
-              old: Tf,
-              new: Tf) -> None:
-        raise NotImplementedError(
-            'reactions should be configured on bound field')
 
     @classmethod
     def validate_fields_against_members(

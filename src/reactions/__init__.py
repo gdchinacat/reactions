@@ -28,7 +28,7 @@ class Counter(Reactant):
     count = Field(-1)
 
     @ count >= 0
-    async def _count(self, field, old, new):
+    async def _count(self, change: FieldChange):
         self.count += 1
 
     def _start(self):

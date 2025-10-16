@@ -67,6 +67,7 @@ class Evaluatable[Tf](ABC):
 
 @dataclass(slots=True)
 class FieldChange[Ti, Tf]:
+    '''A record of a field value changing.'''
     instance: Ti
     field: FieldDescriptor[Tf]
     old: Tf
