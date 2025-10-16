@@ -46,7 +46,7 @@ class Evaluatable[Tf](ABC):
     '''
     Base class for fields and predicates that can be evaluated.
 
-    T is the type the evaluate() returns.
+    Tf is the type the evaluate() returns.
     '''
 
     @property
@@ -72,7 +72,7 @@ class _BoundField[Tf](ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def reaction(self, reaction: FieldReaction[Tf]) -> None:
+    def reaction(self, reaction: FieldReaction) -> None:
         ''' Add a reaction to the list of reactions.'''
         raise NotImplementedError()
 
@@ -123,9 +123,9 @@ class FieldDescriptor[Tf](Evaluatable[Tf], ABC):
 
         # Reactions is the list of reactions on the unbound field. BoundField
         # references this in a copy-on-write manner.
-        self.reactions: list[FieldReaction[Tf]] = []
+        self.reactions: list[FieldReaction] = []
 
-    def reaction(self, reaction: FieldReaction[Tf]) -> None:
+    def reaction(self, reaction: FieldReaction) -> None:
         ''' Add a reaction to the list of reactions.'''
         self.reactions.append(reaction)
 

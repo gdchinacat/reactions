@@ -250,7 +250,7 @@ class OperatorPredicate(Predicate, ABC):
 
 class UnaryPredicate(OperatorPredicate, ABC):
     '''Predicate that has a single operand.'''
-    expression: Evaluatable[Tp]
+    expression: Evaluatable
 
     def __init__(self, expression: Evaluatable[Tp] | object) -> None:
         if not isinstance(expression, Evaluatable):
