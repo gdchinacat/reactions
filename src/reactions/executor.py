@@ -24,7 +24,7 @@ from collections.abc import Awaitable, Generator, Coroutine
 from itertools import count
 from logging import Logger, getLogger
 from types import TracebackType
-from typing import ClassVar, Protocol, Callable
+from typing import ClassVar, Protocol, Callable, TypeVar, Any
 
 from .error import ExecutorAlreadyStarted, ExecutorNotStarted
 from .field_descriptor import FieldDescriptor, Tf, Ti
@@ -32,30 +32,17 @@ from .logging_config import VERBOSE
 
 
 type ReactionCoroutine = Coroutine[object, object, None]
-# Callable arguments behavior is contravariant to ensure type safety.
-# todo  - make FieldDescriptor[T] arg covariant so client code can declare
-#         reactions as taking Field[T] rather than FieldDescriptor[T].
-#         -- or --
-#         Is there someway to make the predicates created by Field take a
-#         Reaction that takes Field? This is probably better from
-#         a type safety perspective since it doesn't violate type safety :)
-# TODO - this _T, B, etc makes errors go away, but specifying different types
-#        for T on the reaction (Field[T], T, T) don't show as errors either,
-#        is kinda the whole point. The reactions should be type checked against
-#        the fields that generated the predicates. Probably need a whole lot
-#        more plumbing to get that to work. For now, the errors on the
-#        reaction decoration is preferable, so commented out to leave a trace
-#        for maybe how to do this.
-#type _T = object
-#type B = FieldDescriptor[_T]
-#type Reaction[_T, F: B] = Callable[[object, F, _T, _T],
-#                                     ReactionCoroutine]
-type Reaction[Tf] = Callable[[object, FieldDescriptor[Tf], Tf, Tf],
+'''Recation coroutines do not yeild or send, and return None'''
+
+Tr = TypeVar('Tr')
+'''TypeVar for Reactions, the same as Tp, but used for clarity'''
+
+type Reaction[Tr] = Callable[[object, FieldDescriptor[Tr], Tr, Tr],
                                      ReactionCoroutine]
 '''
 Reaction is the type for methods that predicates can decorate.
 '''
-type BoundReaction[Tf] = Callable[[object, object, FieldDescriptor[Tf], Tf, Tf],
+type BoundReaction[Tr] = Callable[[object, object, FieldDescriptor[Tr], Tr, Tr],
                                      ReactionCoroutine]
 
 
@@ -115,7 +102,7 @@ class ReactionExecutor:
         self.queue = Queue()
 
     def react[T](self,
-                 reaction: Reaction,  # todo predicate typing
+                 reaction: Reaction[Any],
                  instance: Ti,
                  field: FieldDescriptor[T],
                  old: T, new: T) -> None:

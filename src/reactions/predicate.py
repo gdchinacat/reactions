@@ -21,6 +21,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import partial
+from typing import TypeVar
 import logging
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
@@ -35,27 +36,32 @@ __all__ = ['Constant']
 logger = logging.getLogger("reactions.predicate")
 
 
+Tp = TypeVar('Tp')
+'''the predicate type, composed of field types it is created from'''
+
+
 @dataclass
-class CustomFieldReactionConfiguration[T]:
+class CustomFieldReactionConfiguration[Tp]:
     '''
     Class to indicate to Predicate.__call__ that field reactions should not
     be handled by the Predicate decorator. The decorator will still return a
     _Reaction that references the reaction that can be used to do this
     configuration.
     '''
-    reaction: BoundReaction[object]|None  # todo predicate typing
+    reaction: BoundReaction[Tp]|None
+
 
 @dataclass(eq=True, frozen=True)
-class _Reaction(ReactionMustNotBeCalled):
+class _Reaction[Tp](ReactionMustNotBeCalled):
     '''
     The result of decorating a reaction function.
     '''
-    predicate: Predicate
-    func: Reaction|BoundReaction
+    predicate: Predicate[Tp]
+    func: Reaction[Tp]|BoundReaction[Tp]
 
 
 @dataclass(eq=True, frozen=True)
-class Predicate(Evaluatable[bool], ABC):
+class Predicate[Tp](Evaluatable[bool], ABC):
     '''
     Predicate evaluates expressions.
     T - the type the predicate evaluates to
@@ -244,9 +250,9 @@ class OperatorPredicate(Predicate, ABC):
 
 class UnaryPredicate(OperatorPredicate, ABC):
     '''Predicate that has a single operand.'''
-    expression: Evaluatable
+    expression: Evaluatable[Tp]
 
-    def __init__(self, expression: Evaluatable | object) -> None:
+    def __init__(self, expression: Evaluatable[Tp] | object) -> None:
         if not isinstance(expression, Evaluatable):
             expression = Constant(expression)
         self.expression = expression
