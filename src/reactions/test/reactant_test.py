@@ -26,7 +26,7 @@ from typing import NoReturn
 from unittest import TestCase, main
 
 from .. import (ReactionMustNotBeCalled, ExecutorAlreadyStarted, Field,
-                ReactionExecutor, FieldManager)
+                ReactionExecutor, FieldManager, FieldChange)
 from .async_helpers import asynctest
 
 
@@ -48,18 +48,15 @@ class State(FieldManager):
         pass
 
     @ exception != None
-    async def exception_(self,
-                         field: Field[Exception],
-                         old: Exception|None,
-                         new: Exception|None) -> None:
+    async def exception_(self, change: FieldChange[State, Exception]) -> None:
         '''raise an exception'''
-        if new is not None:
-            raise new
+        if change.new is not None:
+            raise change.new
 
     @ infinite_loop == True
     async def _infinite_interuptable_loop(self,
-             field: Field[int],
-             old: int, new:int) -> NoReturn:  # @UnusedVariable
+                                          change: FieldChange[State, int]
+                                          ) -> NoReturn:
         '''enter an infinite loop. Currently no way to exit it.'''
         assert self.infinite_loop_running is not None
         self.infinite_loop_running.set_result(None)

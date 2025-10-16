@@ -33,7 +33,7 @@ from typing import overload, ClassVar, Self, TypeVar
 from .error import MustNotBeCalled
 
 
-__all__ = ['FieldReaction']
+__all__ = ['FieldReaction', 'FieldChange']
 
 
 type Ti = object  # Type of an instance of a class with Field members
@@ -75,11 +75,6 @@ class FieldChange[Ti, Tf]:
     def __str__(self) -> str:
         # todo template string?
         return f'{self.instance}.{self.field} {self.old} -> {self.new}'
-
-    @property
-    def tuple(self) -> tuple[Ti, FieldDescriptor[Tf], Tf, Tf]:
-        # todo deprecated - exists solely to ease introduction of FieldChange
-        return (self.instance, self.field, self.old, self.new)
 
 
 class _BoundField[Tf](ABC):

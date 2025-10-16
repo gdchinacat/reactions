@@ -22,6 +22,7 @@ from unittest import TestCase, main
 
 from ..error import ReactionMustNotBeCalled
 from ..executor import ReactionExecutor
+from ..field_descriptor import FieldChange
 from ..field import Field, FieldManager, FieldWatcher
 from ..predicate import _Reaction
 from ..predicate_types import And
@@ -47,7 +48,7 @@ class Watched(FieldManager):
 
     @ And(ticks != -1,
           ticks != last_tick)
-    async def tick(self, *_: object) -> None:
+    async def tick(self, change: FieldChange[Watched, int]) -> None:
         self.ticks += 1
 
     @ ticks == last_tick
@@ -56,7 +57,7 @@ class Watched(FieldManager):
     #        reaction accepts more specific Field. Even then, the field type
     #        isn't validating properly. Needs a fair bit of work.
     # todo - create a predicate_test for reaction type checking
-    async def done(self, field: Field[bool], old: int, new:int) -> None:
+    async def done(self, change: FieldChange[Watched, int]) -> None:
         self.ticks = -1
         self.stop()
 
@@ -71,19 +72,17 @@ class FieldWatcherTest(TestCase):
             def __init__(self, watched: Watched,
                          *args: object,
                          **kwargs: object) -> None:
-                super().__init__(watched, *args, **kwargs)  # todo typing
-                self.change_events: list[
-                    tuple[Watched, Field[int], int, int]] = list()
+                super().__init__(watched, *args, **kwargs)
+                self.change_events: list[tuple[int, int]] = []
 
             @ Watched.ticks != None
             @ FieldWatcher  # todo typing
             async def _watch(self,
                              watched: Watched,
-                             field: Field[int],
-                             old: int, new: int) -> None:
+                             change: FieldChange[Watched, int]) -> None:
                 assert isinstance(self, Watcher), f'got {type(self)=}'
                 assert isinstance(watched, Watched), f'got {type(watched)=}'
-                self.change_events.append((watched, field, old, new))
+                self.change_events.append((change.old, change.new))
 
         watched = Watched()
         watcher = Watcher(watched=watched,
@@ -92,8 +91,7 @@ class FieldWatcherTest(TestCase):
         watched.run()
 
         # last_tick + 2 for changing ticks to -1
-        expected = [(watched, Watched.ticks, x - 1,
-                     x if x != watched.last_tick + 1 else -1)
+        expected = [(x - 1, x if x != watched.last_tick + 1 else -1)
                     for x in range(watched.last_tick + 2)]
 
         self.assertEqual(watcher.change_events, expected)
@@ -110,9 +108,7 @@ class FieldWatcherTest(TestCase):
             @ FieldWatcher
             async def _true(self,
                             watched: Watched,
-                            field: Field[bool],
-                            old: bool,
-                            new: bool) -> None:
+                            change: FieldChange[Watched, bool]) -> None:
                 assert self.watched is watched
                 self.reacted = True
 
@@ -142,8 +138,7 @@ class FieldWatcherTest(TestCase):
             @ FieldWatcher  # todo typing
             async def _true(self,
                             state: State,
-                            field: Field[bool],
-                            old: bool, new:bool) -> None:
+                            change: FieldChange[State, bool]) -> None:
                 self.called = True
 
         self.assertIsInstance(Watcher._true, _Reaction)

@@ -82,7 +82,7 @@ class Predicate[Tp](Evaluatable[bool], ABC):
     Predicates objects are immutable and hashable.
     '''
 
-    def react(self, change: FieldChange[Tf], *, reaction: Reaction) -> None:
+    def react(self, change: FieldChange[Ti, Tf], *, reaction: Reaction) -> None:
         '''
         React to a field value changing. If the result of evaluating this
         predicate is True the reaction will be scheduled for execution.
@@ -119,8 +119,7 @@ class Predicate[Tp](Evaluatable[bool], ABC):
             # todo type safety for getting executor...just hoping it's there
             #      isn't great.
             reaction_executor = executor_provider.executor
-            reaction_executor.react(reaction,
-                                    *change.tuple) # todo plumb change
+            reaction_executor.react(reaction, change)
 
     def __call__(self,
                  reaction_or_custom: Reaction|CustomFieldReactionConfiguration

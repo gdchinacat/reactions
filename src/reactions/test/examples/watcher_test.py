@@ -16,8 +16,7 @@
 
 from unittest import main, TestCase
 
-from ... import FieldManager, Field, And, Not
-from reactions.field import FieldWatcher
+from ... import FieldManager, Field, And, Not, FieldWatcher, FieldChange
 
 
 class Watched(FieldManager):
@@ -55,14 +54,12 @@ class Watcher(FieldWatcher[Watched]):
     @ FieldWatcher  # necessary to register non-self reactions (todo?)
     async def watch_watched_field(self,
                                   watched: Watched,
-                                  field: Field[int],
-                                  old: int,
-                                  new: int) -> None:
+                                  change: FieldChange[Watched, int]) -> None:
         # for test, just make sure the old and new values are correct
         if self.last_value is not None:
-            assert self.last_value == old
-            assert new == self.last_value + 1
-        self.last_value = new
+            assert self.last_value == change.old
+            assert change.new == self.last_value + 1
+        self.last_value = change.new
 
 
 class WatcherTest(TestCase):

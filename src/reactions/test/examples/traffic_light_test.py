@@ -21,7 +21,7 @@ from unittest import TestCase, main
 import asyncio
 import logging
 
-from ... import Field, And, FieldManager
+from ... import Field, And, FieldManager, FieldChange
 
 
 NUMBER_OF_TRAFFIC_LIGHTS = 1_000
@@ -75,22 +75,22 @@ class TrafficLight(FieldManager):
     @And(color == Color.RED,
          ticks == TICKS_PER_LIGHT)
     async def red_to_green(self,
-                     field: IntOrColor,
-                     old: int | Color, new:int | Color) -> None:  # @UnusedVariable
+                           change: FieldChange[TrafficLight, IntOrColor]
+                           ) -> None:
         self.change(Color.GREEN)
 
     @And(color == Color.GREEN,
          ticks == TICKS_PER_LIGHT)
     async def green_to_yellow(self,
-                        field: Field[int | Color],
-                        old: int | Color, new:int | Color) -> None:  # @UnusedVariable
+                           change: FieldChange[TrafficLight, IntOrColor]
+                           ) -> None:
         self.change(Color.YELLOW)
 
     @And(color == Color.YELLOW,
          ticks == TICKS_PER_LIGHT)
     async def yellow_to_red(self,
-                      field: Field[int | Color],
-                      old: int | Color, new:int | Color) -> None:  # @UnusedVariable
+                           change: FieldChange[TrafficLight, IntOrColor]
+                           ) -> None:
         self.cycles += 1
         self.change(Color.RED)
 
@@ -101,11 +101,8 @@ class TrafficLight(FieldManager):
         logger.debug('%s %s', self, color.name)
 
     @ ticks != -1
-    async def tick(self,
-             field: Field[int],
-             old: int, new: int) -> None:  # @UnusedVariable
-
-        if self.ticks != new:
+    async def tick(self, change: FieldChange[TrafficLight, int]) -> None:
+        if self.ticks != change.new:
             # change reset ticks, don't react
             return
         assert self.ticks != TICKS_PER_LIGHT

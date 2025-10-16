@@ -19,8 +19,9 @@ from __future__ import annotations
 
 from unittest import TestCase, main
 
-from ..field import Field, FieldManager, FieldManagerMeta
 from ..executor import ReactionExecutor
+from ..field import Field, FieldManager, FieldManagerMeta
+from ..field_descriptor import FieldChange
 from .async_helpers import asynctest
 
 
@@ -58,9 +59,9 @@ class PredicateTest(TestCase):
 
         change_events: list[tuple[State, Field[int], int, int]] = []
         @ State.field[state] != None
-        async def watch(state: State, field: Field[int],
-                        old: int, new: int) -> None:
-            change_events.append((state, field, old, new))
+        async def watch(state: State, change: FieldChange[State, int]) -> None:
+            change_events.append((change.instance, change.field,
+                                  change.old, change.new))
 
         state.run()
 
@@ -79,8 +80,7 @@ class PredicateTest(TestCase):
         class State:
             field = Field(False)
             @ field == True
-            async def _true(self, field: Field[bool],
-                            old: bool, new: bool) -> None:
+            async def _true(self, change: FieldChange[State, bool]) -> None:
                 self.called = True
             def __init__(self) -> None:
                 self.executor = ReactionExecutor()

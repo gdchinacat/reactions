@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from unittest import TestCase, main
 
-from ... import Field, FieldManager, And
+from ... import Field, FieldManager, And, FieldChange
 
 
 class Counter(FieldManager):
@@ -47,10 +47,7 @@ class Counter(FieldManager):
 
     @ And(0 <= count,
           count < count_to)
-    async def loop(self,
-                   field: Field[int],
-                   old: int,
-                   new: int) -> None:
+    async def loop(self, change: FieldChange[Counter, int]) -> None:
         self.count += 1
 
 

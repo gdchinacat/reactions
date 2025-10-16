@@ -27,7 +27,7 @@ from types import TracebackType
 from typing import ClassVar, Protocol, Callable, TypeVar, Any
 
 from .error import ExecutorAlreadyStarted, ExecutorNotStarted
-from .field_descriptor import FieldDescriptor, Tf, Ti
+from .field_descriptor import FieldDescriptor, FieldChange, FieldChange, Tf, Ti
 from .logging_config import VERBOSE
 
 
@@ -37,8 +37,7 @@ type ReactionCoroutine = Coroutine[object, object, None]
 Tr = TypeVar('Tr')
 '''TypeVar for Reactions, the same as Tp, but used for clarity'''
 
-type Reaction[Tr] = Callable[[object, FieldDescriptor[Tr], Tr, Tr],
-                                     ReactionCoroutine]
+type Reaction[Tf, Tr] = Callable[[Ti, FieldChange[Ti, Tf]], ReactionCoroutine]
 '''
 Reaction is the type for methods that predicates can decorate.
 '''
@@ -78,7 +77,7 @@ class ReactionExecutor:
     task: Task[None]|None = None
     '''the task that is processing the queue to execute reactions'''
 
-    queue: Queue[tuple[int, ReactionCoroutine, object]]
+    queue: Queue[tuple[int, ReactionCoroutine, FieldChange]]
     '''
     The queue of reactions to execute.
     tuple elements are:
@@ -101,21 +100,19 @@ class ReactionExecutor:
         super().__init__(*args, **kwargs)
         self.queue = Queue()
 
-    def react[T](self,
-                 reaction: Reaction[Any],
-                 instance: Ti,
-                 field: FieldDescriptor[T],
-                 old: T, new: T) -> None:
+    def react[T, Tf](self,
+                 reaction: Reaction[Any, Any],
+                 change: FieldChange[Ti, Tf]) -> None:
         '''reaction that asynchronously executes the reaction'''
 
         assert self.task, "ReactionExecutor not start()'ed"
 
         id_ = next(self._ids)
 
-        reaction_coroutine = reaction(instance, field, old, new)
-        self.queue.put_nowait((id_, reaction_coroutine, (field, old, new)))
-        logger.log(VERBOSE, '%d scheduled %s(..., %s,  %s)',
-                   id_, reaction.__qualname__, old, new)
+        reaction_coroutine = reaction(change.instance, change)
+        self.queue.put_nowait((id_, reaction_coroutine, change))
+        logger.log(VERBOSE, '%d scheduled %s(..., %s, %s)',
+                   id_, reaction.__qualname__, change.old, change.new)
 
     ###########################################################################
     # Task life cycle:
@@ -173,14 +170,14 @@ class ReactionExecutor:
             try:
                 # todo - use template string for id, args, other logging only
                 #        info.
-                (id_, coroutine, args) = await self.queue.get()
+                (id_, coroutine, change) = await self.queue.get()
             except QueueShutDown:
                 logger.info('%s stopped', self)
                 break
 
             try:
                 logger.debug('%s %s calling %s(%s)',
-                             self, id_, coroutine.__qualname__, str(args))
+                             self, id_, coroutine.__qualname__, str(change))
                 await coroutine
                 await sleep(0)
             except CancelledError as ce:

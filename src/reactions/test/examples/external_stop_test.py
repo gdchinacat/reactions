@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from unittest import TestCase, main
 
-from ... import Field, FieldManager
+from ... import Field, FieldManager, FieldChange
 
 
 class Counter(FieldManager):
@@ -51,12 +51,11 @@ class ExternalStopTest(TestCase):
 
         @ Counter.count[counter] == count_to
         async def stop(instance: Counter,
-                       field: Field[int],
-                       old: int, new: int) -> None:
+                       change: FieldChange[Counter, int]) -> None:
             # the Counter reaction to increment count has already executed by
             # the time this one executes, so instance.count is one greater than
             # the value that caused this reaction to execute.
-            self.assertEqual(instance.count, new + 1)
+            self.assertEqual(instance.count, change.new + 1)
             counter.done = True
 
         counter.run()
