@@ -40,6 +40,9 @@ Tr = TypeVar('Tr')
 type Reaction[Tf, Tr] = Callable[[Ti, FieldChange[Ti, Tf]], ReactionCoroutine]
 '''
 Reaction is the type for methods that predicates can decorate.
+The instance is provided as the first argument despite being available in
+the second argument (FieldChange) in order to provide a 'self' argument to
+predicate decorated methods.
 '''
 type BoundReaction[Tr] = Callable[[object, object, FieldDescriptor[Tr], Tr, Tr],
                                      ReactionCoroutine]
@@ -109,6 +112,11 @@ class ReactionExecutor:
 
         id_ = next(self._ids)
 
+        # The reaction takes change.instance as the first argument even though
+        # it is included in the second argument so that predicate decorated
+        # methods get a 'self' argument as the first one. Without it they
+        # would only recieve the field change and have to be static methods
+        # that extract the self from the change.
         reaction_coroutine = reaction(change.instance, change)
         self.queue.put_nowait((id_, reaction_coroutine, change))
         logger.log(VERBOSE, '%d scheduled %s(..., %s, %s)',
