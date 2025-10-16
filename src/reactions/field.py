@@ -90,7 +90,7 @@ class BoundField[Tf](_BoundField[Tf], Evaluatable[Tf], ComparisonPredicates):
     def evaluate(self, instance: Ti) -> Tf:
         return self.field.evaluate(instance)
 
-class Field[T](FieldDescriptor[T], ComparisonPredicates):
+class Field[Tf](FieldDescriptor[Tf], ComparisonPredicates):
     '''
     Field provides attribute change notification and predicates to configure
     asynchronous callbacks when the condition becomes true.
@@ -117,7 +117,7 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
         '''make Field hashable/immutable'''
         return id(self)
 
-    def bound_field(self, instance: Ti) -> BoundField[T]:
+    def bound_field(self, instance: Ti) -> BoundField[Tf]:
         '''
         Get/create/set a Field specific to the instance.
 
@@ -127,10 +127,9 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
         bound_field = getattr(instance, self._attr_bound)
         assert isinstance(bound_field, BoundField)
         return bound_field
-
     __getitem__ = bound_field
 
-    def _bind(self, nascent_instance: Ti) -> BoundField[T]:
+    def _bind(self, nascent_instance: Ti) -> BoundField[Tf]:
         '''
         Create a BoundField on instance.
         nascent_instance:
@@ -153,16 +152,17 @@ class Field[T](FieldDescriptor[T], ComparisonPredicates):
             raise FieldAlreadyBound(
                 f'{self} already bound to object '
                 f'id(instance)={id(nascent_instance)}')
-        bound_field = BoundField[T](nascent_instance, self)
+        bound_field = BoundField[Tf](nascent_instance, self)
         setattr(nascent_instance, self._attr_bound, bound_field)
         return bound_field
 
     def react(self,
               instance: Ti,
-              field: FieldDescriptor[T],
-              old: T,
-              new: T) -> None:
-        raise NotImplementedError('reactions should be on bound field')
+              field: FieldDescriptor[Tf],
+              old: Tf,
+              new: Tf) -> None:
+        raise NotImplementedError(
+            'reactions should be configured on bound field')
 
     @classmethod
     def validate_fields_against_members(
