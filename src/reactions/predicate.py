@@ -21,7 +21,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import partial
-from typing import TypeVar
+from typing import TypeVar, overload
 import logging
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
@@ -59,6 +59,12 @@ class _Reaction[Tp](ReactionMustNotBeCalled):
     predicate: Predicate[Tp]
     func: Reaction[Tp]|BoundReaction[Tp]
 
+
+type Decoratee[Tf, Tr, Tp] = Reaction[Tf, Tr]|CustomFieldReactionConfiguration[Tp]
+'''
+Decoratee is the type of things that Predicate can decorate or arguments
+to the predicate decorator (Predicate.__call__).
+'''
 
 @dataclass(eq=True, frozen=True)
 class Predicate[Tp](Evaluatable[bool], ABC):
@@ -107,23 +113,23 @@ class Predicate[Tp](Evaluatable[bool], ABC):
         if self.evaluate(change.instance):
             logger.debug('%s TRUE for %s', self, change)
 
-            # Eitehr the reaction or the instance provides the executor.
-            # It is noticeably faster to just try to get __self__ than to check
-            # inspect.ismethod(react). if reaction is a method the fastest is
-            # to try/except AttributeError, but if it's not that is horrendous.
-            executor_provider: HasExecutor = getattr(reaction, '__self__',
-                                                     change.instance)
-
             # Objects that react must provide an executor. This is typically
             # done by deriving from FieldManager or FieldWatcher.
             # todo type safety for getting executor...just hoping it's there
             #      isn't great.
+            executor_provider: HasExecutor = getattr(reaction, '__self__',
+                                                     change.instance)
             reaction_executor = executor_provider.executor
             reaction_executor.react(reaction, change)
 
-    def __call__(self,
-                 reaction_or_custom: Reaction|CustomFieldReactionConfiguration
-                 ) -> _Reaction:
+    @overload
+    def __call__(self, decorated: Reaction) -> _Reaction: ...
+
+    @overload
+    def __call__(self, decorated: CustomFieldReactionConfiguration
+                 ) -> _Reaction: ...
+
+    def __call__(self, decorated: Decoratee) -> _Reaction:
         '''
         Predicates are decorators that arrange for the decorated method to be
         called when the predicate becomes True.
@@ -178,15 +184,15 @@ class Predicate[Tp](Evaluatable[bool], ABC):
         (rather than the classes that fields are on).
         '''
         reaction: Reaction|BoundReaction
-        if isinstance(reaction_or_custom, CustomFieldReactionConfiguration):
-            assert reaction_or_custom.reaction
-            reaction = reaction_or_custom.reaction
+        if isinstance(decorated, CustomFieldReactionConfiguration):
+            assert decorated.reaction
+            reaction = decorated.reaction
             logger.info('changes to %s will use %s to '
                         'create bound reactions for %s',
                         ', '.join(str(f) for f in self.fields),
-                        reaction_or_custom, self)
+                        decorated, self)
         else:
-            reaction = reaction_or_custom
+            reaction = decorated
             self.configure_reaction(reaction)
         return _Reaction(self, reaction)
 
