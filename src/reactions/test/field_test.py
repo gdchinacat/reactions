@@ -15,9 +15,6 @@
 '''
 Test field functionality.
 '''
-
-from __future__ import annotations
-
 from dataclasses import dataclass
 from types import NoneType
 from unittest import TestCase, main
@@ -35,7 +32,7 @@ class TestField(TestCase):
 
     def test_class_field_eq_creates_predicate(self) -> None:
         class C:
-            field = Field[bool](False, 'C', 'field')
+            field = Field['C', bool](False, 'C', 'field')
 
         predicate = C.field == True
         self.assertIsInstance(predicate, Predicate)
@@ -43,7 +40,7 @@ class TestField(TestCase):
 
     def test_del_field_not_allowed(self) -> None:
         class C:
-            field = Field[bool](False, 'C', 'field')
+            field = Field['C', bool](False, 'C', 'field')
         c = C()
         with self.assertRaises(MustNotBeCalled):
             del c.field
@@ -51,14 +48,14 @@ class TestField(TestCase):
 
     def test_instance_field_equality(self) -> None:
         class C(FieldManager):
-            field = Field[bool](True, 'C', 'field')
+            field = Field['C', bool](True, 'C', 'field')
             def _start(self) -> None: ...
         c = C()
         self.assertTrue(c.field == True)
 
         # set a notification on c.field_a to call print
         reaction_called = False
-        def reaction(change: FieldChange[C, bool]) -> None:
+        def reaction(change: FieldChange[Field[C, bool], C, bool]) -> None:
             nonlocal reaction_called
             reaction_called = True  # @UnusedVariable - it really is used
             self.assertEqual(
@@ -74,11 +71,11 @@ class TestField(TestCase):
 
     def test_edge_triggered_notify(self) -> None:
         class C(FieldManager):
-            field = Field[bool|None](None, 'C', 'field')
+            field = Field['C', bool|None](None, 'C', 'field')
             def _start(self) -> None: ...
 
         changes = list[tuple[bool|None, bool|None]]()
-        def collect(change: FieldChange[C, bool|None]) -> None:
+        def collect(change: FieldChange[Field[C, bool], C, bool|None]) -> None:
             changes.append((change.old, change.new))
 
         c = C()
@@ -96,8 +93,8 @@ class TestField(TestCase):
     def test_predicate_operators(self) -> None:
         @dataclass
         class C(FieldManager):
-            field_a: Field[bool|None] = Field(None, 'C', 'field_a')
-            field_b: Field[int|tuple[bool]|None] = Field(None, 'C', 'field_b')
+            field_a: Field[C, bool|None] = Field(None, 'C', 'field_a')
+            field_b: Field[C, int|tuple[bool]|None] = Field(None, 'C', 'field_b')
             def _start(self) -> None: ...
         c = C(True, 0)
         self.assertTrue((C.field_a == True).evaluate(c))
@@ -130,14 +127,14 @@ class TestField(TestCase):
 
     def test_field_already_bound(self) -> None:
         class C(FieldManager):
-            field = Field(0, 'C', 'field')
+            field = Field['C', int](0, 'C', 'field')
             def _start(self) -> None: ...
         with self.assertRaises(FieldAlreadyBound):
             C.field._bind(C())  # pylint: disable=protected-access
 
     def test_field_manager_binds_fields(self) -> None:
         class C(FieldManager):
-            field = Field(0, 'C', 'field')
+            field = Field['C', int](0, 'C', 'field')
             def _start(self) -> None: ...
         c1 = C()
         c2 = C()
@@ -154,7 +151,7 @@ class TestField(TestCase):
 
     def test_bound_field_predicate(self) -> None:
         class C(FieldManager):
-            field = Field(0, 'C', 'field')
+            field = Field['C', int](0, 'C', 'field')
             def _start(self) -> None: ...
         c = C()
         c_field = C.field[c]
@@ -168,7 +165,7 @@ class TestField(TestCase):
             called = True  # @UnusedVariable
 
         class C(FieldManager):
-            field = Field[bool|int|None](None, 'C', 'field')
+            field = Field['C', bool|int|None](None, 'C', 'field')
             def _start(self) -> None: ...
 
         # add an instance reaction and verify it is called
@@ -187,12 +184,14 @@ class TestField(TestCase):
 
     def test_watcher__reactions_is_cached(self) -> None:
         class Watched(FieldManager):
-            field = Field(False)
+            field = Field['Watched', bool](False)
             def _start(self) -> None: ...
         class Watcher(FieldWatcher[Watched]):
             _false: object
             @ Watched.field == True
-            async def _true(self, change: FieldChange[Watched, bool]) -> None:
+            async def _true(self,
+                            change: FieldChange[Field[Watched, bool],
+                                                Watched, bool]) -> None:
                 pass
 
         watched = Watched()
@@ -223,7 +222,7 @@ class TestField(TestCase):
         '''
         with self.assertRaises(FieldConfigurationError):
             class _:
-                field = Field(False, '_', 'field')
+                field = Field['_', bool](False, '_', 'field')
                 @field == False
                 async def _field(self, *_: object) -> None: ...
 
@@ -235,7 +234,7 @@ class TestField(TestCase):
         '''
         with self.assertRaises(FieldConfigurationError):
             class _(metaclass=FieldManagerMeta):
-                field = Field(False)
+                field = Field['_', bool](False)
                 @field == False
                 async def _field(self, *_: object) -> None: ...
 

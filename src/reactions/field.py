@@ -14,9 +14,6 @@
 '''
 The public facing Field implementation.
 '''
-
-from __future__ import annotations
-
 from abc import ABCMeta, abstractmethod, ABC
 from asyncio import run
 from collections.abc import Awaitable, Iterable, MutableMapping
@@ -29,7 +26,7 @@ from reactions.error import FieldConfigurationError
 from .error import FieldAlreadyBound
 from .executor import ReactionExecutor, BoundReaction
 from .field_descriptor import (FieldDescriptor, FieldReaction, Evaluatable,
-                               FieldChange, _BoundField, Ti, Tf)
+                               FieldChange, _BoundField)
 from .predicate import _Reaction, CustomFieldReactionConfiguration
 from .predicate_types import ComparisonPredicates
 
@@ -40,7 +37,8 @@ __all__ = ['Field', 'FieldManager', 'FieldWatcher']
 logger = getLogger('reactions.field')
 
 
-class BoundField[Tf](_BoundField[Tf], Evaluatable[Tf], ComparisonPredicates):
+class BoundField[Ti, Tft](_BoundField['Field[Tft]', Ti, Tft],
+                         Evaluatable[Ti, Tft], ComparisonPredicates):
     '''
     A field bound to a specific instance.
 
@@ -51,7 +49,7 @@ class BoundField[Tf](_BoundField[Tf], Evaluatable[Tf], ComparisonPredicates):
 
     def __init__(self,
                  nascent_instance: Ti,
-                 field: Field[Tf],
+                 field: Field[Tft],
                  *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
         self.field = field
@@ -62,7 +60,7 @@ class BoundField[Tf](_BoundField[Tf], Evaluatable[Tf], ComparisonPredicates):
         # are configured.
         self.reactions = field.reactions
 
-    def reaction(self, reaction: FieldReaction[Tf]) -> None:
+    def reaction(self, reaction: FieldReaction[Tft]) -> None:
         '''Add a reaction for when this bound field changes value.'''
         # ensure the bound field is using a private reactions list
         if self.reactions is self.field.reactions:
@@ -70,7 +68,7 @@ class BoundField[Tf](_BoundField[Tf], Evaluatable[Tf], ComparisonPredicates):
 
         self.reactions.append(reaction)
 
-    def react(self, change: FieldChange[Ti, Tf]) -> None:
+    def react(self, change: FieldChange[Ti, Tft]) -> None:
 
         """React to field change events by dispatching them to the reactions"""
         for reaction in self.reactions:
@@ -82,13 +80,13 @@ class BoundField[Tf](_BoundField[Tf], Evaluatable[Tf], ComparisonPredicates):
     __repr__ = __str__
 
     @property
-    def fields(self) -> Iterable[Field[Tf]]:
+    def fields(self) -> Iterable[Field[Tft]]:
         yield self.field
 
-    def evaluate(self, instance: Ti) -> Tf:
+    def evaluate(self, instance: Ti) -> Tft:
         return self.field.evaluate(instance)
 
-class Field[Tf](FieldDescriptor[Tf], ComparisonPredicates):
+class Field[Ti, Tft](FieldDescriptor[Ti, Tft], ComparisonPredicates):
     '''
     Field provides attribute change notification and predicates to configure
     asynchronous callbacks when the condition becomes true.
@@ -115,7 +113,7 @@ class Field[Tf](FieldDescriptor[Tf], ComparisonPredicates):
         '''make Field hashable/immutable'''
         return id(self)
 
-    def bound_field(self, instance: Ti) -> BoundField[Tf]:
+    def bound_field(self, instance: Ti) -> BoundField[Tft]:
         '''
         Get/create/set a Field specific to the instance.
 
@@ -127,7 +125,7 @@ class Field[Tf](FieldDescriptor[Tf], ComparisonPredicates):
         return bound_field
     __getitem__ = bound_field
 
-    def _bind(self, nascent_instance: Ti) -> BoundField[Tf]:
+    def _bind(self, nascent_instance: Ti) -> BoundField[Tft]:
         '''
         Create a BoundField on instance.
         nascent_instance:
@@ -150,7 +148,7 @@ class Field[Tf](FieldDescriptor[Tf], ComparisonPredicates):
             raise FieldAlreadyBound(
                 f'{self} already bound to object '
                 f'id(instance)={id(nascent_instance)}')
-        bound_field = BoundField[Tf](nascent_instance, self)
+        bound_field = BoundField[Ti, Tft](nascent_instance, self)
         setattr(nascent_instance, self._attr_bound, bound_field)
         return bound_field
 
@@ -170,7 +168,7 @@ class Field[Tf](FieldDescriptor[Tf], ComparisonPredicates):
             fields  = [x for x in namespace.values() if isinstance(x, Field)]
 
         assert isinstance(fields, Iterable)
-        fields = cast(Iterable[Field[object]], fields)
+        fields = cast(Iterable[Field[Ti, object]], fields)
         attr_field_names = {
             name for field in fields
                  for name in (field._attr, field._attr_bound)}  # pylint: disable=protected-access
@@ -192,7 +190,7 @@ class FieldManagerMetaDict(dict[str, object]):
 
     def __init__(self, classname: str) -> None:
         self.classname = classname
-        self['_fields'] = tuple[tuple[Field[object]]]()
+        self['_fields'] = tuple[tuple[Field[object, object]]]()  # todo use Ti?
 
     def __setitem__(self, attr: str, value: object)->None:
         if isinstance(value, Field):
@@ -370,7 +368,7 @@ class FieldManager(Reactant, ABC, metaclass=FieldManagerMeta):
 
 class FieldWatcher[Tw: FieldManager](  # todo relax so Tw can be bare class
         Reactant,
-        CustomFieldReactionConfiguration['FieldWatcher[Tw]'],
+        CustomFieldReactionConfiguration,
         ABC):
     '''
     Base class to allow subclasses to watch Fields on other classes.
@@ -396,7 +394,7 @@ class FieldWatcher[Tw: FieldManager](  # todo relax so Tw can be bare class
     # todo move overloads into .pyi
     @overload
     def __init__(self,
-                 reaction_or_watched: BoundReaction[Tf],
+                 reaction_or_watched: BoundReaction[Tft],
                  ) -> None:
         '''Reaction decorator to indicate FieldWatcher manages field reaction
         configuration.'''

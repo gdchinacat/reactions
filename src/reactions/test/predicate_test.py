@@ -15,8 +15,6 @@
 '''
 Predicate test
 '''
-from __future__ import annotations
-
 from unittest import TestCase, main
 
 from ..executor import ReactionExecutor
@@ -31,7 +29,7 @@ class PredicateTest(TestCase):
     async def test_decorator_returns__reaction(self)->None:
         '''test the object returned by decorating a reaction is correct'''
         class State:
-            field = Field(False)
+            field = Field['State', bool](False)
         async def reaction(*_: object) -> None: ...
         predicate = State.field == True
         reaction = predicate(reaction)  # todo predicate typing
@@ -44,7 +42,7 @@ class PredicateTest(TestCase):
         '''
         start = 5
         class State(FieldManager):
-            field = Field(-1)
+            field = Field['State', int](-1)
             @ field > 0
             async def decrement(self, *_: object) -> None:
                 self.field -= 1
@@ -53,9 +51,9 @@ class PredicateTest(TestCase):
             def _start(self) -> None: self.field = start
         state = State()
 
-        change_events: list[tuple[State, Field[int], int, int]] = []
+        change_events: list[tuple[State, Field[State, int], int, int]] = []
         @ State.field[state] != None
-        async def watch(state: State, change: FieldChange[State, int]) -> None:
+        async def watch(state: State, change: FieldChange[Field[State, int], State, int]) -> None:
             change_events.append((change.instance, change.field,
                                   change.old, change.new))
 
@@ -74,9 +72,10 @@ class PredicateTest(TestCase):
         as they provide an executor.
         '''
         class State:
-            field = Field(False)
+            field = Field['State', bool](False)
             @ field == True
-            async def _true(self, change: FieldChange[State, bool]) -> None:
+            async def _true(self, change: FieldChange[Field[State, bool],
+                                                      State, bool]) -> None:
                 self.called = True
             def __init__(self) -> None:
                 self.executor = ReactionExecutor()

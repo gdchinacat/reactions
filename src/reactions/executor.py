@@ -15,9 +15,6 @@
 '''
 Asynchronous reaction executor.
 '''
-
-from __future__ import annotations
-
 from asyncio import (Queue, Task, create_task, QueueShutDown, sleep,
                      get_event_loop, CancelledError)
 from collections.abc import Awaitable, Generator, Coroutine
@@ -27,7 +24,7 @@ from types import TracebackType
 from typing import ClassVar, Protocol, Callable, TypeVar, Any
 
 from .error import ExecutorAlreadyStarted, ExecutorNotStarted
-from .field_descriptor import FieldDescriptor, FieldChange, FieldChange, Tf, Ti
+from .field_descriptor import FieldDescriptor, FieldChange, FieldChange
 from .logging_config import VERBOSE
 
 
@@ -37,14 +34,15 @@ type ReactionCoroutine = Coroutine[object, object, None]
 Tr = TypeVar('Tr')
 '''TypeVar for Reactions, the same as Tp, but used for clarity'''
 
-type Reaction[Tf, Tr] = Callable[[Ti, FieldChange[Ti, Tf]], ReactionCoroutine]
+type Reaction[Tf, Ti, Tft] = Callable[[Ti, FieldChange[Tf, Ti, Tft]],
+                                          ReactionCoroutine]
 '''
 Reaction is the type for methods that predicates can decorate.
 The instance is provided as the first argument despite being available in
 the second argument (FieldChange) in order to provide a 'self' argument to
 predicate decorated methods.
 '''
-type BoundReaction[Tr] = Callable[[object, object, FieldDescriptor[Tr], Tr, Tr],
+type BoundReaction[Tf, Ti, Tft] = Callable[[object, object, Tf, Tft, Tft],
                                      ReactionCoroutine]
 
 
@@ -54,6 +52,10 @@ __all__ = ['ReactionExecutor']
 
 logger: Logger = getLogger('reactions.executor')
 
+# todo should Executor be tied to specific instance types? it doesn't care,
+#      but may need to be able to plumb the types through to the reaction it
+#      calls. I *think* synchronously creating the reaction makes it safe...but
+#      this needs to be sorted out as the todo typing effort (under way).
 class ReactionExecutor:
     '''
     ReactionExecutor executes ReactionCoroutines sequentially but
@@ -80,7 +82,8 @@ class ReactionExecutor:
     task: Task[None]|None = None
     '''the task that is processing the queue to execute reactions'''
 
-    queue: Queue[tuple[int, ReactionCoroutine, FieldChange]]
+    queue: Queue[tuple[int, ReactionCoroutine,
+                       FieldChange[object, object, object]]]  # todo how to get these to the reactions?
     '''
     The queue of reactions to execute.
     tuple elements are:
@@ -103,9 +106,9 @@ class ReactionExecutor:
         super().__init__(*args, **kwargs)
         self.queue = Queue()
 
-    def react[T, Tf](self,
-                 reaction: Reaction[Any, Any],
-                 change: FieldChange[Ti, Tf]) -> None:
+    def react[Tf, Ti, Tft](self,
+                 reaction: Reaction,
+                 change: FieldChange[Tf, Ti, Tft]) -> None:
         '''reaction that asynchronously executes the reaction'''
 
         assert self.task, "ReactionExecutor not start()'ed"
@@ -118,7 +121,7 @@ class ReactionExecutor:
         # would only recieve the field change and have to be static methods
         # that extract the self from the change.
         reaction_coroutine = reaction(change.instance, change)
-        self.queue.put_nowait((id_, reaction_coroutine, change))
+        self.queue.put_nowait((id_, reaction_coroutine, change))  # todo typing
         logger.log(VERBOSE, '%d scheduled %s(..., %s, %s)',
                    id_, reaction.__qualname__, change.old, change.new)
 

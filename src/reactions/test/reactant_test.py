@@ -15,9 +15,6 @@
 '''
 State machine test.
 '''
-
-from __future__ import annotations
-
 from asyncio import Future, CancelledError, sleep, Barrier
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -35,8 +32,8 @@ class State(FieldManager):
     Kitchen sink state machine for testing various aspects of State.
     '''
 
-    exception = Field[Exception|None](None)
-    infinite_loop = Field(False)
+    exception = Field['State', Exception|None](None)
+    infinite_loop = Field['State', bool](False)
 
     infinite_loop_running: Future[None]
 
@@ -48,14 +45,16 @@ class State(FieldManager):
         pass
 
     @ exception != None
-    async def exception_(self, change: FieldChange[State, Exception]) -> None:
+    async def exception_(self,
+                         change: FieldChange[Field[State, Exception],
+                                             State, Exception]) -> None:
         '''raise an exception'''
         if change.new is not None:
             raise change.new
 
     @ infinite_loop == True
-    async def _infinite_interuptable_loop(self,
-                                          change: FieldChange[State, int]
+    async def _infinite_interuptable_loop(
+        self, change: FieldChange[Field[State, int], State, int]
                                           ) -> NoReturn:
         '''enter an infinite loop. Currently no way to exit it.'''
         assert self.infinite_loop_running is not None
@@ -142,7 +141,7 @@ class ReactantTest(TestCase):
         '''fields added to a Reactant subclass after definition are named'''
         obj = object()
         class _State(State):
-            foo: Field[object]
+            foo: Field[_State, object]
         _State.foo = Field(obj)
 
         # Verify that it got named and tracked properly.
@@ -166,7 +165,7 @@ class ReactantTest(TestCase):
         # wait on a barrier
         barrier = Barrier(2)
         class State(FieldManager):
-            field = Field(False)
+            field = Field['State', bool](False)
             @ field  == True
             async def field_(self, *_: object) -> None:
                 await barrier.wait()

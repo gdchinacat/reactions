@@ -15,9 +15,6 @@
 '''
 ReactionExecutor test.
 '''
-
-from __future__ import annotations
-
 from unittest import TestCase, main
 
 from ..error import ExecutorAlreadyStarted

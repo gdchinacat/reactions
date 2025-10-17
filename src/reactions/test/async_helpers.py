@@ -15,12 +15,10 @@
 '''
 Helpers for async testing.
 '''
-from __future__ import annotations
-
 from collections.abc import Callable, Coroutine
 from functools import wraps
-import asyncio
 from typing import ParamSpec
+import asyncio
 
 
 TestParams = ParamSpec("TestParams")

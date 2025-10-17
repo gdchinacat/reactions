@@ -18,16 +18,14 @@ Example of how to cleanly stop a self driven state.
 The Counter has a done field that is set to indicate it should stop. The _count
 reaction predicate checks this flag and stops processing.
 '''
-from __future__ import annotations
-
 from unittest import TestCase, main
 
 from ... import Field, FieldManager, FieldChange
 
 
 class Counter(FieldManager):
-    done = Field(False) # field to  indicate state should stop
-    count = Field(-1)    # start in a quiescent state
+    done: Field[Counter, bool] = Field(False) # field to  indicate state should stop
+    count: Field[Counter, int] = Field(-1)    # start in a quiescent state
 
     # Manual application of predicate decorator to stop the state machine when
     # done.
@@ -50,8 +48,10 @@ class ExternalStopTest(TestCase):
         counter = Counter()
 
         @ Counter.count[counter] == count_to
-        async def stop(instance: Counter,
-                       change: FieldChange[Counter, int]) -> None:
+        async def stop(
+            instance: Counter,
+            change: FieldChange[Field[Counter, int], Counter, int]
+            ) -> None:
             # the Counter reaction to increment count has already executed by
             # the time this one executes, so instance.count is one greater than
             # the value that caused this reaction to execute.

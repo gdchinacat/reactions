@@ -24,7 +24,7 @@ class Watched(FieldManager):
     Example class that has a field to be watched by Watcher. Class counts the
     stop_predicate value then stops.
     '''
-    field = Field(-1)
+    field = Field['Watched', int](-1)
     '''state field initialized to -1'''
 
     stop_predicate = field >= 5
@@ -54,7 +54,8 @@ class Watcher(FieldWatcher[Watched]):
     @ FieldWatcher  # necessary to register non-self reactions (todo?)
     async def watch_watched_field(self,
                                   watched: Watched,
-                                  change: FieldChange[Watched, int]) -> None:
+                                  change: FieldChange[Field[Watched, int],
+                                                      Watched, int]) -> None:
         # for test, just make sure the old and new values are correct
         if self.last_value is not None:
             assert self.last_value == change.old

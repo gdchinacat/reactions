@@ -12,8 +12,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from __future__ import annotations
-
 from collections.abc import Coroutine
 from enum import Enum
 from time import time
@@ -40,21 +38,23 @@ class Color(Enum):
     YELLOW = 3
 
 
-type IntOrColor = Field[int] | Field[Color]
+type IntOrColor = Field[TrafficLight, int] | Field[TrafficLight, Color]
 
+type IntOrColorFieldChange = FieldChange[Field[TrafficLight, int|Color],
+                                         TrafficLight, IntOrColor]
 
 class TrafficLight(FieldManager):
     '''
     simple model that implements a traffic light:
     '''
 
-    color = Field(Color.RED)
+    color = Field['TrafficLight', Color](Color.RED)
     '''color: the current color of the light'''
 
-    ticks = Field(-1)
+    ticks = Field['TrafficLight', int](-1)
     '''tick: the number of ticks for the current color'''
 
-    cycles = Field(0)
+    cycles = Field['TrafficLight', int](0)
     ''' cycles: the number of times the light has gone through a full cycle '''
 
     _next_tick_time: float = 0
@@ -74,23 +74,17 @@ class TrafficLight(FieldManager):
 
     @And(color == Color.RED,
          ticks == TICKS_PER_LIGHT)
-    async def red_to_green(self,
-                           change: FieldChange[TrafficLight, IntOrColor]
-                           ) -> None:
+    async def red_to_green(self, change: IntOrColorFieldChange) -> None:
         self.change(Color.GREEN)
 
     @And(color == Color.GREEN,
          ticks == TICKS_PER_LIGHT)
-    async def green_to_yellow(self,
-                           change: FieldChange[TrafficLight, IntOrColor]
-                           ) -> None:
+    async def green_to_yellow(self, change: IntOrColorFieldChange) -> None:
         self.change(Color.YELLOW)
 
     @And(color == Color.YELLOW,
          ticks == TICKS_PER_LIGHT)
-    async def yellow_to_red(self,
-                           change: FieldChange[TrafficLight, IntOrColor]
-                           ) -> None:
+    async def yellow_to_red(self, change: IntOrColorFieldChange) -> None:
         self.cycles += 1
         self.change(Color.RED)
 
@@ -101,7 +95,8 @@ class TrafficLight(FieldManager):
         logger.debug('%s %s', self, color.name)
 
     @ ticks != -1
-    async def tick(self, change: FieldChange[TrafficLight, int]) -> None:
+    async def tick(self, change: FieldChange[Field[TrafficLight, int],
+                                             TrafficLight, int]) -> None:
         if self.ticks != change.new:
             # change reset ticks, don't react
             return

@@ -15,9 +15,6 @@
 '''
 .field.FieldWatcher test
 '''
-
-from __future__ import annotations
-
 from unittest import TestCase, main
 
 from ..error import ReactionMustNotBeCalled
@@ -32,8 +29,8 @@ from .async_helpers import asynctest
 class Watched(FieldManager):
     '''class with fields to be watched'''
 
-    last_tick: Field[int] = Field(1)
-    ticks = Field(-1)
+    last_tick = Field['Watched', int](1)
+    ticks = Field['Watched', int](-1)
 
     def __init__(self,
                  *args: object,
@@ -48,7 +45,9 @@ class Watched(FieldManager):
 
     @ And(ticks != -1,
           ticks != last_tick)
-    async def tick(self, change: FieldChange[Watched, int]) -> None:
+    async def tick(self,
+                   change: FieldChange[Field['Watched', int], 'Watched', int]
+                  ) -> None:
         self.ticks += 1
 
     @ ticks == last_tick
@@ -57,7 +56,9 @@ class Watched(FieldManager):
     #        reaction accepts more specific Field. Even then, the field type
     #        isn't validating properly. Needs a fair bit of work.
     # todo - create a predicate_test for reaction type checking
-    async def done(self, change: FieldChange[Watched, int]) -> None:
+    async def done(self,
+                   change: FieldChange[Field['Watched', int], 'Watched', int]
+                  ) -> None:
         self.ticks = -1
         self.stop()
 
@@ -79,7 +80,8 @@ class FieldWatcherTest(TestCase):
             @ FieldWatcher  # todo typing
             async def _watch(self,
                              watched: Watched,
-                             change: FieldChange[Watched, int]) -> None:
+                             change: FieldChange[Field[Watched, int],
+                                                 Watched, int]) -> None:
                 assert isinstance(self, Watcher), f'got {type(self)=}'
                 assert isinstance(watched, Watched), f'got {type(watched)=}'
                 self.change_events.append((change.old, change.new))
@@ -99,7 +101,7 @@ class FieldWatcherTest(TestCase):
     @asynctest
     async def test_automatic_dispatches_to_correct_watcher(self)->None:
         class Watched(FieldManager):
-            field = Field(False)
+            field = Field['Watched', bool](False)
             def _start(self) -> None: ...
 
         class Watcher(FieldWatcher[Watched]):
@@ -108,7 +110,8 @@ class FieldWatcherTest(TestCase):
             @ FieldWatcher
             async def _true(self,
                             watched: Watched,
-                            change: FieldChange[Watched, bool]) -> None:
+                            change: FieldChange[Field[Watched, bool],
+                                                Watched, bool]) -> None:
                 assert self.watched is watched
                 self.reacted = True
 
@@ -130,7 +133,7 @@ class FieldWatcherTest(TestCase):
     async def test_decorator_bound_reactions(self)->None:
         '''test that bound reactions are handled properly'''
         class State(FieldManager):
-            field = Field(False)
+            field = Field['State', bool](False)
             def _start(self) -> None: ...
         class Watcher(FieldWatcher[State]):
             called = False
@@ -138,7 +141,8 @@ class FieldWatcherTest(TestCase):
             @ FieldWatcher  # todo typing
             async def _true(self,
                             state: State,
-                            change: FieldChange[State, bool]) -> None:
+                            change: FieldChange[Field[State, bool],
+                                                State, bool]) -> None:
                 self.called = True
 
         self.assertIsInstance(Watcher._true, _Reaction)

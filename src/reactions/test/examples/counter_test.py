@@ -12,8 +12,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from __future__ import annotations
-
 from unittest import TestCase, main
 
 from ... import Field, FieldManager, And, FieldChange
@@ -31,8 +29,8 @@ class Counter(FieldManager):
     '''
 
     # annotations are required for dataclass to include in __init__
-    count_to: Field[int] = Field(0)
-    count: Field[int] = Field(-1)
+    count_to: Field[Counter, int] = Field(0)
+    count: Field[Counter, int] = Field(-1)
 
     def __init__(self, count_to: int = 0):
         super().__init__()
@@ -47,7 +45,9 @@ class Counter(FieldManager):
 
     @ And(0 <= count,
           count < count_to)
-    async def loop(self, change: FieldChange[Counter, int]) -> None:
+    async def loop(self,
+                   change: FieldChange[Field[Counter, int], Counter, int]
+                   ) -> None:
         self.count += 1
 
 

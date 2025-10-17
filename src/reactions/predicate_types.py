@@ -15,9 +15,6 @@
 '''
 The predicate implementation types.
 '''
-
-from __future__ import annotations
-
 from typing import NoReturn
 import operator
 

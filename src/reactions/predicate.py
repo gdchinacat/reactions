@@ -15,18 +15,16 @@
 '''
 Predicates implement comparison checks.
 '''
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import partial
-from typing import TypeVar, overload
+from typing import TypeVar, overload, Never
 import logging
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
 from .executor import HasExecutor, Reaction, BoundReaction
-from .field_descriptor import FieldDescriptor, Evaluatable, FieldChange, Tf, Ti
+from .field_descriptor import FieldDescriptor, Evaluatable, FieldChange
 from .logging_config import VERBOSE
 
 
@@ -41,33 +39,33 @@ Tp = TypeVar('Tp')
 
 
 @dataclass
-class CustomFieldReactionConfiguration[Tp]:
+class CustomFieldReactionConfiguration:
     '''
     Class to indicate to Predicate.__call__ that field reactions should not
     be handled by the Predicate decorator. The decorator will still return a
     _Reaction that references the reaction that can be used to do this
     configuration.
     '''
-    reaction: BoundReaction[Tp]|None
+    reaction: BoundReaction|None  # todo typing
 
 
 @dataclass(eq=True, frozen=True)
-class _Reaction[Tp](ReactionMustNotBeCalled):
+class _Reaction(ReactionMustNotBeCalled):
     '''
     The result of decorating a reaction function.
     '''
-    predicate: Predicate[Tp]
-    func: Reaction[Tp]|BoundReaction[Tp]
+    predicate: Predicate
+    func: Reaction|BoundReaction
 
 
-type Decoratee[Tf, Tr, Tp] = Reaction[Tf, Tr]|CustomFieldReactionConfiguration[Tp]
+type Decoratee[Tf, Tr, Tp] = Reaction|CustomFieldReactionConfiguration
 '''
 Decoratee is the type of things that Predicate can decorate or arguments
 to the predicate decorator (Predicate.__call__).
 '''
 
 @dataclass(eq=True, frozen=True)
-class Predicate[Tp](Evaluatable[bool], ABC):
+class Predicate[Tf, Ti, Tft](Evaluatable[object, bool], ABC):  # todo typing
     '''
     Predicate evaluates expressions.
     T - the type the predicate evaluates to
@@ -88,7 +86,11 @@ class Predicate[Tp](Evaluatable[bool], ABC):
     Predicates objects are immutable and hashable.
     '''
 
-    def react(self, change: FieldChange[Ti, Tf], *, reaction: Reaction) -> None:
+    def react[Tfc: FieldChange[Tf, Ti, Tft]](self,
+                                             change: Tfc,#FieldChange[Tf, Ti, Tft],
+                                             *,
+                                             reaction: Reaction
+                                            ) -> None:
         '''
         React to a field value changing. If the result of evaluating this
         predicate is True the reaction will be scheduled for execution.
@@ -197,20 +199,20 @@ class Predicate[Tp](Evaluatable[bool], ABC):
         return _Reaction(self, reaction)
 
     def configure_reaction(self, func: Reaction,
-                           instance: Ti = None) -> None:
+                           instance: Ti|None = None) -> None:
         '''configure the reaction on the fields'''
         # Add a reaction on all the fields to call self.react() with
         # func as the reaction function.
         for field in set(self.fields):
-            field_ = (field.bound_field(instance)
+            field_ = (field.bound_field(instance)  # todo Evaluatable.fields isn't right
                       if instance is not None else field)
             logger.info('changes to %s will call %s', field, func)
             field_.reaction(partial(self.react, reaction=func))
 
 @dataclass
-class Constant[T](Evaluatable[T]):
+class Constant[Ti, Tft](Evaluatable[Ti, Tft]):
     '''An Evaluatable that always evaluates to it's value.'''
-    value: T
+    value: Tft
 
     def __eq__(self, other: object) -> bool:
         return self.value == other
@@ -218,18 +220,18 @@ class Constant[T](Evaluatable[T]):
     def __str__(self) -> str:
         return str(self.value)
 
-    def evaluate(self, _: object) -> T:
+    def evaluate(self, _: object) -> Tft:
         return self.value
 
     @InvalidPredicateExpression
     def __bool__(self) -> None: ...
 
     @property
-    def fields(self) -> Iterable[FieldDescriptor]:
+    def fields(self) -> Iterable[Never]:  # todo typing evaluatable
         return ()
 
 
-class OperatorPredicate(Predicate, ABC):
+class OperatorPredicate(Predicate, ABC):  # todo typing predicate
     '''
     Predicate that uses an operator for its logic.
     '''
@@ -242,17 +244,17 @@ class OperatorPredicate(Predicate, ABC):
         '''the operator token (i.e. '==') to use for logging the predicate'''
 
 
-class UnaryPredicate(OperatorPredicate, ABC):
+class UnaryPredicate[Ti, Tft](OperatorPredicate, ABC):
     '''Predicate that has a single operand.'''
-    expression: Evaluatable
+    expression: Evaluatable[Tf, Ti, Tft]
 
-    def __init__(self, expression: Evaluatable[Tp] | object) -> None:
+    def __init__(self, expression: Evaluatable[Ti, Tft]|Tft) -> None:
         if not isinstance(expression, Evaluatable):
-            expression = Constant(expression)
+            expression = Constant[Ti, Tft](expression)
         self.expression = expression
 
     @property
-    def fields(self) -> Iterable[FieldDescriptor]:
+    def fields(self) -> Iterable[Tf]:
         yield from self.expression.fields
 
     def evaluate(self, instance: Ti) -> bool:
