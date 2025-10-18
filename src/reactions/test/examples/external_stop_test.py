@@ -50,7 +50,7 @@ class ExternalStopTest(TestCase):
         @ Counter.count[counter] == count_to
         async def stop(
             instance: Counter,
-            change: FieldChange[Field[Counter, int], Counter, int]
+            change: FieldChange[Counter, int]
             ) -> None:
             # the Counter reaction to increment count has already executed by
             # the time this one executes, so instance.count is one greater than

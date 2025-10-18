@@ -46,16 +46,14 @@ class State(FieldManager):
 
     @ exception != None
     async def exception_(self,
-                         change: FieldChange[Field[State, Exception],
-                                             State, Exception]) -> None:
+                         change: FieldChange[State, Exception]) -> None:
         '''raise an exception'''
         if change.new is not None:
             raise change.new
 
     @ infinite_loop == True
     async def _infinite_interuptable_loop(
-        self, change: FieldChange[Field[State, int], State, int]
-                                          ) -> NoReturn:
+        self, change: FieldChange[State, int]) -> NoReturn:
         '''enter an infinite loop. Currently no way to exit it.'''
         assert self.infinite_loop_running is not None
         self.infinite_loop_running.set_result(None)
@@ -66,13 +64,14 @@ class State(FieldManager):
 @asynccontextmanager
 async def running_state(skip_stop: bool = False,
                         skip_await: bool = False,
-                        ) -> AsyncIterator[tuple[State, ReactionExecutor]]:
+                        ) -> AsyncIterator[tuple[State,
+                                                 ReactionExecutor[State, object]]]:
     '''
     Async contexst manager to run the state before managed block and wait
     for it after the block. Context is (state, state_done_awaitable).
     async with running_state() as state:
     '''
-    executor = ReactionExecutor()
+    executor = ReactionExecutor[State, object]()
     state = State(executor=executor)
     executor.start()
     try:

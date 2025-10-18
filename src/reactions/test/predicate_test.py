@@ -53,7 +53,8 @@ class PredicateTest(TestCase):
 
         change_events: list[tuple[State, Field[State, int], int, int]] = []
         @ State.field[state] != None
-        async def watch(state: State, change: FieldChange[Field[State, int], State, int]) -> None:
+        async def watch(state: State, change: FieldChange[State, int]) -> None:
+            reveal_type(change.field)
             change_events.append((change.instance, change.field,
                                   change.old, change.new))
 
@@ -74,11 +75,10 @@ class PredicateTest(TestCase):
         class State:
             field = Field['State', bool](False)
             @ field == True
-            async def _true(self, change: FieldChange[Field[State, bool],
-                                                      State, bool]) -> None:
+            async def _true(self, change: FieldChange[State, bool]) -> None:
                 self.called = True
             def __init__(self) -> None:
-                self.executor = ReactionExecutor()
+                self.executor = ReactionExecutor[State, bool]()
                 self.called = False
 
         state = State()

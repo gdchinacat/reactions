@@ -54,8 +54,7 @@ class Watcher(FieldWatcher[Watched]):
     @ FieldWatcher  # necessary to register non-self reactions (todo?)
     async def watch_watched_field(self,
                                   watched: Watched,
-                                  change: FieldChange[Field[Watched, int],
-                                                      Watched, int]) -> None:
+                                  change: FieldChange[Watched, int]) -> None:
         # for test, just make sure the old and new values are correct
         if self.last_value is not None:
             assert self.last_value == change.old

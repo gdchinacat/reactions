@@ -40,8 +40,7 @@ class Color(Enum):
 
 type IntOrColor = Field[TrafficLight, int] | Field[TrafficLight, Color]
 
-type IntOrColorFieldChange = FieldChange[Field[TrafficLight, int|Color],
-                                         TrafficLight, IntOrColor]
+type IntOrColorFieldChange = FieldChange[TrafficLight, IntOrColor]
 
 class TrafficLight(FieldManager):
     '''
@@ -95,8 +94,7 @@ class TrafficLight(FieldManager):
         logger.debug('%s %s', self, color.name)
 
     @ ticks != -1
-    async def tick(self, change: FieldChange[Field[TrafficLight, int],
-                                             TrafficLight, int]) -> None:
+    async def tick(self, change: FieldChange[TrafficLight, int]) -> None:
         if self.ticks != change.new:
             # change reset ticks, don't react
             return

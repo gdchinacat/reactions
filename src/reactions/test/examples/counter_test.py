@@ -45,9 +45,7 @@ class Counter(FieldManager):
 
     @ And(0 <= count,
           count < count_to)
-    async def loop(self,
-                   change: FieldChange[Field[Counter, int], Counter, int]
-                   ) -> None:
+    async def loop(self, change: FieldChange[Counter, int]) -> None:
         self.count += 1
 
 

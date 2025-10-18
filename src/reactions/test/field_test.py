@@ -55,7 +55,7 @@ class TestField(TestCase):
 
         # set a notification on c.field_a to call print
         reaction_called = False
-        def reaction(change: FieldChange[Field[C, bool], C, bool]) -> None:
+        def reaction(change: FieldChange[C, bool]) -> None:
             nonlocal reaction_called
             reaction_called = True  # @UnusedVariable - it really is used
             self.assertEqual(
@@ -75,7 +75,7 @@ class TestField(TestCase):
             def _start(self) -> None: ...
 
         changes = list[tuple[bool|None, bool|None]]()
-        def collect(change: FieldChange[Field[C, bool], C, bool|None]) -> None:
+        def collect(change: FieldChange[C, bool|None]) -> None:
             changes.append((change.old, change.new))
 
         c = C()
@@ -190,8 +190,7 @@ class TestField(TestCase):
             _false: object
             @ Watched.field == True
             async def _true(self,
-                            change: FieldChange[Field[Watched, bool],
-                                                Watched, bool]) -> None:
+                            change: FieldChange[Watched, bool]) -> None:
                 pass
 
         watched = Watched()
