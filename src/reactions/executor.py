@@ -39,10 +39,14 @@ The instance is provided as the first argument despite being available in
 the second argument (FieldChange) in order to provide a 'self' argument to
 predicate decorated methods.
 '''
-type BoundReaction[Tw, Ti, Tf] = Callable[[Tw, Ti, Tf, Tf, Tf],
-                                          ReactionCoroutine]
 
-
+type BoundReaction[Tw, Ti, Tf] = Callable[  # move to .predicate?
+    [Tw, Ti, FieldDescriptor[Ti, Tf], Tf, Tf],
+    ReactionCoroutine]
+'''
+BoundReaction is a Reaction on a type that is not the instance that changed.
+This could be a different type entirely, or a different instance of Ti.
+'''
 
 __all__ = ['ReactionExecutor']
 

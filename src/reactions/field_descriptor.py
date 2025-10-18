@@ -20,6 +20,7 @@ in this package.
 FieldDescriptor is the descriptor implementation. It uses ReactionsList to
 track and call the reactions when field values change.
 '''
+
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -63,7 +64,7 @@ class Evaluator[Ti, Te, Tf](ABC):
 @dataclass(slots=True)
 class FieldChange[Ti, Tf]:
     '''A record of a field value changing.'''
-    instance: Ti
+    instance: Ti  # todo typing HasExecutor?
     field: FieldDescriptor[Ti, Tf]
     old: Tf
     new: Tf
@@ -259,5 +260,4 @@ class FieldDescriptor[Ti, Tf](Evaluator[Ti, Tf, Tf], ABC):
     def __str__(self) -> str:
         return f"{self.classname}.{self.attr}"
     __repr__ = __str__
-
 
