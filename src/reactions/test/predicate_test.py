@@ -54,7 +54,6 @@ class PredicateTest(TestCase):
         change_events: list[tuple[State, Field[State, int], int, int]] = []
         @ State.field[state] != None
         async def watch(state: State, change: FieldChange[State, int]) -> None:
-            reveal_type(change.field)
             change_events.append((change.instance, change.field,
                                   change.old, change.new))
 

@@ -39,14 +39,14 @@ Tp = TypeVar('Tp')
 
 
 @dataclass
-class CustomFieldReactionConfiguration[Tw, Ti, Tf]:
+class CustomFieldReactionConfiguration:
     '''
     Class to indicate to Predicate.__call__ that field reactions should not
     be handled by the Predicate decorator. The decorator will still return a
     _Reaction that references the reaction that can be used to do this
     configuration.
     '''
-    reaction: BoundReaction[Tw, Ti, Tf]|None
+    reaction: BoundReaction|None  # todo typing reaction
 
 
 @dataclass(eq=True, frozen=True)
@@ -64,8 +64,8 @@ Decoratee is the type of things that Predicate can decorate or arguments
 to the predicate decorator (Predicate.__call__).
 '''
 
-@dataclass(eq=True, frozen=True, slots=True)
-class Predicate[Ti, Tf](Evaluator[Ti, bool, Tf], ABC):  # todo typing
+@dataclass(eq=True, frozen=True)
+class Predicate[Ti, Tf](Evaluator[Ti, bool, Tf], ABC):
     '''
     Predicate evaluates expressions.
     T - the type the predicate evaluates to
@@ -277,7 +277,10 @@ class BinaryPredicate[Ti, Tf](OperatorPredicate[Ti, Tf], ABC):
         # Everything that isn't an Evaluator is treated as a constant.
         # This may need to be reevaluated, but it helps with the fields()
         # logic for now.
-        super().__init__()
+        print(f'{isinstance(self, Predicate)=}')
+        print(f'{type(left)=}')
+        print(f'{type(right)=}')
+        super(BinaryPredicate, self).__init__()
         self.left = (left if isinstance(left, Evaluator)
                           else Constant(left))
         self.right = (right if isinstance(right, Evaluator)

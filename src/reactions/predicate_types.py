@@ -18,6 +18,7 @@ The predicate implementation types.
 from typing import NoReturn
 import operator
 
+from .field_descriptor import Evaluator
 from .predicate import UnaryPredicate, BinaryPredicate, Predicate
 
 
@@ -26,57 +27,57 @@ __all__ = ['Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
            'ComparisonPredicates']
 
 
-class Not(UnaryPredicate):
+class Not[Ti, Tf](UnaryPredicate[Ti, Tf]):
     token = '!not!'
     operator = operator.not_
 
-class And(BinaryPredicate):
+class And[Ti, Tf](BinaryPredicate[Ti, Tf]):
     token = '!and!'
     operator = lambda _, a, b: a and b
 
-class Or(BinaryPredicate):
+class Or[Ti, Tf](BinaryPredicate[Ti, Tf]):
     token = '!or!'
     operator = lambda _, a, b: a or b
 
-class Eq(BinaryPredicate):
+class Eq[Ti, Tf](BinaryPredicate[Ti, Tf]):
     token = '=='
     operator = operator.eq
 
-class Ne(BinaryPredicate):
+class Ne[Ti, Tf](BinaryPredicate[Ti, Tf]):
     token = '!='
     operator = operator.ne
 
-class Lt(BinaryPredicate):
+class Lt[Ti, Tf](BinaryPredicate[Ti, Tf]):
     token = '<'
     operator = operator.lt
 
-class Le(BinaryPredicate):
+class Le[Ti, Tf](BinaryPredicate[Ti, Tf]):
     token = '<='
     operator = operator.le
 
-class Gt(BinaryPredicate):
+class Gt[Ti, Tf](BinaryPredicate[Ti, Tf]):
     token = '>'
     operator = operator.gt
 
-class Ge(BinaryPredicate):
+class Ge[Ti, Tf](BinaryPredicate[Ti, Tf]):
     token = '>='
     operator = operator.ge
 
-class Contains(BinaryPredicate):
+class Contains[Ti, Tf](BinaryPredicate[Ti, Tf]):
     token = 'contains'
     operator = operator.contains
 
 # BinaryAnd and BinaryOr aren't strictly predicates since they don't evaluate
 # to a bool. Still useful, so included.
-class BinaryAnd(BinaryPredicate):
+class BinaryAnd[Ti, Tf](BinaryPredicate[Ti, Tf]):
     token = '&'
     operator = operator.and_
 
-class BinaryOr(BinaryPredicate):
+class BinaryOr[Ti, Tf](BinaryPredicate[Ti, Tf]):
     token = '|'
     operator = operator.or_
 
-class BinaryNot(BinaryPredicate):
+class BinaryNot[Ti, Tf](BinaryPredicate[Ti, Tf]):
     token = '~'
     operator = operator.or_
 
@@ -99,12 +100,12 @@ class ComparisonPredicates:
         '''not implemented'''
         raise NotImplementedError('use Contains(self, other) instead')
 
-    def __and__(self, other: object) -> Predicate:
-        '''create an And (&) predicate for the field'''
+    def __and__[Tf: Evaluator[Ti, Tf, Tf]|object](self, other: object) -> Predicate[Ti, Tf]:
+        '''create a BinaryAnd (&) predicate for the field'''
         return BinaryAnd(self, other)
 
     def __or__(self, other: object) -> Predicate:
-        '''create an Or (|) predicate for the field'''
+        '''create a BinaryOr (|) predicate for the field'''
         return BinaryOr(self, other)
 
     def __eq__(self, other: object) -> Predicate:  # type: ignore[override]
@@ -112,7 +113,7 @@ class ComparisonPredicates:
         return Eq(self, other)
 
     def __ne__(self, other: object) -> Predicate:  # type: ignore[override]
-        '''create an Eq predicate for the field'''
+        '''create an Ne predicate for the field'''
         return Ne(self, other)
 
     def __lt__(self, other: object) -> Predicate:

@@ -37,8 +37,9 @@ __all__ = ['Field', 'FieldManager', 'FieldWatcher']
 logger = getLogger('reactions.field')
 
 
-class BoundField[Ti, Tft](_BoundField['Field[Tft]', Ti, Tft],
-                         Evaluator[Ti, Tft], ComparisonPredicates):
+class BoundField[Ti, Tf](_BoundField[Ti, Tf],
+                         Evaluator[Ti, Tf, Tf],
+                         ComparisonPredicates):
     '''
     A field bound to a specific instance.
 
@@ -49,7 +50,7 @@ class BoundField[Ti, Tft](_BoundField['Field[Tft]', Ti, Tft],
 
     def __init__(self,
                  nascent_instance: Ti,
-                 field: Field[Tft],
+                 field: Field[Ti, Tf],
                  *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
         self.field = field
@@ -60,7 +61,7 @@ class BoundField[Ti, Tft](_BoundField['Field[Tft]', Ti, Tft],
         # are configured.
         self.reactions = field.reactions
 
-    def reaction(self, reaction: FieldReaction[Tft]) -> None:
+    def reaction(self, reaction: FieldReaction[Ti, Tf]) -> None:
         '''Add a reaction for when this bound field changes value.'''
         # ensure the bound field is using a private reactions list
         if self.reactions is self.field.reactions:
@@ -68,7 +69,7 @@ class BoundField[Ti, Tft](_BoundField['Field[Tft]', Ti, Tft],
 
         self.reactions.append(reaction)
 
-    def react(self, change: FieldChange[Ti, Tft]) -> None:
+    def react(self, change: FieldChange[Ti, Tf]) -> None:
 
         """React to field change events by dispatching them to the reactions"""
         for reaction in self.reactions:
@@ -80,13 +81,14 @@ class BoundField[Ti, Tft](_BoundField['Field[Tft]', Ti, Tft],
     __repr__ = __str__
 
     @property
-    def fields(self) -> Iterable[Field[Tft]]:
+    def fields(self) -> Iterable[Field[Ti, Tf]]:
         yield self.field
 
-    def evaluate(self, instance: Ti) -> Tft:
+    def evaluate(self, instance: Ti) -> Tf:
         return self.field.evaluate(instance)
 
-class Field[Ti, Tft](FieldDescriptor[Ti, Tft], ComparisonPredicates):
+class Field[Ti, Tf](FieldDescriptor[Ti, Tf],
+                    ComparisonPredicates):
     '''
     Field provides attribute change notification and predicates to configure
     asynchronous callbacks when the condition becomes true.
@@ -113,7 +115,7 @@ class Field[Ti, Tft](FieldDescriptor[Ti, Tft], ComparisonPredicates):
         '''make Field hashable/immutable'''
         return id(self)
 
-    def bound_field(self, instance: Ti) -> BoundField[Tft]:
+    def bound_field(self, instance: Ti) -> BoundField[Ti, Tf]:
         '''
         Get/create/set a Field specific to the instance.
 
@@ -125,7 +127,7 @@ class Field[Ti, Tft](FieldDescriptor[Ti, Tft], ComparisonPredicates):
         return bound_field
     __getitem__ = bound_field
 
-    def _bind(self, nascent_instance: Ti) -> BoundField[Tft]:
+    def _bind(self, nascent_instance: Ti) -> BoundField[Ti, Tf]:
         '''
         Create a BoundField on instance.
         nascent_instance:
@@ -148,7 +150,7 @@ class Field[Ti, Tft](FieldDescriptor[Ti, Tft], ComparisonPredicates):
             raise FieldAlreadyBound(
                 f'{self} already bound to object '
                 f'id(instance)={id(nascent_instance)}')
-        bound_field = BoundField[Ti, Tft](nascent_instance, self)
+        bound_field = BoundField[Ti, Tf](nascent_instance, self)
         setattr(nascent_instance, self._attr_bound, bound_field)
         return bound_field
 
@@ -199,7 +201,7 @@ class FieldManagerMetaDict(dict[str, object]):
         super().__setitem__(attr, value)
 
 
-class FieldManagerMeta(ABCMeta, type):
+class FieldManagerMeta[Ti](ABCMeta, type):
     '''
     Metaclass to manage the Field members of classes.
 
@@ -217,7 +219,7 @@ class FieldManagerMeta(ABCMeta, type):
     # _fields is initialized by FieldManagerMetaDict.__init__() since it needs
     # to be present during the nascent stages before __init__ is called to
     # initialize the instance.
-    _fields: tuple[Field[object], ...] = tuple()
+    _fields: tuple[Field[Ti, object], ...] = tuple()
 
     @classmethod
     def __prepare__(metacls, name: str, bases: tuple[type, ...], \
@@ -259,13 +261,14 @@ class BoundFieldCreatorMixin:
     dispatch to the bound field rather than having to check if the Field or the 
     bound field should be called.
     '''
-    _fields: Iterable[Field[object]]
+    _fields: Iterable[Field[BoundFieldCreatorMixin, object]]  # todo should be the subclass of BFCM
 
     def __new__(cls, *_: object, **__: object) -> BoundFieldCreatorMixin:
         nascent = super().__new__(cls)
         for field_ in nascent._fields:
             field_._bind(nascent)
         return nascent
+
 
 class Reactant():
     '''
@@ -278,13 +281,14 @@ class Reactant():
     Reactants are asynchronous context managers that start on enter and stop
     on exit.
     '''
-    executor: ReactionExecutor
+
+    executor: ReactionExecutor[Reactant, object]  # todo typing should be subclass of Reactant, Tf=object
     '''The ReactionExecutor that predicates will use to execute reactions.'''
 
     @overload
     def __init__(self,
                  *args: object,
-                 executor: ReactionExecutor|None = None,
+                 executor: ReactionExecutor[Reactant, object]|None = None,  # todo typing Tf=object
                  **kwargs: object) -> None: ...
 
     @overload
@@ -366,10 +370,7 @@ class FieldManager(Reactant, ABC, metaclass=FieldManagerMeta):
     '''
 
 
-class FieldWatcher[Tw: FieldManager](  # todo relax so Tw can be bare class
-        Reactant,
-        CustomFieldReactionConfiguration,
-        ABC):
+class FieldWatcher[Ti](Reactant, CustomFieldReactionConfiguration, ABC):
     '''
     Base class to allow subclasses to watch Fields on other classes.
 
@@ -382,10 +383,10 @@ class FieldWatcher[Tw: FieldManager](  # todo relax so Tw can be bare class
             async def reaction(...
     '''
 
-    watched: Tw
+    watched: Ti
     '''The instance being watched.'''
 
-    _reactions: set[_Reaction]
+    _reactions: set[_Reaction[Ti, object, object]]  # todo typing Te, TF = object
     '''
     The reactions the class needs to register bound reactions for when
     instances are initialized.
@@ -394,29 +395,28 @@ class FieldWatcher[Tw: FieldManager](  # todo relax so Tw can be bare class
     # todo move overloads into .pyi
     @overload
     def __init__(self,
-                 reaction_or_watched: BoundReaction[Tft],
+                 reaction_or_watched: BoundReaction,
                  ) -> None:
         '''Reaction decorator to indicate FieldWatcher manages field reaction
         configuration.'''
 
     @overload
     def __init__(self,
-                 reaction_or_watched: Tw,
+                 reaction_or_watched: Ti|BoundReaction,
                  *args: object,
-                 executor: ReactionExecutor|None = None,
+                 executor: ReactionExecutor[Ti, object]|None = None,  # todo typing Tf=object
                  **kwargs: object) -> None: ...
 
     @overload
     def __init__(self,
-                 reaction_or_watched: Tw,
+                 reaction_or_watched: Ti|BoundReaction,
                  *args: object,
                  **kwargs: object
                  ) -> None: ...
 
-    def __init__[T](self,  # todo predicate typing BoundReaction get rid of generic type T on method
-                 reaction_or_watched: BoundReaction[T]|Tw,
+    def __init__(self,  # todo predicate typing BoundReaction get rid of generic type T on method
+                 reaction_or_watched: Ti|BoundReaction,
                  *args: object,
-                 #executor: ReactionExecutor|None = None,
                  **kwargs: object) -> None:
         '''
         Create a FieldWatcher or decorate a BoundReaction managed by
@@ -433,7 +433,7 @@ class FieldWatcher[Tw: FieldManager](  # todo relax so Tw can be bare class
             super().__init__(reaction)
         else:
             self.watched = reaction_or_watched
-            executor = kwargs.pop('executor', self.watched.executor)
+            executor = kwargs.pop('executor', self.watched.executor)  # todo typing HasExcutor
             super().__init__(None, # CustomFieldReactionConfiguration.reaction
                              *args,
                              executor=executor,
