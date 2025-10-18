@@ -31,19 +31,16 @@ from .logging_config import VERBOSE
 type ReactionCoroutine = Coroutine[object, object, None]
 '''Recation coroutines do not yeild or send, and return None'''
 
-Tr = TypeVar('Tr')
-'''TypeVar for Reactions, the same as Tp, but used for clarity'''
-
-type Reaction[Tf, Ti, Tft] = Callable[[Ti, FieldChange[Tf, Ti, Tft]],
-                                          ReactionCoroutine]
+type Reaction[Ti, Tf] = Callable[[Ti, FieldChange[Ti, Tf]],
+                                 ReactionCoroutine]
 '''
 Reaction is the type for methods that predicates can decorate.
 The instance is provided as the first argument despite being available in
 the second argument (FieldChange) in order to provide a 'self' argument to
 predicate decorated methods.
 '''
-type BoundReaction[Tf, Ti, Tft] = Callable[[object, object, Tf, Tft, Tft],
-                                     ReactionCoroutine]
+type BoundReaction[Tw, Ti, Tf] = Callable[[Tw, Ti, Tf, Tf, Tf],
+                                          ReactionCoroutine]
 
 
 
@@ -56,7 +53,7 @@ logger: Logger = getLogger('reactions.executor')
 #      but may need to be able to plumb the types through to the reaction it
 #      calls. I *think* synchronously creating the reaction makes it safe...but
 #      this needs to be sorted out as the todo typing effort (under way).
-class ReactionExecutor:
+class ReactionExecutor[Ti, Tf]:
     '''
     ReactionExecutor executes ReactionCoroutines sequentially but
     asynchronously (the submitter is not blocked). Submitters are typically
@@ -82,8 +79,7 @@ class ReactionExecutor:
     task: Task[None]|None = None
     '''the task that is processing the queue to execute reactions'''
 
-    queue: Queue[tuple[int, ReactionCoroutine,
-                       FieldChange[object, object, object]]]  # todo how to get these to the reactions?
+    queue: Queue[tuple[int, ReactionCoroutine, FieldChange[Ti, Tf]]]
     '''
     The queue of reactions to execute.
     tuple elements are:
@@ -106,9 +102,9 @@ class ReactionExecutor:
         super().__init__(*args, **kwargs)
         self.queue = Queue()
 
-    def react[Tf, Ti, Tft](self,
-                 reaction: Reaction,
-                 change: FieldChange[Tf, Ti, Tft]) -> None:
+    def react(self,
+              reaction: Reaction[Ti, Tf],
+              change: FieldChange[Ti, Tf]) -> None:
         '''reaction that asynchronously executes the reaction'''
 
         assert self.task, "ReactionExecutor not start()'ed"
@@ -220,11 +216,11 @@ class ReactionExecutor:
         yield from self.task
 
 
-class HasExecutor(Protocol):
+class HasExecutor[Ti, Tf](Protocol):
     '''
     Protocol that has a ReactionExecutor member.
     User state classes don't need to extend Reactant, but they *do* need to
     provide a way to execute their reactions. This Protocol provides that
     functionality, but they do not need to extend it, just have an executor.
     '''
-    executor: ReactionExecutor
+    executor: ReactionExecutor[Ti, Tf]

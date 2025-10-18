@@ -32,29 +32,26 @@ from .error import MustNotBeCalled
 
 __all__ = ['FieldReaction', 'FieldChange']
 
-# Tf - the type of field
-# Tft - the type the field contains
-# Ti - the field class type
 
-type FieldReaction[Tf, Ti, Tft] = Callable[[FieldChange[Tf, Ti, Tft]], None]
+type FieldReaction[Ti, Tf] = Callable[[FieldChange[Ti, Tf]], None]
 '''A method that is called when a field changes.'''
 
 
-class Evaluatable[Ti, Tft](ABC):
+class Evaluator[Ti, Te, Tf](ABC):
     '''
     Base class for fields and predicates that can be evaluated.
 
-    Tf the type of fields the Evaluatable is built from (or Never)
-    Tft is the type the evaluate() returns.
+    Te is the type the evaluator evaluates to
+    Tf the type of fields the Evaluator is built from (or Never)
     '''
 
     @property
     @abstractmethod
-    def fields[Tf: FieldDescriptor[Ti, Tft]](self) -> Iterable[Tf]:
+    def fields(self) -> Iterable[FieldDescriptor[Ti, Tf]]:
         raise NotImplementedError
 
     @abstractmethod
-    def evaluate(self, instance: Ti) -> Tft:
+    def evaluate(self, instance: Ti) -> Te:
         '''
         Get the value of the type on instance.
         Field returns the instance value of the field.
@@ -64,36 +61,36 @@ class Evaluatable[Ti, Tft](ABC):
 
 
 @dataclass(slots=True)
-class FieldChange[Tf, Ti, Tft]:
+class FieldChange[Ti, Tf]:
     '''A record of a field value changing.'''
     instance: Ti
-    field: Tf
-    old: Tft
-    new: Tft
+    field: FieldDescriptor[Ti, Tf]
+    old: Tf
+    new: Tf
 
     def __str__(self) -> str:
         # todo template string?
         return f'{self.instance}.{self.field} {self.old} -> {self.new}'
 
 
-class _BoundField[Tf, Ti, Tft](ABC):
+class _BoundField[Ti, Tf](ABC):
     '''Base class for BoundField (used for typing)'''
     @abstractmethod
-    def react(self, change: FieldChange[Tf, Ti, Tft]) -> None:
+    def react(self, change: FieldChange[Ti, Tf]) -> None:
         raise NotImplementedError()
 
     @abstractmethod
-    def reaction(self, reaction: FieldReaction) -> None:
+    def reaction(self, reaction: FieldReaction[Ti, Tf]) -> None:
         ''' Add a reaction to the list of reactions.'''
         raise NotImplementedError()
 
 
-class FieldDescriptor[Ti, Tft](Evaluatable[Ti, Tft], ABC):
+class FieldDescriptor[Ti, Tf](Evaluator[Ti, Tf, Tf], ABC):
     '''
     An instrumented field.
     Generic Types:
         - Ti: the type of class the field is a member of
-        - Tft: is the type of object the field references
+        - Tf: is the type of object the field references
 
     This is a descriptor that:
         - manages and tracks updates to the field value
@@ -113,7 +110,7 @@ class FieldDescriptor[Ti, Tft](Evaluatable[Ti, Tft], ABC):
     _field_count: ClassVar[count[int]] = count()  # class member for assigning default attr names
 
     def __init__(self,
-                 initial_value: Tft,
+                 initial_value: Tf,
                  classname: str|None = None,
                  attr: str|None = None,
                  *args: object,
@@ -137,17 +134,14 @@ class FieldDescriptor[Ti, Tft](Evaluatable[Ti, Tft], ABC):
 
         # Reactions is the list of reactions on the unbound field. BoundField
         # references this in a copy-on-write manner.
-        self.reactions: list[FieldReaction] = []
+        self.reactions: list[FieldReaction[Ti, Tf]] = []
 
-    def reaction(self, reaction: FieldReaction) -> None:
+    def reaction(self, reaction: FieldReaction[Ti, Tf]) -> None:
         ''' Add a reaction to the list of reactions.'''
         self.reactions.append(reaction)
 
     @abstractmethod
-    def _bind[Tf: FieldDescriptor[Ti, Tft]](
-            self: Tf,
-            nascent_instance: Ti
-           ) -> _BoundField[Tf, Ti, Tft]:
+    def _bind(self, nascent_instance: Ti) -> _BoundField[Ti, Tf]:
         '''_bind the fields for the nascent_instance'''
         raise NotImplementedError()
 
@@ -187,25 +181,25 @@ class FieldDescriptor[Ti, Tft](Evaluatable[Ti, Tft], ABC):
         '''
         return id(self)
 
-    def evaluate(self, instance: Ti) -> Tft:
+    def evaluate(self, instance: Ti) -> Tf:
         return getattr(instance, self._attr, self.initial_value)
 
     ###########################################################################
     # Descriptor protocol for intercepting field updates
     ###########################################################################
     @overload
-    def __get__(self: Self,             # access field on class
+    def __get__(self,             # access field on class
                 instance: None,
                 owner: type) -> Self: ...
 
     @overload
-    def __get__(self: Self,             # access field on instance
+    def __get__(self,             # access field on instance
                 instance: Ti,
-                owner: type) -> Tft: ...
+                owner: type) -> Tf: ...
 
-    def __get__(self: Self,
+    def __get__(self,
                 instance: Ti|None,
-                owner: type|None) -> Self|Tft:
+                owner: type|None) -> Self|Tf:
         '''
         Get the value of the field.
 
@@ -230,7 +224,7 @@ class FieldDescriptor[Ti, Tft](Evaluatable[Ti, Tft], ABC):
         assert owner is not None
         return self
 
-    def __set__(self, instance: Ti, value: Tft) -> None:
+    def __set__(self, instance: Ti, value: Tf) -> None:
         # See comment in __get__ for handling field access. Ignore this call
         # if value is self.
         if value is self:
@@ -251,8 +245,7 @@ class FieldDescriptor[Ti, Tft](Evaluatable[Ti, Tft], ABC):
     ###########################################################################
 
     @abstractmethod
-    def bound_field[Tf: FieldDescriptor[Tft, Tft]](
-            self: Tf, instance: Ti) -> _BoundField[Tf, Ti, Tft]:
+    def bound_field(self: Tf, instance: Ti) -> _BoundField[Ti, Tf]:
         '''get the bound field for this field on instance'''
         raise NotImplementedError()
 
@@ -260,7 +253,7 @@ class FieldDescriptor[Ti, Tft](Evaluatable[Ti, Tft], ABC):
         None, "removal of state attributes is not permitted")
 
     @property
-    def fields(self: Self) -> Iterable[Self]:
+    def fields(self) -> Iterable[FieldDescriptor[Ti, Tf]]:
         yield self
 
     def __str__(self) -> str:

@@ -24,7 +24,7 @@ import logging
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
 from .executor import HasExecutor, Reaction, BoundReaction
-from .field_descriptor import FieldDescriptor, Evaluatable, FieldChange
+from .field_descriptor import FieldDescriptor, Evaluator, FieldChange
 from .logging_config import VERBOSE
 
 
@@ -65,7 +65,7 @@ to the predicate decorator (Predicate.__call__).
 '''
 
 @dataclass(eq=True, frozen=True)
-class Predicate[Tf, Ti, Tft](Evaluatable[object, bool], ABC):  # todo typing
+class Predicate[Tf, Ti, Tf](Evaluator[object, bool], ABC):  # todo typing
     '''
     Predicate evaluates expressions.
     T - the type the predicate evaluates to
@@ -86,11 +86,10 @@ class Predicate[Tf, Ti, Tft](Evaluatable[object, bool], ABC):  # todo typing
     Predicates objects are immutable and hashable.
     '''
 
-    def react[Tfc: FieldChange[Tf, Ti, Tft]](self,
-                                             change: Tfc,#FieldChange[Tf, Ti, Tft],
-                                             *,
-                                             reaction: Reaction
-                                            ) -> None:
+    def react(self,
+              change: FieldChange[Ti, Tf],
+              *,
+              reaction: Reaction) -> None:
         '''
         React to a field value changing. If the result of evaluating this
         predicate is True the reaction will be scheduled for execution.
@@ -204,15 +203,15 @@ class Predicate[Tf, Ti, Tft](Evaluatable[object, bool], ABC):  # todo typing
         # Add a reaction on all the fields to call self.react() with
         # func as the reaction function.
         for field in set(self.fields):
-            field_ = (field.bound_field(instance)  # todo Evaluatable.fields isn't right
+            field_ = (field.bound_field(instance)  # todo Evaluator.fields isn't right
                       if instance is not None else field)
             logger.info('changes to %s will call %s', field, func)
             field_.reaction(partial(self.react, reaction=func))
 
 @dataclass
-class Constant[Ti, Tft](Evaluatable[Ti, Tft]):
-    '''An Evaluatable that always evaluates to it's value.'''
-    value: Tft
+class Constant[Ti, Tf](Evaluator[Ti, Tf]):
+    '''An Evaluator that always evaluates to it's value.'''
+    value: Tf
 
     def __eq__(self, other: object) -> bool:
         return self.value == other
@@ -220,7 +219,7 @@ class Constant[Ti, Tft](Evaluatable[Ti, Tft]):
     def __str__(self) -> str:
         return str(self.value)
 
-    def evaluate(self, _: object) -> Tft:
+    def evaluate(self, _: object) -> Tf:
         return self.value
 
     @InvalidPredicateExpression
@@ -244,13 +243,13 @@ class OperatorPredicate(Predicate, ABC):  # todo typing predicate
         '''the operator token (i.e. '==') to use for logging the predicate'''
 
 
-class UnaryPredicate[Ti, Tft](OperatorPredicate, ABC):
+class UnaryPredicate[Ti, Tf](OperatorPredicate, ABC):
     '''Predicate that has a single operand.'''
-    operand: Evaluatable[Tf, Ti, Tft]
+    operand: Evaluator[Tf, Ti, Tf]
 
-    def __init__(self, expression: Evaluatable[Ti, Tft]|Tft) -> None:
-        if not isinstance(expression, Evaluatable):
-            expression = Constant[Ti, Tft](expression)
+    def __init__(self, expression: Evaluator[Ti, Tf]|Tf) -> None:
+        if not isinstance(expression, Evaluator):
+            expression = Constant[Ti, Tf](expression)
         self.operand = expression
 
     @property
@@ -266,19 +265,19 @@ class UnaryPredicate[Ti, Tft](OperatorPredicate, ABC):
 
 class BinaryPredicate(OperatorPredicate, ABC):
     '''Predicate that has two operands.'''
-    left: Evaluatable
-    right: Evaluatable
+    left: Evaluator
+    right: Evaluator
 
     def __init__(self,
-                 left: Evaluatable | object,
-                 right: Evaluatable | object) -> None:
-        # Everything that isn't an Evaluatable is treated as a constant.
+                 left: Evaluator | object,
+                 right: Evaluator | object) -> None:
+        # Everything that isn't an Evaluator is treated as a constant.
         # This may need to be reevaluated, but it helps with the fields()
         # logic for now.
         super().__init__()
-        self.left = (left if isinstance(left, Evaluatable)
+        self.left = (left if isinstance(left, Evaluator)
                           else Constant(left))
-        self.right = (right if isinstance(right, Evaluatable)
+        self.right = (right if isinstance(right, Evaluator)
                             else Constant(right))
 
     @property
