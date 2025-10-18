@@ -23,7 +23,7 @@ from typing import NoReturn
 from unittest import TestCase, main
 
 from .. import (ReactionMustNotBeCalled, ExecutorAlreadyStarted, Field,
-                ReactionExecutor, FieldManager, FieldChange)
+                Executor, FieldManager, FieldChange)
 from .async_helpers import asynctest
 
 
@@ -65,13 +65,13 @@ class State(FieldManager):
 async def running_state(skip_stop: bool = False,
                         skip_await: bool = False,
                         ) -> AsyncIterator[tuple[State,
-                                                 ReactionExecutor[State, object]]]:
+                                                 Executor[State, object]]]:
     '''
     Async contexst manager to run the state before managed block and wait
     for it after the block. Context is (state, state_done_awaitable).
     async with running_state() as state:
     '''
-    executor = ReactionExecutor[State, object]()
+    executor = Executor[State, object]()
     state = State(executor=executor)
     executor.start()
     try:

@@ -45,7 +45,7 @@ class MustNotBeCalled(RuntimeError):
 class ReactionMustNotBeCalled(MustNotBeCalled):
     '''
     Exception raised if a function decorated with a predicate is called
-    directly, they should only be called from the ReactionExecutor.
+    directly, they should only be called from the Executor.
 
     The removal of the method from a class definition is very intentional.
         - readers may reasonably but incorrectly think the @Predicate decorator
@@ -83,9 +83,9 @@ class ExecutorAlreadyStarted(ExecutorError):
     '''
     Error indicating the state has already been started.
 
-    The ReactionExecutor may have already terminated, which, as the name
-    implies, is terminal and can't be restarted. This error does not imply the
-    state is running, only that the request to start it failed.
+    The Executor may have already terminated, which, as the name implies, is
+    terminal and can't be restarted. This error does not imply the state is
+    running, only that the request to start it failed.
     '''
 
 class FieldConfigurationError(RuntimeError):

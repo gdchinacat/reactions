@@ -17,7 +17,7 @@ Predicate test
 '''
 from unittest import TestCase, main
 
-from ..executor import ReactionExecutor
+from ..executor import Executor
 from ..field import Field, FieldManager, FieldManagerMeta
 from ..field_descriptor import FieldChange
 from .async_helpers import asynctest
@@ -77,7 +77,7 @@ class PredicateTest(TestCase):
             async def _true(self, change: FieldChange[State, bool]) -> None:
                 self.called = True
             def __init__(self) -> None:
-                self.executor = ReactionExecutor[State, bool]()
+                self.executor = Executor[State, bool]()
                 self.called = False
 
         state = State()

@@ -18,7 +18,7 @@
 from unittest import TestCase, main
 
 from ..error import ReactionMustNotBeCalled
-from ..executor import ReactionExecutor
+from ..executor import Executor
 from ..field import Field, FieldManager, FieldWatcher
 from ..field_descriptor import FieldChange
 from ..predicate import _Reaction
@@ -109,7 +109,7 @@ class FieldWatcherTest(TestCase):
                 assert self.watched is watched
                 self.reacted = True
 
-        executor = ReactionExecutor[Watched, bool]()
+        executor = Executor[Watched, bool]()
 
         watched1 = Watched(executor=executor)
         watcher1 = Watcher(watched1, executor=executor)

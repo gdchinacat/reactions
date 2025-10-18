@@ -24,7 +24,7 @@ from typing import overload, NoReturn, cast
 from reactions.error import FieldConfigurationError
 
 from .error import FieldAlreadyBound
-from .executor import ReactionExecutor, BoundReaction
+from .executor import Executor, BoundReaction
 from .field_descriptor import (FieldDescriptor, FieldReaction, Evaluator,
                                FieldChange, _BoundField)
 from .predicate import _Reaction, CustomFieldReactionConfiguration
@@ -282,13 +282,13 @@ class Reactant():
     on exit.
     '''
 
-    executor: ReactionExecutor[Reactant, object]  # todo typing should be subclass of Reactant, Tf=object
-    '''The ReactionExecutor that predicates will use to execute reactions.'''
+    executor: Executor[Reactant, object]  # todo typing should be subclass of Reactant, Tf=object
+    '''The Executor that predicates will use to execute reactions.'''
 
     @overload
     def __init__(self,
                  *args: object,
-                 executor: ReactionExecutor[Reactant, object]|None = None,  # todo typing Tf=object
+                 executor: Executor[Reactant, object]|None = None,  # todo typing Tf=object
                  **kwargs: object) -> None: ...
 
     @overload
@@ -298,12 +298,12 @@ class Reactant():
 
     def __init__(self,
                  *args: object,
-                 #executor: ReactionExecutor|None = None,
+                 #executor: Executor|None = None,
                  **kwargs: object) -> None:
         # todo - taking executor as a kwarg causes type errors on the overloads
         executor = kwargs.pop('executor', None)
-        assert executor is None or isinstance(executor, ReactionExecutor)
-        self.executor = executor or ReactionExecutor()
+        assert executor is None or isinstance(executor, Executor)
+        self.executor = executor or Executor()
         super().__init__(*args, **kwargs)
 
     @abstractmethod
@@ -416,7 +416,7 @@ class FieldWatcher[Ti](Reactant, CustomFieldReactionConfiguration, ABC):
     def __init__(self,
                  reaction_or_watched: Ti,
                  *args: object,
-                 executor: ReactionExecutor[Ti, object]|None = None,  # todo typing Tf=object
+                 executor: Executor[Ti, object]|None = None,  # todo typing Tf=object
                  **kwargs: object) -> None:
         '''
         Create a FieldWatcher that watches the instance referred to by

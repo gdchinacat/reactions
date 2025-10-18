@@ -48,7 +48,7 @@ BoundReaction is a Reaction on a type that is not the instance that changed.
 This could be a different type entirely, or a different instance of Ti.
 '''
 
-__all__ = ['ReactionExecutor']
+__all__ = ['Executor']
 
 
 logger: Logger = getLogger('reactions.executor')
@@ -57,13 +57,13 @@ logger: Logger = getLogger('reactions.executor')
 #      but may need to be able to plumb the types through to the reaction it
 #      calls. I *think* synchronously creating the reaction makes it safe...but
 #      this needs to be sorted out as the todo typing effort (under way).
-class ReactionExecutor[Ti, Tf]:
+class Executor[Ti, Tf]:
     '''
-    ReactionExecutor executes ReactionCoroutines sequentially but
+    Executor executes ReactionCoroutines sequentially but
     asynchronously (the submitter is not blocked). Submitters are typically
     Predicates.
 
-    ReactionExecutor has a queue and a task. The queue contains the coroutines
+    Executor has a queue and a task. The queue contains the coroutines
     for the reactions to execute, while the task drains the queue and executes
     the coroutines sequentially.
 
@@ -111,7 +111,7 @@ class ReactionExecutor[Ti, Tf]:
               change: FieldChange[Ti, Tf]) -> None:
         '''reaction that asynchronously executes the reaction'''
 
-        assert self.task, "ReactionExecutor not start()'ed"
+        assert self.task, "Executor not start()'ed"
 
         id_ = next(self._ids)
 
@@ -222,9 +222,9 @@ class ReactionExecutor[Ti, Tf]:
 
 class HasExecutor[Ti, Tf](Protocol):
     '''
-    Protocol that has a ReactionExecutor member.
+    Protocol that has a Executor member.
     User state classes don't need to extend Reactant, but they *do* need to
     provide a way to execute their reactions. This Protocol provides that
     functionality, but they do not need to extend it, just have an executor.
     '''
-    executor: ReactionExecutor[Ti, Tf]
+    executor: Executor[Ti, Tf]

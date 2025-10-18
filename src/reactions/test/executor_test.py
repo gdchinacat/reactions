@@ -13,12 +13,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 '''
-ReactionExecutor test.
+Executor test.
 '''
 from unittest import TestCase, main
 
 from ..error import ExecutorAlreadyStarted
-from ..executor import ReactionExecutor
+from ..executor import Executor
 from .async_helpers import asynctest
 
 
@@ -26,7 +26,7 @@ class ExecutorTest(TestCase):
 
     @asynctest
     async def test_executor_context_manager(self) -> None:
-        executor = ReactionExecutor()
+        executor = Executor()
         async with executor:
             with self.assertRaises(ExecutorAlreadyStarted):
                 executor.start()
