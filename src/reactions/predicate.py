@@ -246,22 +246,22 @@ class OperatorPredicate(Predicate, ABC):  # todo typing predicate
 
 class UnaryPredicate[Ti, Tft](OperatorPredicate, ABC):
     '''Predicate that has a single operand.'''
-    expression: Evaluatable[Tf, Ti, Tft]
+    operand: Evaluatable[Tf, Ti, Tft]
 
     def __init__(self, expression: Evaluatable[Ti, Tft]|Tft) -> None:
         if not isinstance(expression, Evaluatable):
             expression = Constant[Ti, Tft](expression)
-        self.expression = expression
+        self.operand = expression
 
     @property
     def fields(self) -> Iterable[Tf]:
-        yield from self.expression.fields
+        yield from self.operand.fields
 
     def evaluate(self, instance: Ti) -> bool:
-        return self.operator(self.expression.evaluate(instance))
+        return self.operator(self.operand.evaluate(instance))
 
     def __str__(self) -> str:
-        return f"({self.token} {self.expression})"
+        return f"({self.token} {self.operand})"
 
 
 class BinaryPredicate(OperatorPredicate, ABC):
