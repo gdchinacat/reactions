@@ -43,7 +43,7 @@ class Evaluator[Ti, Te, Tf](ABC):
     Base class for fields and predicates that can be evaluated.
 
     Te is the type the evaluator evaluates to
-    Tf the type of fields the Evaluator is built from (or Never)
+    Tf the type of fields the Evaluator is built from
     '''
 
     @property

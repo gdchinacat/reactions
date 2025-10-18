@@ -64,7 +64,6 @@ Decoratee is the type of things that Predicate can decorate or arguments
 to the predicate decorator (Predicate.__call__).
 '''
 
-@dataclass(eq=True, frozen=True)
 class Predicate[Ti, Tf](Evaluator[Ti, bool, Tf], ABC):
     '''
     Predicate evaluates expressions.

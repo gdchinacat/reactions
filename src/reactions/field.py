@@ -378,13 +378,23 @@ class FieldWatcher[Ti](Reactant, CustomFieldReactionConfiguration, ABC):
     the reactions are routed to the proper instance.
 
     Usage:
+        class Watcher(FieldWatcher):
             @ Watched.field == True
             @ FieldWatcher
             async def reaction(...
+
+    This class has an unusual dual purpose. It acts as a base class for classes
+    that watch fields on other classes as well as being a decorator for that
+    classes reactions. While complex, this is done to tightly bind the field
+    management the predicate decorator defers when it receives a
+    CustomFieldReactionConfiguration to the implementation of that provided
+    by this class.
     '''
 
     watched: Ti
-    '''The instance being watched.'''
+    '''The instance being watched. Only defined when created as a FieldWatcher
+    rather than a CustomFieldReactionConfiguration.
+    '''
 
     _reactions: set[_Reaction[Ti, object, object]]  # todo typing Te, TF = object
     '''
@@ -397,24 +407,35 @@ class FieldWatcher[Ti](Reactant, CustomFieldReactionConfiguration, ABC):
     def __init__(self,
                  reaction_or_watched: BoundReaction,
                  ) -> None:
-        '''Reaction decorator to indicate FieldWatcher manages field reaction
-        configuration.'''
+        '''
+        Reaction decorator to indicate the reaction referred to by
+        reaction_or_watched is managed by FieldWatcher.
+        '''
 
     @overload
     def __init__(self,
-                 reaction_or_watched: Ti|BoundReaction,
+                 reaction_or_watched: Ti,
                  *args: object,
                  executor: ReactionExecutor[Ti, object]|None = None,  # todo typing Tf=object
-                 **kwargs: object) -> None: ...
+                 **kwargs: object) -> None:
+        '''
+        Create a FieldWatcher that watches the instance referred to by
+        reaction_or_watched and executes the reaction with executor.
+        '''
 
     @overload
     def __init__(self,
                  reaction_or_watched: Ti|BoundReaction,
                  *args: object,
                  **kwargs: object
-                 ) -> None: ...
+                 ) -> None:
+        '''
+        Create a FieldWatcher that watches the instance referred to by
+        reaction_or_watched and executes the reaction using the executor used
+        by watched.
+        '''
 
-    def __init__(self,  # todo predicate typing BoundReaction get rid of generic type T on method
+    def __init__(self,
                  reaction_or_watched: Ti|BoundReaction,
                  *args: object,
                  **kwargs: object) -> None:

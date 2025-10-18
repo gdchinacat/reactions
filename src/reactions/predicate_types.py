@@ -18,7 +18,6 @@ The predicate implementation types.
 from typing import NoReturn
 import operator
 
-from .field_descriptor import Evaluator
 from .predicate import UnaryPredicate, BinaryPredicate, Predicate
 
 
@@ -100,7 +99,7 @@ class ComparisonPredicates:
         '''not implemented'''
         raise NotImplementedError('use Contains(self, other) instead')
 
-    def __and__[Tf: Evaluator[Ti, Tf, Tf]|object](self, other: object) -> Predicate[Ti, Tf]:
+    def __and__(self, other: object) -> Predicate[Ti, Tf]:
         '''create a BinaryAnd (&) predicate for the field'''
         return BinaryAnd(self, other)
 
