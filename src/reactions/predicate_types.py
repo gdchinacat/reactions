@@ -99,7 +99,7 @@ class ComparisonPredicates:
         '''not implemented'''
         raise NotImplementedError('use Contains(self, other) instead')
 
-    def __and__(self, other: object) -> Predicate[Ti, Tf]:
+    def __and__(self, other: object) -> Predicate:
         '''create a BinaryAnd (&) predicate for the field'''
         return BinaryAnd(self, other)
 
