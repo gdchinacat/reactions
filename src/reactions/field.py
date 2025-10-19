@@ -24,17 +24,15 @@ from typing import overload, NoReturn, cast
 from reactions.error import FieldConfigurationError
 
 from .error import FieldAlreadyBound
-from .executor import Executor, BoundReaction
+from .executor import Executor
 from .field_descriptor import (FieldDescriptor, FieldReaction, Evaluator,
-                               FieldChange, _BoundField)
+                               FieldChange, _BoundField, BoundReaction)
 from .predicate import _Reaction, CustomFieldReactionConfiguration
 from .predicate_types import ComparisonPredicates
 
-
 __all__ = ['Field', 'FieldManager', 'FieldWatcher']
 
-
-logger = getLogger('reactions.field')
+logger = getLogger()
 
 
 class BoundField[Ti, Tf](_BoundField[Ti, Tf],
@@ -282,13 +280,13 @@ class Reactant():
     on exit.
     '''
 
-    executor: Executor[Reactant, object]  # todo typing should be subclass of Reactant, Tf=object
+    executor: Executor  # todo typing should be subclass of Reactant, Tf=object
     '''The Executor that predicates will use to execute reactions.'''
 
     @overload
     def __init__(self,
                  *args: object,
-                 executor: Executor[Reactant, object]|None = None,  # todo typing Tf=object
+                 executor: Executor|None = None,  # todo typing Tf=object
                  **kwargs: object) -> None: ...
 
     @overload
@@ -416,7 +414,7 @@ class FieldWatcher[Ti](Reactant, CustomFieldReactionConfiguration, ABC):
     def __init__(self,
                  reaction_or_watched: Ti,
                  *args: object,
-                 executor: Executor[Ti, object]|None = None,  # todo typing Tf=object
+                 executor: Executor|None = None,  # todo typing Tf=object
                  **kwargs: object) -> None:
         '''
         Create a FieldWatcher that watches the instance referred to by

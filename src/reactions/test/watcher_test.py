@@ -109,7 +109,7 @@ class FieldWatcherTest(TestCase):
                 assert self.watched is watched
                 self.reacted = True
 
-        executor = Executor[Watched, bool]()
+        executor = Executor()
 
         watched1 = Watched(executor=executor)
         watcher1 = Watcher(watched1, executor=executor)

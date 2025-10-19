@@ -15,49 +15,32 @@
 '''
 Asynchronous reaction executor.
 '''
+
 from asyncio import (Queue, Task, create_task, QueueShutDown, sleep,
                      get_event_loop, CancelledError)
-from collections.abc import Awaitable, Generator, Coroutine
+from collections.abc import Awaitable, Generator
 from itertools import count
 from logging import Logger, getLogger
 from types import TracebackType
-from typing import ClassVar, Protocol, Callable, TypeVar, Any
+from typing import ClassVar, Any
+
 
 from .error import ExecutorAlreadyStarted, ExecutorNotStarted
-from .field_descriptor import FieldDescriptor, FieldChange, FieldChange
+from .field_descriptor import (FieldChange, _Executor, Reaction,
+                               ReactionCoroutine)
 from .logging_config import VERBOSE
 
 
-type ReactionCoroutine = Coroutine[object, object, None]
-'''Recation coroutines do not yeild or send, and return None'''
-
-type Reaction[Ti, Tf] = Callable[[Ti, FieldChange[Ti, Tf]],
-                                 ReactionCoroutine]
-'''
-Reaction is the type for methods that predicates can decorate.
-The instance is provided as the first argument despite being available in
-the second argument (FieldChange) in order to provide a 'self' argument to
-predicate decorated methods.
-'''
-
-type BoundReaction[Tw, Ti, Tf] = Callable[  # move to .predicate?
-    [Tw, Ti, FieldDescriptor[Ti, Tf], Tf, Tf],
-    ReactionCoroutine]
-'''
-BoundReaction is a Reaction on a type that is not the instance that changed.
-This could be a different type entirely, or a different instance of Ti.
-'''
 
 __all__ = ['Executor']
 
 
 logger: Logger = getLogger('reactions.executor')
 
-# todo should Executor be tied to specific instance types? it doesn't care,
-#      but may need to be able to plumb the types through to the reaction it
-#      calls. I *think* synchronously creating the reaction makes it safe...but
-#      this needs to be sorted out as the todo typing effort (under way).
-class Executor[Ti, Tf]:
+type AnyReaction = Reaction[Any, Any]
+type AnyFieldChange = FieldChange[Any, Any]
+
+class Executor(_Executor):
     '''
     Executor executes ReactionCoroutines sequentially but
     asynchronously (the submitter is not blocked). Submitters are typically
@@ -83,7 +66,7 @@ class Executor[Ti, Tf]:
     task: Task[None]|None = None
     '''the task that is processing the queue to execute reactions'''
 
-    queue: Queue[tuple[int, ReactionCoroutine, FieldChange[Ti, Tf]]]
+    queue: Queue[tuple[int, ReactionCoroutine, AnyFieldChange]]
     '''
     The queue of reactions to execute.
     tuple elements are:
@@ -107,8 +90,8 @@ class Executor[Ti, Tf]:
         self.queue = Queue()
 
     def react(self,
-              reaction: Reaction[Ti, Tf],
-              change: FieldChange[Ti, Tf]) -> None:
+              reaction: AnyReaction,
+              change: AnyFieldChange) -> None:
         '''reaction that asynchronously executes the reaction'''
 
         assert self.task, "Executor not start()'ed"
@@ -219,12 +202,3 @@ class Executor[Ti, Tf]:
             raise ExecutorNotStarted()
         yield from self.task
 
-
-class HasExecutor[Ti, Tf](Protocol):
-    '''
-    Protocol that has a Executor member.
-    User state classes don't need to extend Reactant, but they *do* need to
-    provide a way to execute their reactions. This Protocol provides that
-    functionality, but they do not need to extend it, just have an executor.
-    '''
-    executor: Executor[Ti, Tf]

@@ -64,14 +64,13 @@ class State(FieldManager):
 @asynccontextmanager
 async def running_state(skip_stop: bool = False,
                         skip_await: bool = False,
-                        ) -> AsyncIterator[tuple[State,
-                                                 Executor[State, object]]]:
+                        ) -> AsyncIterator[tuple[State, Executor]]:
     '''
     Async contexst manager to run the state before managed block and wait
     for it after the block. Context is (state, state_done_awaitable).
     async with running_state() as state:
     '''
-    executor = Executor[State, object]()
+    executor = Executor()
     state = State(executor=executor)
     executor.start()
     try:

@@ -23,8 +23,8 @@ from typing import TypeVar, overload, Never
 import logging
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
-from .executor import HasExecutor, Reaction, BoundReaction
-from .field_descriptor import FieldDescriptor, Evaluator, FieldChange
+from .field_descriptor import (FieldDescriptor, Evaluator, FieldChange,
+                               BoundReaction, HasExecutor, Reaction)
 from .logging_config import VERBOSE
 
 
@@ -64,7 +64,7 @@ Decoratee is the type of things that Predicate can decorate or arguments
 to the predicate decorator (Predicate.__call__).
 '''
 
-class Predicate[Ti, Tf](Evaluator[Ti, bool, Tf], ABC):
+class Predicate[Ti: HasExecutor, Tf](Evaluator[Ti, bool, Tf], ABC):
     '''
     Predicate evaluates expressions.
     T - the type the predicate evaluates to
@@ -117,11 +117,11 @@ class Predicate[Ti, Tf](Evaluator[Ti, bool, Tf], ABC):
             # done by deriving from FieldManager or FieldWatcher.
             # todo type safety for getting executor...just hoping it's there
             #      isn't great.
-            executor_provider: HasExecutor[Ti, Tf] = getattr(
-                reaction, '__self__',
-                change.instance)  # todo typing HasExcecutor
-            reaction_executor = executor_provider.executor
-            reaction_executor.react(reaction, change)
+            executor_provider: HasExecutor = getattr(  # get executor from:
+                reaction, '__self__',  # the instance reaction is bound to
+                change.instance)       # or the instance the field changed on
+            executor = executor_provider.executor
+            executor.react(reaction, change)
 
     @overload
     def __call__(self, decorated: Reaction) -> _Reaction: ...
@@ -197,16 +197,16 @@ class Predicate[Ti, Tf](Evaluator[Ti, bool, Tf], ABC):
             self.configure_reaction(reaction)
         return _Reaction(self, reaction)
 
-    def configure_reaction(self, func: Reaction,
+    def configure_reaction(self, reaction: Reaction,
                            instance: Ti|None = None) -> None:
         '''configure the reaction on the fields'''
         # Add a reaction on all the fields to call self.react() with
         # func as the reaction function.
         for field in set(self.fields):
-            field_ = (field.bound_field(instance)  # todo Evaluator.fields isn't right
+            field_ = (field.bound_field(instance)
                       if instance is not None else field)
-            logger.info('changes to %s will call %s', field, func)
-            field_.reaction(partial(self.react, reaction=func))
+            logger.info('changes to %s will call %s', field, reaction)
+            field_.reaction(partial(self.react, reaction=reaction))
 
 @dataclass
 class Constant[Ti, Tf](Evaluator[Ti, Tf, Never]):

@@ -26,7 +26,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from itertools import count
 from types import MappingProxyType
-from typing import overload, ClassVar, Self, TypeVar
+from typing import overload, ClassVar, Self, Protocol, Any, Coroutine, TypeVar
 
 from .error import MustNotBeCalled
 
@@ -38,7 +38,53 @@ type FieldReaction[Ti, Tf] = Callable[[FieldChange[Ti, Tf]], None]
 '''A method that is called when a field changes.'''
 
 
-class Evaluator[Ti, Te, Tf](ABC):
+type ReactionCoroutine = Coroutine[object, object, None]
+'''Recation coroutines do not yeild or send, and return None'''
+
+
+type Reaction[Ti, Tf] = Callable[[Ti, FieldChange[Ti, Tf]],
+                                 ReactionCoroutine]
+'''
+Reaction is the type for methods that predicates can decorate.
+The instance is provided as the first argument despite being available in
+the second argument (FieldChange) in order to provide a 'self' argument to
+predicate decorated methods.
+'''
+
+
+type BoundReaction[Tw, Ti, Tf] = Callable[  # move to .predicate?
+    [Tw, Ti, FieldDescriptor[Ti, Tf], Tf, Tf],
+    ReactionCoroutine]
+'''
+BoundReaction is a Reaction on a type that is not the instance that changed.
+This could be a different type entirely, or a different instance of Ti.
+'''
+
+
+class _Executor(ABC):
+
+    @abstractmethod
+    def react(self,
+              reaction: Reaction[Any, Any],  # todo typing Reaction
+              change: FieldChange[Any, Any]) -> None:
+        raise NotImplementedError()
+
+
+class HasExecutor(Protocol):
+    '''
+    Protocol that has a Executor member.
+    User state classes don't need to extend Reactant, but they *do* need to
+    provide a way to execute their reactions. This Protocol provides that
+    functionality, but they do not need to extend it, just have an executor.
+    '''
+
+    @property
+    @abstractmethod
+    def executor(self) -> _Executor:
+        raise NotImplementedError()
+
+
+class Evaluator[Ti: HasExecutor, Te, Tf](ABC):
     '''
     Base class for fields and predicates that can be evaluated.
 
@@ -62,9 +108,9 @@ class Evaluator[Ti, Te, Tf](ABC):
 
 
 @dataclass(slots=True)
-class FieldChange[Ti, Tf]:
+class FieldChange[Ti: HasExecutor, Tf]:
     '''A record of a field value changing.'''
-    instance: Ti  # todo typing HasExecutor?
+    instance: Ti
     field: FieldDescriptor[Ti, Tf]
     old: Tf
     new: Tf
@@ -74,7 +120,7 @@ class FieldChange[Ti, Tf]:
         return f'{self.instance}.{self.field} {self.old} -> {self.new}'
 
 
-class _BoundField[Ti, Tf](ABC):
+class _BoundField[Ti: HasExecutor, Tf](ABC):
     '''Base class for BoundField (used for typing)'''
     @abstractmethod
     def react(self, change: FieldChange[Ti, Tf]) -> None:
@@ -86,7 +132,7 @@ class _BoundField[Ti, Tf](ABC):
         raise NotImplementedError()
 
 
-class FieldDescriptor[Ti, Tf](Evaluator[Ti, Tf, Tf], ABC):
+class FieldDescriptor[Ti: HasExecutor, Tf](Evaluator[Ti, Tf, Tf], ABC):
     '''
     An instrumented field.
     Generic Types:
@@ -160,7 +206,8 @@ class FieldDescriptor[Ti, Tf](Evaluator[Ti, Tf, Tf], ABC):
         self.attr = attr
         self._attr: str = '_' + self.attr               # private
 
-    def __set_name__(self, owner: type, name: str) -> None:
+    def __set_name__(self, owner: type,
+                     name: str) -> None:  # @UnusedVariable
         '''
         Fallback to set name and validate conflicts for classes that do not
         use FieldManagerMeta.

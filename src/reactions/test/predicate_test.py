@@ -77,7 +77,7 @@ class PredicateTest(TestCase):
             async def _true(self, change: FieldChange[State, bool]) -> None:
                 self.called = True
             def __init__(self) -> None:
-                self.executor = Executor[State, bool]()
+                self.executor = Executor()
                 self.called = False
 
         state = State()
