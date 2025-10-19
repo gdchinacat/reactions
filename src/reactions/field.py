@@ -232,7 +232,7 @@ class FieldManagerMeta[Ti](ABCMeta, type):
         '''
         if isinstance(value, Field):
             value.set_names(self.__qualname__, attr)
-            self._fields = self._fields + (value,)  # pylint: disable=no-member
+            self._fields = self._fields + (value,)
         super().__setattr__(attr, value)
 
     def __new__[T: type](cls: T,
@@ -280,26 +280,14 @@ class Reactant():
     on exit.
     '''
 
-    executor: Executor  # todo typing should be subclass of Reactant, Tf=object
+    executor: Executor
     '''The Executor that predicates will use to execute reactions.'''
 
-    @overload
-    def __init__(self,
-                 *args: object,
-                 executor: Executor|None = None,  # todo typing Tf=object
-                 **kwargs: object) -> None: ...
-
-    @overload
-    def __init__(self,
-                 *args: object,
-                 **kwargs: object) -> None: ...
 
     def __init__(self,
                  *args: object,
-                 #executor: Executor|None = None,
+                 executor: Executor|None = None,
                  **kwargs: object) -> None:
-        # todo - taking executor as a kwarg causes type errors on the overloads
-        executor = kwargs.pop('executor', None)
         assert executor is None or isinstance(executor, Executor)
         self.executor = executor or Executor()
         super().__init__(*args, **kwargs)
@@ -387,6 +375,13 @@ class FieldWatcher[Ti](Reactant, CustomFieldReactionConfiguration, ABC):
     management the predicate decorator defers when it receives a
     CustomFieldReactionConfiguration to the implementation of that provided
     by this class.
+    # todo Is it possible to make this class acting in its
+           CustomFieldReactionConfiguration able to look like a callable?
+           Need to have the static type of __call__ be the Reaction that is
+           passed to the initializer. Should this complexity be scrapped and
+           just use a static method decorator?  Could then just tag the
+           reaction and return it rather than acting as a proxy. Probably
+           simplify things a bit.
     '''
 
     watched: Ti
@@ -414,19 +409,8 @@ class FieldWatcher[Ti](Reactant, CustomFieldReactionConfiguration, ABC):
     def __init__(self,
                  reaction_or_watched: Ti,
                  *args: object,
-                 executor: Executor|None = None,  # todo typing Tf=object
+                 executor: Executor|None = None,
                  **kwargs: object) -> None:
-        '''
-        Create a FieldWatcher that watches the instance referred to by
-        reaction_or_watched and executes the reaction with executor.
-        '''
-
-    @overload
-    def __init__(self,
-                 reaction_or_watched: Ti|BoundReaction,
-                 *args: object,
-                 **kwargs: object
-                 ) -> None:
         '''
         Create a FieldWatcher that watches the instance referred to by
         reaction_or_watched and executes the reaction using the executor used
@@ -436,6 +420,7 @@ class FieldWatcher[Ti](Reactant, CustomFieldReactionConfiguration, ABC):
     def __init__(self,
                  reaction_or_watched: Ti|BoundReaction,
                  *args: object,
+                 executor: Executor|None = None,
                  **kwargs: object) -> None:
         '''
         Create a FieldWatcher or decorate a BoundReaction managed by
@@ -451,8 +436,23 @@ class FieldWatcher[Ti](Reactant, CustomFieldReactionConfiguration, ABC):
             reaction = reaction_or_watched  # for clarity
             super().__init__(reaction)
         else:
+            # actually creating the FieldWatcher
             self.watched = reaction_or_watched
-            executor = kwargs.pop('executor', self.watched.executor)  # todo typing HasExcutor
+            if not executor:
+                # Watcher will use the executor of watched if an executor is
+                # not provided. Ti is not limited to things that have an
+                # executor since it doesn't need to have an instance if only
+                # bound reactions are used (ie classes that provide fields
+                # for others to what but don't themselves have any reactions).
+                # Typing for either this or that is non-obvious and skipped.
+                # It is taken on blind faith that callers will provide an
+                # executor if the type they are watching don't have an
+                # executor. The exception that results if this blind faith is
+                # misplaced occurs at definition time and will be trivially
+                # noticed on first execution. It's not great, but the risk of
+                # horrible things happening is minimal.
+                # A similar issue exists with predicate reactions.
+                executor = self.watched.executor  # type: ignore # blind faith
             super().__init__(None, # CustomFieldReactionConfiguration.reaction
                              *args,
                              executor=executor,

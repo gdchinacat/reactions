@@ -24,7 +24,7 @@ import logging
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
 from .field_descriptor import (FieldDescriptor, Evaluator, FieldChange,
-                               BoundReaction, HasExecutor, Reaction)
+                               BoundReaction, Reaction)
 from .logging_config import VERBOSE
 
 
@@ -64,7 +64,7 @@ Decoratee is the type of things that Predicate can decorate or arguments
 to the predicate decorator (Predicate.__call__).
 '''
 
-class Predicate[Ti: HasExecutor, Tf](Evaluator[Ti, bool, Tf], ABC):
+class Predicate[Ti, Tf](Evaluator[Ti, bool, Tf], ABC):
     '''
     Predicate evaluates expressions.
     T - the type the predicate evaluates to
@@ -116,11 +116,20 @@ class Predicate[Ti: HasExecutor, Tf](Evaluator[Ti, bool, Tf], ABC):
             # Objects that react must provide an executor. This is typically
             # done by deriving from FieldManager or FieldWatcher.
             # todo type safety for getting executor...just hoping it's there
-            #      isn't great.
-            executor_provider: HasExecutor = getattr(  # get executor from:
+            #      isn't great. It's complicated by Executors being able to
+            #      be provided on creation of watchers. This should not require
+            #      instances have executors nor that watchers should have
+            #      executors. The semantics are that either one or the other
+            #      must have executor, which doesn't seem possible to express
+            #      with static type hints.
+            #      For now, this code just gets it and will error out
+            #      if neither do. Unfortunately any errors from mistrust will
+            #      not occur until the reaction executes. A similar issue
+            #      exists with FieldWatcher executor assignment.
+            executor_provider = getattr(  # get executor from:
                 reaction, '__self__',  # the instance reaction is bound to
                 change.instance)       # or the instance the field changed on
-            executor = executor_provider.executor
+            executor = executor_provider.executor  # type:ignore
             executor.react(reaction, change)
 
     @overload
@@ -276,9 +285,6 @@ class BinaryPredicate[Ti, Tf](OperatorPredicate[Ti, Tf], ABC):
         # Everything that isn't an Evaluator is treated as a constant.
         # This may need to be reevaluated, but it helps with the fields()
         # logic for now.
-        print(f'{isinstance(self, Predicate)=}')
-        print(f'{type(left)=}')
-        print(f'{type(right)=}')
         super(BinaryPredicate, self).__init__()
         self.left = (left if isinstance(left, Evaluator)
                           else Constant(left))

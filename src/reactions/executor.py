@@ -26,7 +26,7 @@ from typing import ClassVar, Any
 
 
 from .error import ExecutorAlreadyStarted, ExecutorNotStarted
-from .field_descriptor import (FieldChange, _Executor, Reaction,
+from .field_descriptor import (FieldChange, Reaction,
                                ReactionCoroutine)
 from .logging_config import VERBOSE
 
@@ -37,10 +37,12 @@ __all__ = ['Executor']
 
 logger: Logger = getLogger('reactions.executor')
 
+
 type AnyReaction = Reaction[Any, Any]
 type AnyFieldChange = FieldChange[Any, Any]
 
-class Executor(_Executor):
+
+class Executor:
     '''
     Executor executes ReactionCoroutines sequentially but
     asynchronously (the submitter is not blocked). Submitters are typically

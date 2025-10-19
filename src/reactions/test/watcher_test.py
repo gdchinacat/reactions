@@ -124,7 +124,7 @@ class FieldWatcherTest(TestCase):
         self.assertFalse(watcher2.reacted)
 
     @asynctest
-    async def test_decorator_bound_reactions(self)->None:
+    async def test_decorator_bound_reactions(self) -> None:
         '''test that bound reactions are handled properly'''
         class State(FieldManager):
             field = Field['State', bool](False)
@@ -132,7 +132,7 @@ class FieldWatcherTest(TestCase):
         class Watcher(FieldWatcher[State]):
             called = False
             @ State.field == True
-            @ FieldWatcher  # todo typing
+            @ FieldWatcher
             async def _true(self,
                             state: State,
                             change: FieldChange[State, bool]) -> None:

@@ -26,7 +26,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from itertools import count
 from types import MappingProxyType
-from typing import overload, ClassVar, Self, Protocol, Any, Coroutine, TypeVar
+from typing import overload, ClassVar, Self, Coroutine
 
 from .error import MustNotBeCalled
 
@@ -61,30 +61,7 @@ This could be a different type entirely, or a different instance of Ti.
 '''
 
 
-class _Executor(ABC):
-
-    @abstractmethod
-    def react(self,
-              reaction: Reaction[Any, Any],  # todo typing Reaction
-              change: FieldChange[Any, Any]) -> None:
-        raise NotImplementedError()
-
-
-class HasExecutor(Protocol):
-    '''
-    Protocol that has a Executor member.
-    User state classes don't need to extend Reactant, but they *do* need to
-    provide a way to execute their reactions. This Protocol provides that
-    functionality, but they do not need to extend it, just have an executor.
-    '''
-
-    @property
-    @abstractmethod
-    def executor(self) -> _Executor:
-        raise NotImplementedError()
-
-
-class Evaluator[Ti: HasExecutor, Te, Tf](ABC):
+class Evaluator[Ti, Te, Tf](ABC):
     '''
     Base class for fields and predicates that can be evaluated.
 
@@ -108,7 +85,7 @@ class Evaluator[Ti: HasExecutor, Te, Tf](ABC):
 
 
 @dataclass(slots=True)
-class FieldChange[Ti: HasExecutor, Tf]:
+class FieldChange[Ti, Tf]:
     '''A record of a field value changing.'''
     instance: Ti
     field: FieldDescriptor[Ti, Tf]
@@ -120,7 +97,7 @@ class FieldChange[Ti: HasExecutor, Tf]:
         return f'{self.instance}.{self.field} {self.old} -> {self.new}'
 
 
-class _BoundField[Ti: HasExecutor, Tf](ABC):
+class _BoundField[Ti, Tf](ABC):
     '''Base class for BoundField (used for typing)'''
     @abstractmethod
     def react(self, change: FieldChange[Ti, Tf]) -> None:
@@ -132,7 +109,7 @@ class _BoundField[Ti: HasExecutor, Tf](ABC):
         raise NotImplementedError()
 
 
-class FieldDescriptor[Ti: HasExecutor, Tf](Evaluator[Ti, Tf, Tf], ABC):
+class FieldDescriptor[Ti, Tf](Evaluator[Ti, Tf, Tf], ABC):
     '''
     An instrumented field.
     Generic Types:
