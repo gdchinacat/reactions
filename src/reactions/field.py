@@ -19,7 +19,7 @@ from abc import ABCMeta, abstractmethod, ABC
 from asyncio import run
 from collections.abc import Awaitable, Iterable, MutableMapping
 from logging import getLogger
-from types import MethodType, TracebackType, MappingProxyType
+from types import MethodType, TracebackType, MappingProxyType, NoneType
 from typing import overload, NoReturn, cast, Self
 
 from .error import FieldAlreadyBound, FieldConfigurationError
@@ -285,11 +285,21 @@ class Reactant():
     executor: Executor
     '''The Executor that predicates will use to execute reactions.'''
 
-
+    @overload
     def __init__(self,
                  *args: object,
                  executor: Executor|None = None,
+                 **kwargs: object): ...
+                 
+    @overload
+    def __init__(self,
+                 *args: object,
+                 **kwargs: object): ...
+
+    def __init__(self,
+                 *args: object,
                  **kwargs: object) -> None:
+        executor = kwargs.pop('executor', None)
         assert executor is None or isinstance(executor, Executor)
         self.executor = executor or Executor()
         super().__init__(*args, **kwargs)
@@ -411,7 +421,6 @@ class FieldWatcher[Ti](Reactant, CustomFieldReactionConfiguration, ABC):
     def __init__(self,
                  reaction_or_watched: Ti,
                  *args: object,
-                 executor: Executor|None = None,
                  **kwargs: object) -> None:
         '''
         Create a FieldWatcher that watches the instance referred to by
@@ -422,7 +431,6 @@ class FieldWatcher[Ti](Reactant, CustomFieldReactionConfiguration, ABC):
     def __init__(self,
                  reaction_or_watched: Ti|BoundReaction,
                  *args: object,
-                 executor: Executor|None = None,
                  **kwargs: object) -> None:
         '''
         Create a FieldWatcher or decorate a BoundReaction managed by
@@ -440,6 +448,8 @@ class FieldWatcher[Ti](Reactant, CustomFieldReactionConfiguration, ABC):
         else:
             # actually creating the FieldWatcher
             self.watched = reaction_or_watched
+            executor = kwargs.pop('executor', None)
+            assert isinstance(executor, (Executor, NoneType))
             if not executor:
                 # Watcher will use the executor of watched if an executor is
                 # not provided. Ti is not limited to things that have an

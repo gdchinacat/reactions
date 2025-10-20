@@ -70,7 +70,7 @@ class FieldWatcherTest(TestCase):
             def __init__(self, watched: Watched,
                          *args: object,
                          **kwargs: object) -> None:
-                super().__init__(watched, *args, **kwargs)  # todo executor kwarg confusion
+                super().__init__(watched, *args, **kwargs)
                 self.change_events: list[tuple[int, int]] = []
 
             @ Watched.ticks != None
