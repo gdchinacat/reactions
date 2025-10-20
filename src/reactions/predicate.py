@@ -19,7 +19,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import partial
-from typing import TypeVar, overload, Never, Any
+from typing import TypeVar, overload, Any
 import logging
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
@@ -64,21 +64,24 @@ Decoratee is the type of things that Predicate can decorate or arguments
 to the predicate decorator (Predicate.__call__).
 '''
 
+
 class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
+    
     '''
-    Predicate evaluates expressions.
+    Predicate decorates reactions to be called when field changes cause the
+    predicate to become true.
+    They evaluate to boolean values. They do not have an instance type because
+    predicates can be composed of fields from multiple instance types.
+
     Created through Field and Predicate comparison methods:
         field = Field(None)
         field == 'value'  # creates a predicate
-
-    Predicates can be used to decorate a function to schedule it to be run
-    when the Predicate becomes True.
 
     Predicates objects are immutable and hashable.
     '''
 
     def react[Ti](self,
-              change: FieldChange[Ti, Tf],
+              change: FieldChange[Ti, Tf],  # todo Ti should be Any?
               *,
               reaction: Reaction) -> None:
         '''
@@ -121,7 +124,7 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
             executor_provider = getattr(  # get executor from:
                 reaction, '__self__',  # the instance reaction is bound to
                 change.instance)       # or the instance the field changed on
-            executor = executor_provider.executor  # type:ignore
+            executor = executor_provider.executor  # type: ignore  # Ti=Any?
             executor.react(reaction, change)
 
     @overload
@@ -209,8 +212,9 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
             logger.info('changes to %s will call %s', field, reaction)
             field_.reaction(partial(self.react, reaction=reaction))
 
+
 @dataclass
-class Constant[Tf](Evaluator[Any, Tf, Never]):
+class Constant[Tf](Evaluator[Any, Tf, Tf]):
     '''An Evaluator that always evaluates to it's value.'''
     value: Tf
 
@@ -220,14 +224,14 @@ class Constant[Tf](Evaluator[Any, Tf, Never]):
     def __str__(self) -> str:
         return str(self.value)
 
-    def evaluate(self, _: object) -> Tf:
+    def evaluate[Ti](self, _: Ti) -> Tf:
         return self.value
 
     @InvalidPredicateExpression
     def __bool__(self) -> None: ...
 
     @property
-    def fields(self) -> Iterable[Never]:
+    def fields(self) -> Iterable[FieldDescriptor[Any, Tf]]:
         return ()
 
 
@@ -244,14 +248,30 @@ class OperatorPredicate[Tf](Predicate[Tf], ABC):
         '''the operator token (i.e. '==') to use for logging the predicate'''
 
 
+type Pe[Tf] = Evaluator[Any, bool, Tf]  # predicate evaluator
+type Fe[Tf] = Evaluator[Any, Tf, Tf]    # field evaluator
+type O[Tf] = Pe[Tf] | Fe[Tf]            # Operand
+type A[Tf] = O[Tf] | Tf                 # Argument
+
+
 class UnaryPredicate[Tf](OperatorPredicate[Tf], ABC):
     '''Predicate that has a single operand.'''
-    operand: Evaluator[Any, Tf|bool, Tf]
+    operand: O[Tf]
 
-    def __init__(self,
-                 operand: Evaluator[Any, Tf, Tf]|Tf) -> None:
+    # For some unknown reason, not having these overloads causes mypy to expect
+    # never if isinstance(operand, Evaluator). Starting to doubt mypy is worth
+    # the effort. No change required to the implementation, just tell it that
+    # sometimes it is called with evaluators and sometimes TF and it suddenly
+    # realizes that TF isn't a Never in Evaluator generic.
+    @overload
+    def __init__(self, operand: O[Tf]) -> None: ...
+    
+    @overload
+    def __init__(self, operand: Tf) -> None: ...
+    
+    def __init__(self, operand: A[Tf]) -> None:
         if not isinstance(operand, Evaluator):
-            operand = Constant[Tf](operand)
+            operand = Constant(operand)
         self.operand = operand
 
     @property
@@ -268,12 +288,22 @@ class UnaryPredicate[Tf](OperatorPredicate[Tf], ABC):
 class BinaryPredicate[Tf](OperatorPredicate[Tf], ABC):
     '''Predicate that has two operands.'''
     # todo typing - do predicate evaluators need Te = Ti|Tf
-    left: Evaluator[Any, Tf, Tf] | Evaluator[Any, bool, Tf]
-    right: Evaluator[Any, Tf, Tf] | Evaluator[Any, bool, Tf]
+    left: O[Tf]
+    right: O[Tf]
 
-    def __init__(self,
-                 left: Evaluator[Any, Tf, Tf] | Evaluator[Any, bool, Tf] | Tf,
-                 right: Evaluator[Any, Tf, Tf] | Evaluator[Any, bool, Tf] | Tf) -> None:
+    @overload
+    def __init__(self, left: O[Tf], right: O[Tf]) -> None: ...
+
+    @overload
+    def __init__(self, left: Tf, right: Tf) -> None: ...
+    
+    @overload
+    def __init__(self, left: O[Tf], right: Tf) -> None: ...
+    
+    @overload
+    def __init__(self, left: Tf, right: O[Tf]) -> None: ...
+
+    def __init__(self, left: O[Tf]|Tf, right: O[Tf]|Tf) -> None:
         # Everything that isn't an Evaluator is treated as a constant.
         # This may need to be reevaluated, but it helps with the fields()
         # logic for now.

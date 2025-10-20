@@ -12,14 +12,14 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+from typing import overload
 '''
 The predicate implementation types.
 '''
-from typing import NoReturn, TypeVar, Any
 import operator
 
-from .field_descriptor import Evaluator, FieldDescriptor
-from .predicate import UnaryPredicate, BinaryPredicate, Predicate
+from .field_descriptor import Evaluator
+from .predicate import UnaryPredicate, BinaryPredicate, Predicate, A, O
 
 
 __all__ = ['Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
@@ -82,10 +82,7 @@ class BinaryNot[Tf](BinaryPredicate[Tf]):
     operator = operator.or_
 
 
-Tf = TypeVar('Tf')
-type T[Tf] = FieldDescriptor[Any, Tf]|Predicate[Tf]|Tf
-
-class ComparisonPredicates(Evaluator[Any, Any, Any]):
+class ComparisonPredicates[Ti, Tf](Evaluator[Ti, Tf, Tf]):
     '''Mixin to create predicates for the rich compparison function'''
     ##########################################################################
     # Predicate creation operators
@@ -99,39 +96,44 @@ class ComparisonPredicates(Evaluator[Any, Any, Any]):
     # TODO - the returned predicates need to have the type of the field that
     #        created them in their type so that when they are called the type
     #        of field the PredicateReaction accepts will match.
-    def __contains__(self, other: T[Tf]) -> NoReturn:
+    def __contains__(self, other: A[Tf]) -> Predicate[Tf]: # todo NoReturn
         '''not implemented'''
         raise NotImplementedError('use Contains(self, other) instead')
 
-    def __and__[Tf](self, other: T[Tf]) -> Predicate[Tf]:
+    @overload
+    def __and__(self, other: O[Tf]) -> Predicate[Tf]: ...
+
+    @overload
+    def __and__(self, other: Tf) -> Predicate[Tf]: ...
+
+    def __and__(self, other: O[Tf]|Tf) -> Predicate[Tf]:
         '''create a BinaryAnd (&) predicate for the field'''
         return BinaryAnd(self, other)
 
-    def __or__[Tf](self, other: T[Tf]) -> Predicate[Tf]:
+    def __or__(self, other: A[Tf]) -> Predicate[Tf]:
         '''create a BinaryOr (|) predicate for the field'''
         return BinaryOr(self, other)
 
-    def __eq__[Tf](self, other: T[Tf]) -> Predicate[Tf]:  # type: ignore[override]
+    def __eq__(self, other: A[Tf]) -> Predicate[Tf]:  # type: ignore[override]
         '''create an Eq (==) predicate for the field'''
         return Eq(self, other)
 
-    def __ne__[Tf](self, other: T[Tf]) -> Predicate[Tf]:  # type: ignore[override]
+    def __ne__(self, other: A[Tf]) -> Predicate[Tf]:  # type: ignore[override]
         '''create an Ne predicate for the field'''
         return Ne(self, other)
 
-    def __lt__[Tf](self, other: T[Tf]) -> Predicate[Tf]:
+    def __lt__(self, other: A[Tf]) -> Predicate[Tf]:
         '''create an Lt (<) predicate for the field'''
         return Lt(self, other)
 
-    def __le__[Tf](self, other: T[Tf]) -> Predicate[Tf]:
+    def __le__(self, other: A[Tf]) -> Predicate[Tf]:
         '''create an Le (<=) predicate for the field'''
         return Le(self, other)
 
-    def __gt__[Tf](self, other: T[Tf]) -> Predicate[Tf]:
+    def __gt__(self, other: A[Tf]) -> Predicate[Tf]:
         '''create an Gt (>) predicate for the field'''
         return Gt(self, other)
 
-    def __ge__[Tf](self, other: T[Tf]) -> Predicate[Tf]:
+    def __ge__(self, other: A[Tf]) -> Predicate[Tf]:
         '''create an Ge (>=) predicate for the field'''
         return Ge(self, other)
-

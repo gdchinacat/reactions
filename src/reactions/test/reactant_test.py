@@ -18,7 +18,6 @@ State machine test.
 from asyncio import Future, CancelledError, sleep, Barrier
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from types import NoneType
 from typing import NoReturn
 from unittest import TestCase, main
 

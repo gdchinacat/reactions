@@ -19,6 +19,8 @@ from asyncio import run
 from collections.abc import Awaitable, Iterable, MutableMapping
 from logging import getLogger
 from types import MethodType, TracebackType, MappingProxyType
+from typing import Never, Any
+from typing import cast
 from typing import overload, NoReturn, cast
 
 from reactions.error import FieldConfigurationError
@@ -26,9 +28,11 @@ from reactions.error import FieldConfigurationError
 from .error import FieldAlreadyBound
 from .executor import Executor
 from .field_descriptor import (FieldDescriptor, FieldReaction, FieldChange,
-                               _BoundField, BoundReaction)
+                               _BoundField, BoundReaction, Evaluator)
 from .predicate import _Reaction, CustomFieldReactionConfiguration
 from .predicate_types import ComparisonPredicates
+from .predicate_types import Not
+
 
 __all__ = ['Field', 'FieldManager', 'FieldWatcher']
 
@@ -36,7 +40,7 @@ logger = getLogger()
 
 
 class BoundField[Ti, Tf](_BoundField[Ti, Tf],
-                     ComparisonPredicates):
+                         ComparisonPredicates[Ti, Tf]):
     '''
     A field bound to a specific instance.
 
@@ -85,7 +89,7 @@ class BoundField[Ti, Tf](_BoundField[Ti, Tf],
         return self.field.evaluate(instance)
 
 class Field[Ti, Tf](FieldDescriptor[Ti, Tf],
-                    ComparisonPredicates):
+                    ComparisonPredicates[Ti, Tf]):
     '''
     Field provides attribute change notification and predicates to configure
     asynchronous callbacks when the condition becomes true.
@@ -176,6 +180,8 @@ class Field[Ti, Tf](FieldDescriptor[Ti, Tf],
             raise FieldConfigurationError(
                 f'conflicting members: {", ".join(conflicts)}')
 
+Not(object())
+Not(Field(True))
 
 class FieldManagerMetaDict(dict[str, object]):
     '''

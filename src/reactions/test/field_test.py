@@ -15,18 +15,23 @@
 '''
 Test field functionality.
 '''
+
 from dataclasses import dataclass
-from types import NoneType
+from typing import Any
 from unittest import TestCase, main
 
 from ..error import (MustNotBeCalled, FieldAlreadyBound,
                      InvalidPredicateExpression, FieldConfigurationError)
 from ..field import (Field, BoundField, FieldManager, FieldWatcher,
                      FieldManagerMeta)
-from ..field_descriptor import FieldDescriptor, FieldChange
+from ..field_descriptor import FieldChange, Evaluator
 from ..predicate import Predicate, _Reaction
 from ..predicate_types import Contains, Not, Or, And
 
+
+def evaluatable_field[Tf](field: Evaluator[Any, Tf, Tf]
+                              ) -> Evaluator[Any, Tf, Tf]:
+    return field
 
 class TestField(TestCase):
 
@@ -109,6 +114,7 @@ class TestField(TestCase):
         self.assertEqual(0, (C.field_b & 1).evaluate(c))
 
         # No operators for these predicates
+        evaluatable_field(C.field_a)
         self.assertFalse((Not(C.field_a)).evaluate(c))
         self.assertTrue(Or(C.field_b, True).evaluate(c))
         self.assertFalse(And(C.field_b, True).evaluate(c))
