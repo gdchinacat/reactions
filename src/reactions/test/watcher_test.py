@@ -73,7 +73,7 @@ class FieldWatcherTest(TestCase):
                 super().__init__(watched, *args, **kwargs)
                 self.change_events: list[tuple[int, int]] = []
 
-            @ Watched.ticks != None
+            @ Watched.ticks != -2
             @ FieldWatcher
             async def _watch(self,
                              watched: Watched,
