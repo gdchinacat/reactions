@@ -19,7 +19,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import partial
-from typing import TypeVar, overload, Never
+from typing import TypeVar, overload, Never, Any
 import logging
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
@@ -54,7 +54,7 @@ class _Reaction[Tw, Ti, Tf](ReactionMustNotBeCalled):
     '''
     The result of decorating a reaction function.
     '''
-    predicate: Predicate[Ti, Tf]
+    predicate: Predicate[Tf]
     func: Reaction[Ti, Tf]|BoundReaction[Tw, Ti, Tf]
 
 
@@ -64,17 +64,9 @@ Decoratee is the type of things that Predicate can decorate or arguments
 to the predicate decorator (Predicate.__call__).
 '''
 
-class Predicate[Ti, Tf](Evaluator[Ti, bool, Tf], ABC):
+class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
     '''
     Predicate evaluates expressions.
-    T - the type the predicate evaluates to
-    TODO - give Predicate a type for the fields they use. Complicated by the
-           fact that a predicate can use fields of different type:
-               And(str_field == 'foo',
-                   int_field == 1))
-            This predicate has two types of fields, what should the predicate
-            type be? str | int? Does this help anything?
-
     Created through Field and Predicate comparison methods:
         field = Field(None)
         field == 'value'  # creates a predicate
@@ -85,7 +77,7 @@ class Predicate[Ti, Tf](Evaluator[Ti, bool, Tf], ABC):
     Predicates objects are immutable and hashable.
     '''
 
-    def react(self,
+    def react[Ti](self,
               change: FieldChange[Ti, Tf],
               *,
               reaction: Reaction) -> None:
@@ -206,7 +198,7 @@ class Predicate[Ti, Tf](Evaluator[Ti, bool, Tf], ABC):
             self.configure_reaction(reaction)
         return _Reaction(self, reaction)
 
-    def configure_reaction(self, reaction: Reaction,
+    def configure_reaction[Ti](self, reaction: Reaction,
                            instance: Ti|None = None) -> None:
         '''configure the reaction on the fields'''
         # Add a reaction on all the fields to call self.react() with
@@ -218,7 +210,7 @@ class Predicate[Ti, Tf](Evaluator[Ti, bool, Tf], ABC):
             field_.reaction(partial(self.react, reaction=reaction))
 
 @dataclass
-class Constant[Ti, Tf](Evaluator[Ti, Tf, Never]):
+class Constant[Tf](Evaluator[Any, Tf, Never]):
     '''An Evaluator that always evaluates to it's value.'''
     value: Tf
 
@@ -239,7 +231,7 @@ class Constant[Ti, Tf](Evaluator[Ti, Tf, Never]):
         return ()
 
 
-class OperatorPredicate[Ti, Tf](Predicate[Ti, Tf], ABC):
+class OperatorPredicate[Tf](Predicate[Tf], ABC):
     '''
     Predicate that uses an operator for its logic.
     '''
@@ -252,36 +244,36 @@ class OperatorPredicate[Ti, Tf](Predicate[Ti, Tf], ABC):
         '''the operator token (i.e. '==') to use for logging the predicate'''
 
 
-class UnaryPredicate[Ti, Tf](OperatorPredicate[Ti, Tf], ABC):
+class UnaryPredicate[Tf](OperatorPredicate[Tf], ABC):
     '''Predicate that has a single operand.'''
-    operand: Evaluator[Ti, Tf, Tf]
+    operand: Evaluator[Any, Tf|bool, Tf]
 
     def __init__(self,
-                 operand: Evaluator[Ti, Tf, Tf]|Tf) -> None:
+                 operand: Evaluator[Any, Tf, Tf]|Tf) -> None:
         if not isinstance(operand, Evaluator):
-            operand = Constant[Ti, Tf](operand)
+            operand = Constant[Tf](operand)
         self.operand = operand
 
     @property
-    def fields(self) -> Iterable[FieldDescriptor[Ti, Tf]]:
+    def fields(self) -> Iterable[FieldDescriptor[Any, Tf]]:
         yield from self.operand.fields
 
-    def evaluate(self, instance: Ti) -> bool:
+    def evaluate[Ti](self, instance: Ti) -> bool:
         return self.operator(self.operand.evaluate(instance))
 
     def __str__(self) -> str:
         return f"({self.token} {self.operand})"
 
 
-class BinaryPredicate[Ti, Tf](OperatorPredicate[Ti, Tf], ABC):
+class BinaryPredicate[Tf](OperatorPredicate[Tf], ABC):
     '''Predicate that has two operands.'''
     # todo typing - do predicate evaluators need Te = Ti|Tf
-    left: Evaluator[Ti, Tf, Tf]
-    right: Evaluator[Ti, Tf, Tf]
+    left: Evaluator[Any, Tf, Tf] | Evaluator[Any, bool, Tf]
+    right: Evaluator[Any, Tf, Tf] | Evaluator[Any, bool, Tf]
 
     def __init__(self,
-                 left: Evaluator[Ti, Tf, Tf] | Tf,
-                 right: Evaluator[Ti, Tf, Tf] | Tf) -> None:
+                 left: Evaluator[Any, Tf, Tf] | Evaluator[Any, bool, Tf] | Tf,
+                 right: Evaluator[Any, Tf, Tf] | Evaluator[Any, bool, Tf] | Tf) -> None:
         # Everything that isn't an Evaluator is treated as a constant.
         # This may need to be reevaluated, but it helps with the fields()
         # logic for now.
@@ -292,11 +284,11 @@ class BinaryPredicate[Ti, Tf](OperatorPredicate[Ti, Tf], ABC):
                             else Constant(right))
 
     @property
-    def fields(self) -> Iterable[FieldDescriptor[Ti, Tf]]:
+    def fields(self) -> Iterable[FieldDescriptor[Any, Tf]]:
         yield from self.left.fields
         yield from self.right.fields
 
-    def evaluate(self, instance: Ti) -> bool:
+    def evaluate[Ti](self, instance: Ti) -> bool:
         return self.operator(self.left.evaluate(instance),
                              self.right.evaluate(instance))
 

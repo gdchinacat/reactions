@@ -26,7 +26,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from itertools import count
 from types import MappingProxyType
-from typing import overload, ClassVar, Self, Coroutine
+from typing import overload, ClassVar, Self, Coroutine, Any
 
 from .error import MustNotBeCalled
 
@@ -158,9 +158,9 @@ class FieldDescriptor[Ti, Tf](Evaluator[Ti, Tf, Tf], ABC):
 
         # Reactions is the list of reactions on the unbound field. BoundField
         # references this in a copy-on-write manner.
-        self.reactions: list[FieldReaction[Ti, Tf]] = []
+        self.reactions: list[FieldReaction[Any, Tf]] = []
 
-    def reaction(self, reaction: FieldReaction[Ti, Tf]) -> None:
+    def reaction(self, reaction: FieldReaction[object, Tf]) -> None:
         ''' Add a reaction to the list of reactions.'''
         self.reactions.append(reaction)
 

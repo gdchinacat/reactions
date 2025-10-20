@@ -35,8 +35,9 @@ class Watched(FieldManager):
     def __init__(self,
                  *args: object,
                  last_tick: int|None = None,
+                 executor: Executor|None = None,
                  **kwargs: object) -> None:
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, executor=executor, **kwargs)
         if last_tick is not None:
             self.last_tick = last_tick
 
@@ -69,7 +70,7 @@ class FieldWatcherTest(TestCase):
             def __init__(self, watched: Watched,
                          *args: object,
                          **kwargs: object) -> None:
-                super().__init__(watched, *args, **kwargs)
+                super().__init__(watched, *args, **kwargs)  # todo executor kwarg confusion
                 self.change_events: list[tuple[int, int]] = []
 
             @ Watched.ticks != None

@@ -25,8 +25,8 @@ from reactions.error import FieldConfigurationError
 
 from .error import FieldAlreadyBound
 from .executor import Executor
-from .field_descriptor import (FieldDescriptor, FieldReaction, Evaluator,
-                               FieldChange, _BoundField, BoundReaction)
+from .field_descriptor import (FieldDescriptor, FieldReaction, FieldChange,
+                               _BoundField, BoundReaction)
 from .predicate import _Reaction, CustomFieldReactionConfiguration
 from .predicate_types import ComparisonPredicates
 
@@ -36,8 +36,7 @@ logger = getLogger()
 
 
 class BoundField[Ti, Tf](_BoundField[Ti, Tf],
-                         Evaluator[Ti, Tf, Tf],
-                         ComparisonPredicates):
+                     ComparisonPredicates):
     '''
     A field bound to a specific instance.
 
