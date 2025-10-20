@@ -290,7 +290,6 @@ class UnaryPredicate[Tf](OperatorPredicate[Tf], ABC):
 
 class BinaryPredicate[Tf](OperatorPredicate[Tf], ABC):
     '''Predicate that has two operands.'''
-    # todo typing - do predicate evaluators need Te = Ti|Tf
     left: PredicateOperand[Tf]
     right: PredicateOperand[Tf]
 

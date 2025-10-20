@@ -20,7 +20,7 @@ from asyncio import run
 from collections.abc import Awaitable, Iterable, MutableMapping
 from logging import getLogger
 from types import MethodType, TracebackType, MappingProxyType
-from typing import overload, NoReturn, cast
+from typing import overload, NoReturn, cast, Self
 
 from .error import FieldAlreadyBound, FieldConfigurationError
 from .executor import Executor
@@ -192,7 +192,7 @@ class FieldManagerMetaDict(dict[str, object]):
 
     def __init__(self, classname: str) -> None:
         self.classname = classname
-        self['_fields'] = tuple[tuple[Field[object, object]]]()  # todo use Ti?
+        self['_fields'] = tuple[tuple[Field[Self, object]]]()
 
     def __setitem__(self, attr: str, value: object)->None:
         if isinstance(value, Field):
@@ -391,7 +391,7 @@ class FieldWatcher[Ti](Reactant, CustomFieldReactionConfiguration, ABC):
     rather than a CustomFieldReactionConfiguration.
     '''
 
-    _reactions: set[_Reaction[Ti, object, object]]  # todo typing Te, TF = object
+    _reactions: set[_Reaction[Ti, object, object]]
     '''
     The reactions the class needs to register bound reactions for when
     instances are initialized.

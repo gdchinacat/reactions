@@ -109,7 +109,7 @@ class Executor:
         # would only recieve the field change and have to be static methods
         # that extract the self from the change.
         reaction_coroutine = reaction(change.instance, change)
-        self.queue.put_nowait((id_, reaction_coroutine, change))  # todo typing
+        self.queue.put_nowait((id_, reaction_coroutine, change))
         logger.log(VERBOSE, '%d scheduled %s(..., %s, %s)',
                    id_, reaction.__qualname__, change.old, change.new)
 

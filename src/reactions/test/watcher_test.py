@@ -103,7 +103,7 @@ class FieldWatcherTest(TestCase):
         class Watcher(FieldWatcher[Watched]):
             reacted: bool = False
             @ Watched.field == True
-            @ FieldWatcher  # todo typing
+            @ FieldWatcher
             async def _true(self,
                             watched: Watched,
                             change: FieldChange[Watched, bool]) -> None:
@@ -147,7 +147,7 @@ class FieldWatcherTest(TestCase):
         self.assertEqual([], State.field.reactions)
 
         state = State()
-        watcher = Watcher(state)  # todo typing
+        watcher = Watcher(state)
 
         self.assertEqual([], State.field.reactions)
         async with state:

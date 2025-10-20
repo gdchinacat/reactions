@@ -32,7 +32,7 @@ class PredicateTest(TestCase):
             field = Field['State', bool](False)
         async def reaction(*_: object) -> None: ...
         predicate = State.field == True
-        reaction = predicate(reaction)  # todo predicate typing
+        reaction = predicate(reaction)
         self.assertEqual(predicate, reaction.predicate)
 
     def test_predicate_decorator_non_self(self) -> None:
