@@ -157,7 +157,8 @@ class FieldDescriptor[Ti, Tf](Evaluator[Ti, Tf, Tf], ABC):
         self.initial_value = initial_value
 
         # Reactions is the list of reactions on the unbound field. BoundField
-        # references this in a copy-on-write manner.
+        # references this in a copy-on-write manner. No restrictions on
+        # instance type are checked (Ti=Any)
         self.reactions: list[FieldReaction[Any, Tf]] = []
 
     def reaction(self, reaction: FieldReaction[object, Tf]) -> None:

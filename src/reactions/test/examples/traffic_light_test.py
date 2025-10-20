@@ -65,7 +65,7 @@ class TrafficLight(FieldManager):
     sequence: list[Color]
 
     def __init__(self, *args: object, **kwargs: object) -> None:
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)  # todo executor kwarg
         self.sequence = []
 
     def _start(self) -> None:

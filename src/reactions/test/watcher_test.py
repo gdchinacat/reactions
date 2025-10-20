@@ -74,7 +74,7 @@ class FieldWatcherTest(TestCase):
                 self.change_events: list[tuple[int, int]] = []
 
             @ Watched.ticks != None
-            @ FieldWatcher  # todo typing
+            @ FieldWatcher
             async def _watch(self,
                              watched: Watched,
                              change: FieldChange[Watched, int]) -> None:

@@ -37,7 +37,10 @@ __all__ = ['Executor']
 
 logger: Logger = getLogger('reactions.executor')
 
-
+# Executor doesn't care what reactions or FieldChanges it is executing. It
+# trusts it is being configured properly to provide the necessary consistency
+# semantics. This makes no effort to enforce anything, only execute what is
+# submitted.
 type AnyReaction = Reaction[Any, Any]
 type AnyFieldChange = FieldChange[Any, Any]
 

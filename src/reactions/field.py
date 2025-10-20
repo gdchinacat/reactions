@@ -14,21 +14,18 @@
 '''
 The public facing Field implementation.
 '''
+
 from abc import ABCMeta, abstractmethod, ABC
 from asyncio import run
 from collections.abc import Awaitable, Iterable, MutableMapping
 from logging import getLogger
 from types import MethodType, TracebackType, MappingProxyType
-from typing import Never, Any
-from typing import cast
 from typing import overload, NoReturn, cast
 
-from reactions.error import FieldConfigurationError
-
-from .error import FieldAlreadyBound
+from .error import FieldAlreadyBound, FieldConfigurationError
 from .executor import Executor
 from .field_descriptor import (FieldDescriptor, FieldReaction, FieldChange,
-                               _BoundField, BoundReaction, Evaluator)
+                               _BoundField, BoundReaction)
 from .predicate import _Reaction, CustomFieldReactionConfiguration
 from .predicate_types import ComparisonPredicates
 from .predicate_types import Not

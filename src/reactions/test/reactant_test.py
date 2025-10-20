@@ -37,7 +37,7 @@ class State(FieldManager):
     infinite_loop_running: Future[None]
 
     def __init__(self, *args: object, **kwargs: object) -> None:
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)  # todo executor kwarg
         self.infinite_loop_running = Future()
 
     def _start(self) -> None:
