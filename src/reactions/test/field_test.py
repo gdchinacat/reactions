@@ -53,7 +53,6 @@ class TestField(TestCase):
         c = C()
         self.assertTrue(c.field == True)
 
-        # set a notification on c.field_a to call print
         reaction_called = False
         def reaction(change: FieldChange[C, bool]) -> None:
             nonlocal reaction_called

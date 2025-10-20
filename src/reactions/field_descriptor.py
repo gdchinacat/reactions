@@ -161,7 +161,7 @@ class FieldDescriptor[Ti, Tf](Evaluator[Ti, Tf, Tf], ABC):
         # instance type are checked (Ti=Any)
         self.reactions: list[FieldReaction[Any, Tf]] = []
 
-    def reaction(self, reaction: FieldReaction[object, Tf]) -> None:
+    def reaction(self, reaction: FieldReaction[Ti, Tf]) -> None:
         ''' Add a reaction to the list of reactions.'''
         self.reactions.append(reaction)
 
