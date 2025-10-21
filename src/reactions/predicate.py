@@ -89,6 +89,7 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
 
     Predicates objects are immutable and hashable.
     It is an Evaluator for any type of instance since Predicates may be
+    composed of fields from different instance types.
     '''
 
     def react[Ti](self,
