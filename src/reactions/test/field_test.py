@@ -187,9 +187,13 @@ class TestField(TestCase):
             def _start(self) -> None: ...
         class Watcher(FieldWatcher[Watched]):
             _false: object
+            # todo typing @ FieldWatcher seems to break predicate decorator
+            #      reaction static type checking. Specifically int in reaction
+            #      is wrong, should be bool.
             @ Watched.field == True
+            @ FieldWatcher
             async def _true(self,
-                            change: FieldChange[Watched, bool]) -> None:
+                            change: FieldChange[Watched, int]) -> None:
                 pass
 
         watched = Watched()
