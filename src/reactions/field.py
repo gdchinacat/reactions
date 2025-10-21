@@ -20,7 +20,7 @@ from asyncio import run
 from collections.abc import Awaitable, Iterable, MutableMapping
 from logging import getLogger
 from types import MethodType, TracebackType, MappingProxyType, NoneType
-from typing import overload, NoReturn, cast, Self
+from typing import overload, NoReturn, cast, Self, Any
 
 from .error import FieldAlreadyBound, FieldConfigurationError
 from .executor import Executor
@@ -368,7 +368,10 @@ class FieldManager(Reactant, ABC, metaclass=FieldManagerMeta):
     '''
 
 
-class FieldWatcher[Ti](Reactant, CustomFieldReactionConfiguration, ABC):
+class FieldWatcher[Ti](Reactant,
+                       CustomFieldReactionConfiguration['FieldWatcher[Ti]',
+                                                        Ti, Any],
+                        ABC):
     '''
     Base class to allow subclasses to watch Fields on other classes.
 
@@ -403,15 +406,14 @@ class FieldWatcher[Ti](Reactant, CustomFieldReactionConfiguration, ABC):
 
     _reactions: set[_Reaction[Ti, object, object]]
     '''
-    The reactions the class needs to register bound reactions for when
+    The reactions FieldWatcher needs to register bound reactions for when
     instances are initialized.
     '''
 
-    # todo move overloads into .pyi
     @overload
     def __init__(self,
-                 reaction_or_watched: BoundReaction,
-                 ) -> None:
+                 reaction_or_watched: BoundReaction[FieldWatcher[Ti],
+                                                    Ti, Any]) -> None:
         '''
         Reaction decorator to indicate the reaction referred to by
         reaction_or_watched is managed by FieldWatcher.
@@ -429,7 +431,8 @@ class FieldWatcher[Ti](Reactant, CustomFieldReactionConfiguration, ABC):
         '''
 
     def __init__(self,
-                 reaction_or_watched: Ti|BoundReaction,
+                 reaction_or_watched: Ti | BoundReaction[FieldWatcher[Ti],
+                                                         Ti, Any],
                  *args: object,
                  **kwargs: object) -> None:
         '''

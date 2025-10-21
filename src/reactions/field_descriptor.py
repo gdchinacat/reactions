@@ -26,7 +26,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from itertools import count
 from types import MappingProxyType
-from typing import overload, ClassVar, Self, Coroutine, Any
+from typing import overload, ClassVar, Self, Coroutine, Any, ParamSpec
 
 from .error import MustNotBeCalled
 
@@ -52,8 +52,8 @@ predicate decorated methods.
 '''
 
 
-type BoundReaction[Tw, Ti, Tf] = Callable[  # move to .predicate?
-    [Tw, Ti, FieldDescriptor[Ti, Tf], Tf, Tf],
+type BoundReaction[Tw, Ti, Tf] = Callable[
+    [Tw, Ti, FieldChange[Ti, Tf]],
     ReactionCoroutine]
 '''
 BoundReaction is a Reaction on a type that is not the instance that changed.

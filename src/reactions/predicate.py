@@ -12,6 +12,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 '''
 Predicates implement comparison checks.
 '''
@@ -39,14 +40,20 @@ Tp = TypeVar('Tp')
 
 
 @dataclass
-class CustomFieldReactionConfiguration:
+class CustomFieldReactionConfiguration[Tw, Ti, Tf]:
     '''
-    Class to indicate to Predicate.__call__ that field reactions should not
-    be handled by the Predicate decorator. The decorator will still return a
-    _Reaction that references the reaction that can be used to do this
-    configuration.
+    CustomFieldReactionConfiguration indicates to Predicate.__call__ that
+    field reactions should not be handled by the Predicate decorator. The
+    decorator will still return a _Reaction that references the reaction that
+    can be used to do this configuration.
+
+    FieldWatcher (typically) subclass reactions are decorated with this class
+    so that the predicates that decorate them do not register field reactions.
+    Instead, the CustomFieldReactionConfiguration.reaction is added as a
+    reaction on the fields or the reactions of the subclass bound to the
+    instance.
     '''
-    reaction: BoundReaction|None  # todo typing reaction
+    reaction: BoundReaction[Tw, Ti, Tf] | None  # todo typing reaction
 
 
 @dataclass(eq=True, frozen=True)
@@ -55,12 +62,13 @@ class _Reaction[Tw, Ti, Tf](ReactionMustNotBeCalled):
     The result of decorating a reaction function.
     '''
     predicate: Predicate[Tf]
-    func: Reaction[Ti, Tf]|BoundReaction[Tw, Ti, Tf]
+    func: Reaction[Ti, Tf] | BoundReaction[Tw, Ti, Tf]
 
 
-type Decoratee[Tf, Tr, Tp] = Reaction|CustomFieldReactionConfiguration
+type Decorated[Tw, Ti, Tf] = ( Reaction[Ti, Tf]
+                              |CustomFieldReactionConfiguration[Tw, Ti, Tf])
 '''
-Decoratee is the type of things that Predicate can decorate or arguments
+Decorated is the type of things that Predicate can decorate or arguments
 to the predicate decorator (Predicate.__call__).
 '''
 
@@ -86,7 +94,7 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
     def react[Ti](self,
               change: FieldChange[Ti, Tf],
               *,
-              reaction: Reaction) -> None:
+              reaction: Reaction[Ti, Tf]) -> None:
         '''
         React to a field value changing. If the result of evaluating this
         predicate is True the reaction will be scheduled for execution.
@@ -131,13 +139,19 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
             executor.react(reaction, change)
 
     @overload
-    def __call__(self, decorated: Reaction) -> _Reaction: ...
+    def __call__[Tw, Ti](self,
+                         decorated: Decorated[Tw, Ti, Tf]
+                        ) -> _Reaction[Tw, Ti, Tf]: ...
 
     @overload
-    def __call__(self, decorated: CustomFieldReactionConfiguration
-                 ) -> _Reaction: ...
+    def __call__[Tw, Ti](self,
+                         decorated: CustomFieldReactionConfiguration[
+                             Tw, Ti, Tf]
+                        ) -> _Reaction[Tw, Ti, Tf]: ...
 
-    def __call__(self, decorated: Decoratee) -> _Reaction:
+    def __call__[Tw, Ti](self,
+                         decorated: Decorated[Tw, Ti, Tf]
+                        ) -> _Reaction[Tw, Ti, Tf]:
         '''
         Predicates are decorators that arrange for the decorated method to be
         called when the predicate becomes True.
@@ -191,7 +205,7 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
         not configure reactions that need to be bound to specific instances
         (rather than the classes that fields are on).
         '''
-        reaction: Reaction|BoundReaction
+        reaction: Reaction[Ti, Tf] | BoundReaction[Tw, Ti, Tf]
         if isinstance(decorated, CustomFieldReactionConfiguration):
             assert decorated.reaction
             reaction = decorated.reaction
@@ -204,8 +218,9 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
             self.configure_reaction(reaction)
         return _Reaction(self, reaction)
 
-    def configure_reaction[Ti](self, reaction: Reaction,
-                           instance: Ti|None = None) -> None:
+    def configure_reaction[Tw, Ti](self,
+                                   reaction:Reaction[Ti, Tf],
+                                   instance: Ti|None = None) -> None:
         '''configure the reaction on the fields'''
         # Add a reaction on all the fields to call self.react() with
         # func as the reaction function.

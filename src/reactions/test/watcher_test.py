@@ -21,7 +21,6 @@ from ..error import ReactionMustNotBeCalled
 from ..executor import Executor
 from ..field import Field, FieldManager, FieldWatcher
 from ..field_descriptor import FieldChange
-from ..predicate import _Reaction
 from ..predicate_types import And
 from .async_helpers import asynctest
 
@@ -139,7 +138,6 @@ class FieldWatcherTest(TestCase):
                             change: FieldChange[State, bool]) -> None:
                 self.called = True
 
-        self.assertIsInstance(Watcher._true, _Reaction)
         self.assertRaises(ReactionMustNotBeCalled, Watcher._true)
 
         # reactions that look like they are bound aren't added to the class

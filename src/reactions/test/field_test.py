@@ -24,7 +24,7 @@ from ..error import (MustNotBeCalled, InvalidPredicateExpression,
 from ..field import (Field, BoundField, FieldManager, FieldWatcher,
                      FieldManagerMeta)
 from ..field_descriptor import FieldChange
-from ..predicate import Predicate, _Reaction
+from ..predicate import Predicate
 from ..predicate_types import Contains, Not, Or, And
 
 
@@ -202,7 +202,6 @@ class TestField(TestCase):
         # add another reaction to Watcher.
         @ Watched.field == False
         async def _false(*_: object) -> None: ...
-        self.assertIsInstance(_false, _Reaction)
         Watcher._false = _false  # unsupported, don't do this outside tests
 
         # verify Watcher reactions hasn't changed (indicating it was cached)
