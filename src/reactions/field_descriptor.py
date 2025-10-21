@@ -38,7 +38,7 @@ type FieldReaction[Ti, Tf] = Callable[[FieldChange[Ti, Tf]], None]
 '''A method that is called when a field changes.'''
 
 
-type ReactionCoroutine = Coroutine[object, object, None]
+type ReactionCoroutine = Coroutine[None, None, None]
 '''Recation coroutines do not yeild or send, and return None'''
 
 

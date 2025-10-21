@@ -139,17 +139,6 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
             executor = executor_provider.executor  # type: ignore
             executor.react(reaction, change)
 
-    @overload
-    def __call__[Tw, Ti](self,
-                         decorated: Decorated[Tw, Ti, Tf]
-                        ) -> _Reaction[Tw, Ti, Tf]: ...
-
-    @overload
-    def __call__[Tw, Ti](self,
-                         decorated: CustomFieldReactionConfiguration[
-                             Tw, Ti, Tf]
-                        ) -> _Reaction[Tw, Ti, Tf]: ...
-
     def __call__[Tw, Ti](self,
                          decorated: Decorated[Tw, Ti, Tf]
                         ) -> _Reaction[Tw, Ti, Tf]:
