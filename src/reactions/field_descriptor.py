@@ -26,7 +26,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from itertools import count
 from types import MappingProxyType
-from typing import overload, ClassVar, Self, Coroutine, Any, ParamSpec
+from typing import overload, ClassVar, Self, Coroutine, Any
 
 from .error import MustNotBeCalled
 

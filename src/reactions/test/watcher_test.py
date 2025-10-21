@@ -53,12 +53,7 @@ class Watched(FieldManager):
         self.ticks += 1
 
     @ ticks == last_tick
-    # todo - Field[..., bool] is wrong...predicate decorator typing isn't
-    #        working because it expects to pass a BaseField to reaction and
-    #        reaction accepts more specific Field. Even then, the field type
-    #        isn't validating properly. Needs a fair bit of work.
-    # todo - create a predicate_test for reaction type checking
-    async def done(self, change: FieldChange['Watched', bool]) -> None:
+    async def done(self, change: FieldChange['Watched', int]) -> None:
         self.ticks = -1
         self.stop()
 
