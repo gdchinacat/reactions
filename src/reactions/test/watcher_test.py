@@ -44,7 +44,8 @@ class Watched(FieldManager):
         self.ticks = 0
 
     @ ticks
-    async def _tick(self,change: FieldChange['Watched', int]) -> None:
+    async def _boolean_ticks(
+        self, change: FieldChange['Watched', int]) -> None:
         '''no op to exercise field Boolean decorator'''
 
     @ And(ticks != -1,

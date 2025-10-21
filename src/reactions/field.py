@@ -177,8 +177,6 @@ class Field[Ti, Tf](FieldDescriptor[Ti, Tf],
             raise FieldConfigurationError(
                 f'conflicting members: {", ".join(conflicts)}')
 
-Not(object())
-Not(Field(True))
 
 class FieldManagerMetaDict(dict[str, object]):
     '''

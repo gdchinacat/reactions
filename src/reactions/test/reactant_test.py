@@ -46,14 +46,14 @@ class State(FieldManager):
 
     @ exception != None
     async def exception_(self,
-                         change: FieldChange[State, Exception]) -> None:
+                         change: FieldChange[State, Exception|None]) -> None:
         '''raise an exception'''
         if change.new is not None:
             raise change.new
 
     @ infinite_loop == True
     async def _infinite_interuptable_loop(
-        self, change: FieldChange[State, int]) -> NoReturn:
+        self, change: FieldChange[State, bool]) -> NoReturn:
         '''enter an infinite loop. Currently no way to exit it.'''
         assert self.infinite_loop_running is not None
         self.infinite_loop_running.set_result(None)
