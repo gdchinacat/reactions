@@ -17,7 +17,7 @@
 Predicates implement comparison checks.
 '''
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from functools import partial
 from typing import TypeVar, overload, Any
@@ -249,8 +249,8 @@ class Constant[Tf](Evaluator[Any, Tf, Tf]):
     def __bool__(self) -> None: ...
 
     @property
-    def fields(self) -> Iterable[FieldDescriptor[Any, Tf]]:
-        return ()
+    def fields(self) -> Iterator[FieldDescriptor[Any, Tf]]:
+        return iter(())
 
 
 class OperatorPredicate[Tf](Predicate[Tf], ABC):
@@ -293,7 +293,7 @@ class UnaryPredicate[Tf](OperatorPredicate[Tf], ABC):
         self.operand = operand
 
     @property
-    def fields(self) -> Iterable[FieldDescriptor[Any, Tf]]:
+    def fields(self) -> Iterator[FieldDescriptor[Any, Tf]]:
         yield from self.operand.fields
 
     def evaluate[Ti](self, instance: Ti) -> bool:
@@ -331,7 +331,7 @@ class BinaryPredicate[Tf](OperatorPredicate[Tf], ABC):
                             else Constant(right))
 
     @property
-    def fields(self) -> Iterable[FieldDescriptor[Any, Tf]]:
+    def fields(self) -> Iterator[FieldDescriptor[Any, Tf]]:
         yield from self.left.fields
         yield from self.right.fields
 

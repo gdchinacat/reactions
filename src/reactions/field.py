@@ -17,10 +17,10 @@ The public facing Field implementation.
 
 from abc import ABCMeta, abstractmethod, ABC
 from asyncio import run
-from collections.abc import Awaitable, Iterable, MutableMapping
+from collections.abc import Awaitable, Iterator, MutableMapping
 from logging import getLogger
 from types import MethodType, TracebackType, MappingProxyType, NoneType
-from typing import overload, NoReturn, cast, Self, Any
+from typing import overload, NoReturn, cast, Self, Any, Iterable
 
 from .error import FieldAlreadyBound, FieldConfigurationError
 from .executor import Executor
@@ -79,7 +79,7 @@ class BoundField[Ti, Tf](_BoundField[Ti, Tf],
     __repr__ = __str__
 
     @property
-    def fields(self) -> Iterable[Field[Ti, Tf]]:
+    def fields(self) -> Iterator[Field[Ti, Tf]]:
         yield self.field
 
     def evaluate(self, instance: Ti) -> Tf:
@@ -167,8 +167,7 @@ class Field[Ti, Tf](FieldDescriptor[Ti, Tf],
             # bare class, find fields by iterating contents of class dict
             fields  = [x for x in namespace.values() if isinstance(x, Field)]
 
-        assert isinstance(fields, Iterable)
-        fields = cast(Iterable[Field[Ti, object]], fields)
+        assert isinstance(fields, Iterable), f'fields is a {type(fields)=}'
         attr_field_names = {
             name for field in fields
                  for name in (field._attr, field._attr_bound)}  # pylint: disable=protected-access
@@ -259,7 +258,7 @@ class BoundFieldCreatorMixin:
     dispatch to the bound field rather than having to check if the Field or the 
     bound field should be called.
     '''
-    _fields: Iterable[Field[BoundFieldCreatorMixin, object]]  # todo should be the subclass of BFCM
+    _fields: Iterator[Field[BoundFieldCreatorMixin, object]]  # todo should be the subclass of BFCM
 
     def __new__(cls, *_: object, **__: object) -> BoundFieldCreatorMixin:
         nascent = super().__new__(cls)

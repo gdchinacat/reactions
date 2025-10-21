@@ -22,7 +22,7 @@ track and call the reactions when field values change.
 '''
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from itertools import count
 from types import MappingProxyType
@@ -71,7 +71,7 @@ class Evaluator[Ti, Te, Tf](ABC):
 
     @property
     @abstractmethod
-    def fields(self) -> Iterable[FieldDescriptor[Ti, Tf]]:
+    def fields(self) -> Iterator[FieldDescriptor[Ti, Tf]]:
         raise NotImplementedError
 
     @abstractmethod
@@ -279,7 +279,7 @@ class FieldDescriptor[Ti, Tf](Evaluator[Ti, Tf, Tf], ABC):
         None, "removal of state attributes is not permitted")
 
     @property
-    def fields(self) -> Iterable[FieldDescriptor[Ti, Tf]]:
+    def fields(self) -> Iterator[FieldDescriptor[Ti, Tf]]:
         yield self
 
     def __str__(self) -> str:
