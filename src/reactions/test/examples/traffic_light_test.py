@@ -38,9 +38,8 @@ class Color(Enum):
     YELLOW = 3
 
 
-type IntOrColor = Field[TrafficLight, int] | Field[TrafficLight, Color]
-
-type IntOrColorFieldChange = FieldChange[TrafficLight, IntOrColor]
+type TlFc[Tf] = FieldChange[TrafficLight, Tf]
+type IntOrColorFieldChange = TlFc[int] | TlFc[Color]
 
 class TrafficLight(FieldManager):
     '''
