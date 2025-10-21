@@ -21,10 +21,11 @@ import operator
 
 from .field_descriptor import Evaluator
 from .predicate import (UnaryPredicate, BinaryPredicate, Predicate,
-                        PredicateArgument, PredicateOperand)
+                        PredicateArgument, PredicateOperand, Decorated,
+                        _Reaction)
 
 
-__all__ = ['Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
+__all__ = ['Boolean', 'Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
            'Contains', 'BinaryAnd', 'BinaryOr', 'BinaryNot',
            'ComparisonPredicates']
 
@@ -32,6 +33,10 @@ __all__ = ['Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
 class Not[Tf](UnaryPredicate[Tf]):
     token = '!not!'
     operator = operator.not_
+
+class Boolean[Tf](UnaryPredicate[Tf]):
+    token = 'bool'
+    operator = bool
 
 class And[Tf](BinaryPredicate[Tf]):
     token = '!and!'
@@ -139,3 +144,8 @@ class ComparisonPredicates[Ti, Tf](Evaluator[Ti, Tf, Tf]):
     def __ge__(self, other: PredicateArgument[Tf]) -> Predicate[Tf]:
         '''create an Ge (>=) predicate for the field'''
         return Ge(self, other)
+
+    def __call__[Tw](self, decorated: Decorated[Tw, Ti, Tf]
+                    ) -> _Reaction[Tw, Ti, Tf]:
+        '''Can be used as a decorator to create a predicate Boolean'''
+        return Boolean(self)(decorated)

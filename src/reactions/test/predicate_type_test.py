@@ -15,7 +15,7 @@
 from unittest import TestCase, main
 
 from .. import (Eq, Ne, Lt, Le, Gt, Ge, Contains, Constant, Not, Or,
-                And, BinaryAnd, BinaryOr, InvalidPredicateExpression)
+                And, BinaryAnd, BinaryOr, Boolean, InvalidPredicateExpression)
 
 class TestPredicate(TestCase):
 
@@ -81,6 +81,12 @@ class TestPredicate(TestCase):
             Constant(1) and Constant(1)
         with self.assertRaises(InvalidPredicateExpression):
             And(True, True) and And(True, True)
+
+    def test_boolean_predicate(self) -> None:
+        self.assertTrue(Boolean(True).evaluate(None))
+        self.assertFalse(Boolean(False).evaluate(None))
+        self.assertTrue(Boolean(object()).evaluate(None))
+        self.assertFalse(Boolean(None).evaluate(None))
 
 if __name__ == '__main__':
     main()

@@ -43,6 +43,10 @@ class Watched(FieldManager):
     def _start(self) -> None:
         self.ticks = 0
 
+    @ ticks
+    async def _tick(self,change: FieldChange['Watched', int]) -> None:
+        '''no op to exercise field Boolean decorator'''
+
     @ And(ticks != -1,
           ticks != last_tick)
     async def tick(self, change: FieldChange['Watched', int]) -> None:
@@ -76,7 +80,7 @@ class FieldWatcherTest(TestCase):
             @ FieldWatcher
             async def _watch(self,
                              watched: Watched,
-                             change: FieldChange[Watched, int]) -> None:
+                             change: FieldChange[Watched, bool]) -> None:  # todo bool is wrong without static type error
                 assert isinstance(self, Watcher), f'got {type(self)=}'
                 assert isinstance(watched, Watched), f'got {type(watched)=}'
                 self.change_events.append((change.old, change.new))
