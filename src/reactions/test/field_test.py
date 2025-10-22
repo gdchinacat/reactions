@@ -111,6 +111,7 @@ class TestField(TestCase):
         self.assertFalse((Not(C.field_a)).evaluate(c))
         self.assertTrue(Or(C.field_b, True).evaluate(c))
         self.assertFalse(And(C.field_b, True).evaluate(c))
+        self.assertFalse(And(True, C.field_b).evaluate(c))
 
         # __contains__ doesn't seem to work with non-bool returns (explains why
         # sqlalchemy uses in_() rather than 'foo in bar' I've wondered about
