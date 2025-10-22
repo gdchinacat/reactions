@@ -13,10 +13,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Any
 from unittest import TestCase, main
 
 from ..error import InvalidPredicateExpression
-from ..field_descriptor import FieldDescriptor
+from ..field import Field
+from ..field_descriptor import FieldDescriptor, FieldChange
 from ..predicate import Constant
 from ..predicate_types import (Eq, Ne, Lt, Le, Gt, Ge, Contains, Not, Or,
                 And, BitwiseAnd, BitwiseOr, BitwiseNot, Boolean,
@@ -24,6 +27,14 @@ from ..predicate_types import (Eq, Ne, Lt, Le, Gt, Ge, Contains, Not, Or,
 
 
 class TestPredicate(TestCase):
+
+    @contextmanager
+    def assertReactionAdded(self, field: FieldDescriptor[Any, Any]
+                       ) -> Iterator[None]:
+        '''assert that a reaction is added to the field'''
+        count = len(field.reactions)
+        yield None
+        self.assertEqual(len(field.reactions), count + 1)
 
     def test_eq_constant_constant(self) -> None:
         self.assertTrue(Eq(1, 1).evaluate(None))
@@ -68,9 +79,18 @@ class TestPredicate(TestCase):
         self.assertTrue(Or(True, False).evaluate(None))
         self.assertFalse(Or(False, False).evaluate(None))
 
-    def test_and_predicate(self) -> None:
+    def test_and_predicate_evaluate(self) -> None:
         self.assertFalse(And(True, False).evaluate(None))
         self.assertTrue(And(True, True).evaluate(None))
+
+    def test_and_predicate_decorate_creates_reaction(self) -> None:
+        class C:
+            field_a = Field['C', bool](False, 'C', 'field_a')
+            field_b = Field['C', bool](False, 'C', 'field_b')
+
+        with self.assertReactionAdded(C.field_a):
+            @ And(C.field_a == True, True)  # todo typing compound predicates
+            async def _(c: C, change: FieldChange[C, bool]) -> None: ...
 
     def test_not_predicate(self) -> None:
         self.assertTrue(Not(False).evaluate(None))
