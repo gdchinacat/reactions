@@ -12,10 +12,16 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+from collections.abc import Iterator
 from unittest import TestCase, main
 
-from .. import (Eq, Ne, Lt, Le, Gt, Ge, Contains, Constant, Not, Or,
-                And, BinaryAnd, BinaryOr, Boolean, InvalidPredicateExpression)
+from ..error import InvalidPredicateExpression
+from ..field_descriptor import FieldDescriptor
+from ..predicate import Constant
+from ..predicate_types import (Eq, Ne, Lt, Le, Gt, Ge, Contains, Not, Or,
+                And, BitwiseAnd, BitwiseOr, BitwiseNot, Boolean,
+                ComparisonPredicates)
+
 
 class TestPredicate(TestCase):
 
@@ -71,10 +77,10 @@ class TestPredicate(TestCase):
         self.assertFalse(Not(True).evaluate(None))
 
     def test_binary_or_predicate(self) -> None:
-        self.assertEqual(0b11, BinaryOr(0b01, 0b10).evaluate(None))
+        self.assertEqual(0b11, BitwiseOr(0b01, 0b10).evaluate(None))
 
     def test_binary_and_predicate(self) -> None:
-        self.assertEqual(0b010, BinaryAnd(0b111, 0b010).evaluate(None))
+        self.assertEqual(0b010, BitwiseAnd(0b111, 0b010).evaluate(None))
 
     def test_and_invalid_predicate(self) -> None:
         with self.assertRaises(InvalidPredicateExpression):
@@ -87,6 +93,28 @@ class TestPredicate(TestCase):
         self.assertFalse(Boolean(False).evaluate(None))
         self.assertTrue(Boolean(object()).evaluate(None))
         self.assertFalse(Boolean(None).evaluate(None))
+
+    def test_comparison_creates_predicate(self) -> None:
+        class C: ...
+        class Creator(ComparisonPredicates[C, int]):
+            def evaluate(self, instance: C)->bool:
+                raise NotImplementedError()
+            @property
+            def fields(self)->Iterator[FieldDescriptor[C, int]]:
+                raise NotImplementedError()
+
+        creator = Creator()
+
+        self.assertIsInstance(creator == 0, Eq)
+        self.assertIsInstance(creator != 0, Ne)
+        self.assertIsInstance(creator < 0, Lt)
+        self.assertIsInstance(creator <= 0, Le)
+        self.assertIsInstance(creator > 0, Gt)
+        self.assertIsInstance(creator >= 0, Ge)
+        self.assertIsInstance(creator & 0, BitwiseAnd)
+        self.assertIsInstance(creator | 0, BitwiseOr)
+        self.assertIsInstance(~creator, BitwiseNot)
+
 
 if __name__ == '__main__':
     main()

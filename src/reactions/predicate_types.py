@@ -26,7 +26,7 @@ from .predicate import (UnaryPredicate, BinaryPredicate, Predicate,
 
 
 __all__ = ['Boolean', 'Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
-           'Contains', 'BinaryAnd', 'BinaryOr', 'BinaryNot',
+           'Contains', 'BitwiseAnd', 'BitwiseOr', 'BitwiseNot',
            'ComparisonPredicates']
 
 
@@ -74,19 +74,19 @@ class Contains[Tf](BinaryPredicate[Tf]):
     token = 'contains'
     operator = operator.contains
 
-# BinaryAnd and BinaryOr aren't strictly predicates since they don't evaluate
+# BitwiseAnd and BitwiseOr aren't strictly predicates since they don't evaluate
 # to a bool. Still useful, so included.
-class BinaryAnd[Tf](BinaryPredicate[Tf]):
+class BitwiseAnd[Tf](BinaryPredicate[Tf]):
     token = '&'
     operator = operator.and_
 
-class BinaryOr[Tf](BinaryPredicate[Tf]):
+class BitwiseOr[Tf](BinaryPredicate[Tf]):
     token = '|'
     operator = operator.or_
 
-class BinaryNot[Tf](BinaryPredicate[Tf]):
+class BitwiseNot[Tf](UnaryPredicate[Tf]):
     token = '~'
-    operator = operator.or_
+    operator = operator.__not__
 
 
 class ComparisonPredicates[Ti, Tf](Evaluator[Ti, Tf, Tf]):
@@ -114,12 +114,16 @@ class ComparisonPredicates[Ti, Tf](Evaluator[Ti, Tf, Tf]):
     def __and__(self, other: Tf) -> Predicate[Tf]: ...
 
     def __and__(self, other: PredicateOperand[Tf]|Tf) -> Predicate[Tf]:
-        '''create a BinaryAnd (&) predicate for the field'''
-        return BinaryAnd(self, other)
+        '''create a BitwiseAnd (&) predicate for the field'''
+        return BitwiseAnd(self, other)
 
     def __or__(self, other: PredicateArgument[Tf]) -> Predicate[Tf]:
-        '''create a BinaryOr (|) predicate for the field'''
-        return BinaryOr(self, other)
+        '''create a BitwiseOr (|) predicate for the field'''
+        return BitwiseOr(self, other)
+
+    def __invert__(self) -> Predicate[Tf]:
+        '''create a BitwiseNot (~) predicate for the field'''
+        return BitwiseNot(self)
 
     def __eq__(self, other: PredicateArgument[Tf]) -> Predicate[Tf]:  # type: ignore[override]
         '''create an Eq (==) predicate for the field'''
