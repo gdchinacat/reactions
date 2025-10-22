@@ -39,6 +39,9 @@ class Boolean[Tf](UnaryPredicate[Tf]):
     operator = bool
 
 class And[Tf](BinaryPredicate[Tf]):
+    # todo? Allow And to take more than two operands? Since it can't be written
+    #       as 'foo and bar and baz' and requires And(foo, And(bar, baz)) it
+    #       is preptty clunky...And(foo, bar, baz) would be a big improvement.
     token = '!and!'
     operator = lambda _, a, b: a and b
 
