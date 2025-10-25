@@ -39,7 +39,7 @@ class Watched(FieldManager):
 
     @ And(field != -1,
           Not(stop_predicate))
-    async def increment(self, *_: object) -> None:
+    async def increment(self, change: FieldChange[Watched, int]) -> None:
         '''increment the field value until the stop predicate is true'''
         self.field += 1
 

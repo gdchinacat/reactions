@@ -16,7 +16,7 @@
 The predicate implementation types.
 '''
 
-from typing import overload
+from typing import overload, override
 import operator
 
 from .field_descriptor import Evaluator
@@ -30,13 +30,17 @@ __all__ = ['Boolean', 'Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
            'ComparisonPredicates']
 
 
+class Boolean[Tf](UnaryPredicate[Tf]):
+    token = 'bool'
+    operator = bool
+
 class Not[Tf](UnaryPredicate[Tf]):
     token = '!not!'
     operator = operator.not_
 
-class Boolean[Tf](UnaryPredicate[Tf]):
-    token = 'bool'
-    operator = bool
+    @override
+    def __init__(self, operand: Predicate[Tf]) -> None:
+        return super().__init__(operand)
 
 class And[Tf](BinaryPredicate[Tf]):
     # todo? Allow And to take more than two operands? Since it can't be written
@@ -45,9 +49,17 @@ class And[Tf](BinaryPredicate[Tf]):
     token = '!and!'
     operator = lambda _, a, b: a and b
 
+    @override
+    def __init__(self, left: Predicate[Tf], right: Predicate[Tf]) -> None:
+        super().__init__(left, right)
+
 class Or[Tf](BinaryPredicate[Tf]):
     token = '!or!'
     operator = lambda _, a, b: a or b
+
+    @override
+    def __init__(self, left: Predicate[Tf]|Tf, right: Predicate[Tf]|Tf) -> None:
+        super().__init__(left, right)
 
 class Eq[Tf](BinaryPredicate[Tf]):
     token = '=='

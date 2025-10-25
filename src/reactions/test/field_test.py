@@ -25,7 +25,7 @@ from ..field import (Field, BoundField, FieldManager, FieldWatcher,
                      FieldManagerMeta)
 from ..field_descriptor import FieldChange
 from ..predicate import Predicate
-from ..predicate_types import Contains, Not, Or, And
+from ..predicate_types import Contains, Not, Or, And, Boolean
 
 
 class TestField(TestCase):
@@ -108,10 +108,10 @@ class TestField(TestCase):
         self.assertEqual(0, (C.field_b & 1).evaluate(c))
 
         # No operators for these predicates
-        self.assertFalse((Not(C.field_a)).evaluate(c))
+        self.assertFalse((Not(Boolean(C.field_a))).evaluate(c))
         self.assertTrue(Or(C.field_b, True).evaluate(c))
-        self.assertFalse(And(C.field_b, True).evaluate(c))
-        self.assertFalse(And(True, C.field_b).evaluate(c))
+        self.assertFalse(And(Boolean(C.field_b), Boolean(True)).evaluate(c))
+        self.assertFalse(And(Boolean(True), Boolean(C.field_b)).evaluate(c))
 
         # __contains__ doesn't seem to work with non-bool returns (explains why
         # sqlalchemy uses in_() rather than 'foo in bar' I've wondered about

@@ -80,8 +80,14 @@ class TestPredicate(TestCase):
         self.assertFalse(Or(False, False).evaluate(None))
 
     def test_and_predicate_evaluate(self) -> None:
-        self.assertFalse(And(True, False).evaluate(None))
-        self.assertTrue(And(True, True).evaluate(None))
+        class C:
+            field = Field['C', bool](False, 'C', 'field')
+
+        c = C()
+        self.assertFalse(And(Boolean(C.field), Boolean(C.field)).evaluate(c))
+
+        c.field = True
+        self.assertTrue(And(Boolean(C.field), Boolean(C.field)).evaluate(c))
 
     def test_and_predicate_decorate_creates_reaction(self) -> None:
         class C:
@@ -89,12 +95,18 @@ class TestPredicate(TestCase):
             field_b = Field['C', bool](False, 'C', 'field_b')
 
         with self.assertReactionAdded(C.field_a):
-            @ And(C.field_a == True, True)  # todo typing compound predicates
+            # The predicates don't matter since it is never evaluated.
+            @ And(C.field_a == True, C.field_a == False)
             async def _(c: C, change: FieldChange[C, bool]) -> None: ...
 
     def test_not_predicate(self) -> None:
-        self.assertTrue(Not(False).evaluate(None))
-        self.assertFalse(Not(True).evaluate(None))
+        class C:
+            field = Field['C',bool](True, 'C', 'field')
+        c = C()
+        true_predicate = C.field == True
+        false_predicate = C.field == False
+        self.assertTrue(Not(false_predicate).evaluate(c))
+        self.assertFalse(Not(true_predicate).evaluate(c))
 
     def test_binary_or_predicate(self) -> None:
         self.assertEqual(0b11, BitwiseOr(0b01, 0b10).evaluate(None))
@@ -103,10 +115,13 @@ class TestPredicate(TestCase):
         self.assertEqual(0b010, BitwiseAnd(0b111, 0b010).evaluate(None))
 
     def test_and_invalid_predicate(self) -> None:
+        class C:
+            field = Field['C', bool](False, 'C', 'field')
         with self.assertRaises(InvalidPredicateExpression):
             Constant(1) and Constant(1)
         with self.assertRaises(InvalidPredicateExpression):
-            And(True, True) and And(True, True)
+            p = C.field == True
+            And(p, p) and And(p, p)
 
     def test_boolean_predicate(self) -> None:
         self.assertTrue(Boolean(True).evaluate(None))
@@ -134,7 +149,3 @@ class TestPredicate(TestCase):
         self.assertIsInstance(creator & 0, BitwiseAnd)
         self.assertIsInstance(creator | 0, BitwiseOr)
         self.assertIsInstance(~creator, BitwiseNot)
-
-
-if __name__ == '__main__':
-    main()
