@@ -20,7 +20,6 @@ often it is called. Provides FPS like characteristics.
 from abc import ABC, abstractmethod
 from asyncio import sleep
 from collections.abc import Coroutine
-from logging import Logger
 from time import time
 
 
@@ -70,5 +69,8 @@ class RateLimit(ABC):
                 # Missed time at which to tick.
                 self.rate_falling_behind(abs(delay))
                 delay = 0
-                self._next_tick_time += 2 * self.time_per_tick
+                if self.time_per_tick > 0:
+                    self._next_tick_time += 2 * self.time_per_tick
+                else:
+                    self._next_tick_time = time()
         return sleep(delay)  # returns coroutine, doesn't actually sleep
