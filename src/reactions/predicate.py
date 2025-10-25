@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from functools import partial
-from typing import TypeVar, overload, Any
+from typing import TypeVar, overload, Any, cast
 import logging
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
@@ -293,24 +293,26 @@ class UnaryPredicate[Tf](OperatorPredicate[Tf], ABC):
         return f"({self.token} {self.operand})"
 
 
-class BinaryPredicate[Tf](OperatorPredicate[Tf], ABC):
+class BinaryPredicate[Tfl, Tfr](OperatorPredicate[Tfl|Tfr], ABC):
     '''Predicate that has two operands.'''
-    left: PredicateOperand[Tf]
-    right: PredicateOperand[Tf]
+    left: PredicateOperand[Tfl]
+    right: PredicateOperand[Tfr]
 
     @overload
-    def __init__(self, left: PredicateOperand[Tf], right: PredicateOperand[Tf]) -> None: ...
+    def __init__(self,
+                 left: PredicateOperand[Tfl],
+                 right: PredicateOperand[Tfr]) -> None: ...
 
     @overload
-    def __init__(self, left: Tf, right: Tf) -> None: ...
+    def __init__(self, left: Tfl, right: Tfr) -> None: ...
     
     @overload
-    def __init__(self, left: PredicateOperand[Tf], right: Tf) -> None: ...
+    def __init__(self, left: PredicateOperand[Tfl], right: Tfr) -> None: ...
     
     @overload
-    def __init__(self, left: Tf, right: PredicateOperand[Tf]) -> None: ...
+    def __init__(self, left: Tfl, right: PredicateOperand[Tfr]) -> None: ...
 
-    def __init__(self, left: PredicateOperand[Tf]|Tf, right: PredicateOperand[Tf]|Tf) -> None:
+    def __init__(self, left: PredicateOperand[Tfl]|Tfl, right: PredicateOperand[Tfr]|Tfr) -> None:
         # Everything that isn't an Evaluator is treated as a constant.
         # This may need to be reevaluated, but it helps with the fields()
         # logic for now.
@@ -321,9 +323,12 @@ class BinaryPredicate[Tf](OperatorPredicate[Tf], ABC):
                             else Constant(right))
 
     @property
-    def fields(self) -> Iterator[FieldDescriptor[Any, Tf]]:
-        yield from self.left.fields
-        yield from self.right.fields
+    def fields(self) -> Iterator[FieldDescriptor[Any, Tfl|Tfr]]:
+        # widening cast to allow [.., Tfl] to be used in for a [../, Tfl|Tfr]
+        yield from cast(Iterator[FieldDescriptor[Any, Tfl|Tfr]],
+                        self.left.fields)
+        yield from cast(Iterator[FieldDescriptor[Any, Tfl|Tfr]],
+                        self.right.fields)
 
     def evaluate[Ti](self, instance: Ti) -> bool:
         return self.operator(self.left.evaluate(instance),

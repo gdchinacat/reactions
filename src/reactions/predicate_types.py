@@ -42,7 +42,7 @@ class Not[Tf](UnaryPredicate[Tf]):
     def __init__(self, operand: Predicate[Tf]) -> None:
         return super().__init__(operand)
 
-class And[Tfl, Tfr](BinaryPredicate[Tfl|Tfr]):
+class And[Tfl, Tfr](BinaryPredicate[Tfl, Tfr]):
     # todo? Allow And to take more than two operands? Since it can't be written
     #       as 'foo and bar and baz' and requires And(foo, And(bar, baz)) it
     #       is preptty clunky...And(foo, bar, baz) would be a big improvement.
@@ -53,7 +53,7 @@ class And[Tfl, Tfr](BinaryPredicate[Tfl|Tfr]):
     def __init__(self, left: Predicate[Tfl], right: Predicate[Tfr]) -> None:
         super().__init__(left, right)
 
-class Or[Tfl,Tfr](BinaryPredicate[Tfl|Tfr]):
+class Or[Tfl,Tfr](BinaryPredicate[Tfl, Tfr]):
     token = '!or!'
     operator = lambda _, a, b: a or b
 
@@ -61,41 +61,41 @@ class Or[Tfl,Tfr](BinaryPredicate[Tfl|Tfr]):
     def __init__(self, left: Predicate[Tfl]|Tfl, right: Predicate[Tfr]|Tfr) -> None:
         super().__init__(left, right)
 
-class Eq[Tf](BinaryPredicate[Tf]):
+class Eq[Tf](BinaryPredicate[Tf, Tf]):
     token = '=='
     operator = operator.eq
 
-class Ne[Tf](BinaryPredicate[Tf]):
+class Ne[Tf](BinaryPredicate[Tf, Tf]):
     token = '!='
     operator = operator.ne
 
-class Lt[Tf](BinaryPredicate[Tf]):
+class Lt[Tf](BinaryPredicate[Tf, Tf]):
     token = '<'
     operator = operator.lt
 
-class Le[Tf](BinaryPredicate[Tf]):
+class Le[Tf](BinaryPredicate[Tf, Tf]):
     token = '<='
     operator = operator.le
 
-class Gt[Tf](BinaryPredicate[Tf]):
+class Gt[Tf](BinaryPredicate[Tf, Tf]):
     token = '>'
     operator = operator.gt
 
-class Ge[Tf](BinaryPredicate[Tf]):
+class Ge[Tf](BinaryPredicate[Tf, Tf]):
     token = '>='
     operator = operator.ge
 
-class Contains[Tf](BinaryPredicate[Tf]):
+class Contains[Tf](BinaryPredicate[Tf, Tf]):
     token = 'contains'
     operator = operator.contains
 
 # BitwiseAnd and BitwiseOr aren't strictly predicates since they don't evaluate
 # to a bool. Still useful, so included.
-class BitwiseAnd[Tf](BinaryPredicate[Tf]):
+class BitwiseAnd[Tf](BinaryPredicate[Tf, Tf]):
     token = '&'
     operator = operator.and_
 
-class BitwiseOr[Tf](BinaryPredicate[Tf]):
+class BitwiseOr[Tf](BinaryPredicate[Tf, Tf]):
     token = '|'
     operator = operator.or_
 
