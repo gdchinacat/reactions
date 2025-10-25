@@ -133,6 +133,7 @@ class FieldWatcherTest(TestCase):
             called = False
             @ State.field == True
             @ FieldWatcher
+            # todo - incorrect decortated FieldChange types not detected
             async def _true(self,
                             state: State,
                             change: FieldChange[State, bool]) -> None:

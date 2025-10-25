@@ -258,7 +258,7 @@ class BoundFieldCreatorMixin:
     dispatch to the bound field rather than having to check if the Field or the 
     bound field should be called.
     '''
-    _fields: Iterator[Field[BoundFieldCreatorMixin, object]]  # todo should be the subclass of BFCM
+    _fields: Iterator[Field[BoundFieldCreatorMixin, object]]
 
     def __new__(cls, *_: object, **__: object) -> BoundFieldCreatorMixin:
         nascent = super().__new__(cls)
@@ -382,9 +382,9 @@ class FieldWatcher[Ti](Reactant,
             async def reaction(...
 
     This class has an unusual dual purpose. It acts as a base class for classes
-    that watch fields on other classes as well as being a decorator for that
-    classes reactions. While complex, this is done to tightly bind the field
-    management the predicate decorator defers when it receives a
+    that watch fields on other classes as well as being a decorator for
+    reactions. While complex, this is done to tightly bind the field management
+    the predicate decorator defers when it receives a
     CustomFieldReactionConfiguration to the implementation of that provided
     by this class.
     # todo Is it possible to make this class acting in its
