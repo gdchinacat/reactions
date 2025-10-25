@@ -51,7 +51,7 @@ class Watcher(FieldWatcher[Watched]):
     '''attribute that tracks the watched field value'''
 
     @ Watched.field != -1
-    @ FieldWatcher  # necessary to register non-self reactions (todo?)
+    @ FieldWatcher.manage
     async def watch_watched_field(self,
                                   watched: Watched,
                                   change: FieldChange[Watched, int]) -> None:

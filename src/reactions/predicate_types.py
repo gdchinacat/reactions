@@ -19,10 +19,9 @@ The predicate implementation types.
 from typing import overload, override
 import operator
 
-from .field_descriptor import Evaluator
+from .field_descriptor import Evaluator, Reaction
 from .predicate import (UnaryPredicate, BinaryPredicate, Predicate,
-                        PredicateArgument, PredicateOperand, Decorated,
-                        _Reaction)
+                        PredicateArgument, PredicateOperand, _Reaction)
 
 
 __all__ = ['Boolean', 'Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
@@ -164,7 +163,7 @@ class ComparisonPredicates[Ti, Tf](Evaluator[Ti, Tf, Tf]):
         '''create an Ge (>=) predicate for the field'''
         return Ge(self, other)
 
-    def __call__[Tw](self, decorated: Decorated[Tw, Ti, Tf]
+    def __call__[Tw](self, reaction: Reaction[Ti, Tf]
                     ) -> _Reaction[Tw, Ti, Tf]:
         '''Can be used as a decorator to create a predicate Boolean'''
-        return Boolean(self)(decorated)
+        return Boolean(self)(reaction)

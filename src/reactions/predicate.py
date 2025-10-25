@@ -40,20 +40,34 @@ Tp = TypeVar('Tp')
 
 
 @dataclass
-class CustomFieldReactionConfiguration[Tw, Ti, Tf]:
+class CustomFieldReactionConfiguration[Tw, Ti, Tf](ABC):
     '''
     CustomFieldReactionConfiguration indicates to Predicate.__call__ that
     field reactions should not be handled by the Predicate decorator. The
     decorator will still return a _Reaction that references the reaction that
     can be used to do this configuration.
 
-    FieldWatcher (typically) subclass reactions are decorated with this class
+    FieldWatcher (typically) subclass reactions are decorated with .manage
     so that the predicates that decorate them do not register field reactions.
-    Instead, the CustomFieldReactionConfiguration.reaction is added as a
-    reaction on the fields or the reactions of the subclass bound to the
-    instance.
+    .manage() is used to tag the reaction as being managed by cls. .manager()
+    is used to retrieve the manager, or None if not being managed.
     '''
-    reaction: BoundReaction[Tw, Ti, Tf] | None  # todo typing reaction
+    @classmethod
+    def manage(cls, reaction: BoundReaction[Any, Any, Any]) -> None:
+        # Type is ignored because the entire purpose is to create a name
+        # mangled property to track the field manager for the reaction.
+        reaction.__manager = cls  # type: ignore
+
+    @classmethod
+    def manager(cls,
+                reaction: Reaction[Any, Any] 
+                          | BoundReaction[Any, Any, Any]) -> type|None:
+        try:
+            # Type is ignored because the entire purpose is to retrieve a
+            # name mangled property created by this class.
+            return reaction.__manager  # type: ignore
+        except AttributeError:
+            return None
 
 
 @dataclass(eq=True, frozen=True)
@@ -63,14 +77,6 @@ class _Reaction[Tw, Ti, Tf](ReactionMustNotBeCalled):
     '''
     predicate: Predicate[Tf]
     func: Reaction[Ti, Tf] | BoundReaction[Tw, Ti, Tf]
-
-
-type Decorated[Tw, Ti, Tf] = ( Reaction[Ti, Tf]
-                              |CustomFieldReactionConfiguration[Tw, Ti, Tf])
-'''
-Decorated is the type of things that Predicate can decorate or arguments
-to the predicate decorator (Predicate.__call__).
-'''
 
 
 class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
@@ -140,10 +146,10 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
             executor.react(reaction, change)
 
     def __call__[Tw, Ti](self,
-                         decorated: Decorated[Tw, Ti, Tf]
+                         reaction: Reaction[Ti, Tf] | BoundReaction[Any, Ti,Tf]
                         ) -> _Reaction[Tw, Ti, Tf]:
         '''
-        Predicates are decorators that arrange for the decorated method to be
+        Predicates are decorators that arrange for the reaction method to be
         called when the predicate becomes True.
 
         For example:
@@ -190,22 +196,19 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
                @ field2 == 2
                Attempting this currently raises ReactionMustNotBeCalled.
 
-        Field reactions are not configured if the decorated func is an instance
+        Field reactions are not configured if the reaction func is an instance
         of CustomFieldReactionConfiguration. This is used by FieldWatcher to
         not configure reactions that need to be bound to specific instances
         (rather than the classes that fields are on).
         '''
-        reaction: Reaction[Ti, Tf] | BoundReaction[Tw, Ti, Tf]
-        if isinstance(decorated, CustomFieldReactionConfiguration):
-            assert decorated.reaction
-            reaction = decorated.reaction
+        manager = CustomFieldReactionConfiguration.manager(reaction)
+        if manager is not None:
             logger.info('changes to %s will use %s to '
                         'create bound reactions for %s',
                         ', '.join(str(f) for f in self.fields),
-                        decorated, self)
+                        reaction, self)
         else:
-            reaction = decorated
-            self.configure_reaction(reaction)
+            self.configure_reaction(cast(Reaction[Ti, Tf], reaction))
         return _Reaction(self, reaction)
 
     def configure_reaction[Tw, Ti](self,
