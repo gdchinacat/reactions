@@ -319,7 +319,7 @@ class Reactant():
         self._start()
         return self.executor
 
-    def run(self)->None:
+    def run(self) -> None:
         '''run and wait until complete'''
         async def _run() -> None:
             awaitable = await self.start()

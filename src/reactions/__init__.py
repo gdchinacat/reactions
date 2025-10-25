@@ -42,12 +42,14 @@ from . import field
 from . import field_descriptor
 from . import predicate
 from . import predicate_types
+from . import utilities
 from .error import *
 from .executor import *
 from .field import *
 from .field_descriptor import *
 from .predicate import *
 from .predicate_types import *
+from .utilities import *
 
 
 __all__ = (
@@ -57,4 +59,5 @@ __all__ = (
            field.__all__ +
            predicate.__all__ +
            predicate_types.__all__ +
+           utilities.__all__ +
           [])

@@ -12,14 +12,12 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from collections.abc import Coroutine
 from enum import Enum
-from time import time
 from unittest import TestCase, main
 import asyncio
 import logging
 
-from ... import Field, And, FieldManager, FieldChange
+from ... import Field, And, FieldManager, FieldChange, RateLimit
 
 
 NUMBER_OF_TRAFFIC_LIGHTS = 1_000
@@ -41,7 +39,8 @@ class Color(Enum):
 type TlFc[Tf] = FieldChange[TrafficLight, Tf]
 type IntOrColorFieldChange = TlFc[int|Color]
 
-class TrafficLight(FieldManager):
+
+class TrafficLight(FieldManager, RateLimit):
     '''
     simple model that implements a traffic light:
     '''
@@ -55,13 +54,9 @@ class TrafficLight(FieldManager):
     cycles = Field['TrafficLight', int](0)
     ''' cycles: the number of times the light has gone through a full cycle '''
 
-    _next_tick_time: float = 0
-    '''
-    the time the next tick should happen, used to keep a regular tick rather
-    than a regular space between ticks.
-    '''
-
     sequence: list[Color]
+
+    time_per_tick = TIME_PER_TICK
 
     def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
@@ -69,6 +64,9 @@ class TrafficLight(FieldManager):
 
     def _start(self) -> None:
         self.ticks = 0
+
+    def rate_falling_behind(self, overrun: float)->None:
+        logger.error(f'{self} tick missed by {overrun:.2f}s')
 
     @And(color == Color.RED,
          ticks == TICKS_PER_LIGHT)
@@ -102,27 +100,8 @@ class TrafficLight(FieldManager):
         if self.cycles == CYCLES:
             self.stop()
         else:
-            await self._delay()
+            await self.delay()
             self.ticks += 1
-
-    def _delay(self) -> Coroutine[None, None, None]:
-        '''delay until the next tick should happen'''
-        if self._next_tick_time == 0:
-            delay: float = 0
-            self._next_tick_time = time() + TIME_PER_TICK
-        else:
-            delay = self._next_tick_time - time()
-            if delay > 0:
-                self._next_tick_time += TIME_PER_TICK
-            else:
-                # Missed time at which to tick.
-                # TODO - move constant rate into mixin?
-                # TODO - make missed tick behavior customizable.
-                # TODO - metric on delay time?
-                logger.error(f'{self} delayed tick')
-                delay = 0
-                self._next_tick_time += 2 * TIME_PER_TICK
-        return asyncio.sleep(delay)
 
     def __str__(self) -> str:
         return f'{self.__class__.__qualname__}({id(self)})'

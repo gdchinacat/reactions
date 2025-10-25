@@ -21,7 +21,7 @@ from typing import NoReturn
 
 __all__ = ['MustNotBeCalled', 'ReactionMustNotBeCalled',
            'ExecutorError', 'ExecutorNotStarted', 'ExecutorAlreadyStarted',
-           'PredicateError', 'InvalidPredicateExpression']
+           'PredicateError', 'InvalidPredicateExpression', 'ExecutorStopped']
 
 
 class MustNotBeCalled(RuntimeError):
@@ -86,6 +86,15 @@ class ExecutorAlreadyStarted(ExecutorError):
     The Executor may have already terminated, which, as the name implies, is
     terminal and can't be restarted. This error does not imply the state is
     running, only that the request to start it failed.
+    '''
+
+class ExecutorStopped(ExecutorError):
+    '''
+    The executor has been stopped and can not accept more reactions.
+
+    This typically happens when a reaction updates a Field value after the
+    executor for that change has been stopped. Update the state model to not
+    perform this invalid state update.
     '''
 
 class FieldConfigurationError(RuntimeError):

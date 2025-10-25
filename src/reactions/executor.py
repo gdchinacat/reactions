@@ -25,7 +25,7 @@ from types import TracebackType
 from typing import ClassVar, Any
 
 
-from .error import ExecutorAlreadyStarted, ExecutorNotStarted
+from .error import ExecutorAlreadyStarted, ExecutorNotStarted, ExecutorStopped
 from .field_descriptor import (FieldChange, Reaction,
                                ReactionCoroutine)
 from .logging_config import VERBOSE
@@ -109,7 +109,10 @@ class Executor:
         # would only recieve the field change and have to be static methods
         # that extract the self from the change.
         reaction_coroutine = reaction(change.instance, change)
-        self.queue.put_nowait((id_, reaction_coroutine, change))
+        try:
+            self.queue.put_nowait((id_, reaction_coroutine, change))
+        except QueueShutDown:
+            raise ExecutorStopped()
         logger.log(VERBOSE, '%d scheduled %s(..., %s, %s)',
                    id_, reaction.__qualname__, change.old, change.new)
 
