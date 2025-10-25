@@ -76,8 +76,12 @@ class TestPredicate(TestCase):
         self.assertFalse(Contains(Constant((1, )), 2).evaluate(None))
 
     def test_or_predicate(self) -> None:
-        self.assertTrue(Or(True, False).evaluate(None))
-        self.assertFalse(Or(False, False).evaluate(None))
+        class C:
+            false = Field['C', bool](False, 'C', 'false')
+            true = Field['C', bool](True, 'C', 'true')
+        c = C()
+        self.assertTrue(Or(C.false == True, C.false == False).evaluate(c))
+        self.assertFalse(Or(C.true == False, C.false == True).evaluate(c))
 
     def test_and_predicate_evaluate(self) -> None:
         class C:
@@ -149,3 +153,6 @@ class TestPredicate(TestCase):
         self.assertIsInstance(creator & 0, BitwiseAnd)
         self.assertIsInstance(creator | 0, BitwiseOr)
         self.assertIsInstance(~creator, BitwiseNot)
+
+if __name__ == '__main__':
+    main()

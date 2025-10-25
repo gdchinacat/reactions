@@ -126,6 +126,7 @@ class TrafficLight(FieldManager):
 
     def __str__(self) -> str:
         return f'{self.__class__.__qualname__}({id(self)})'
+    __repr__ = __str__
 
 class TrafficLightTest(TestCase):
 

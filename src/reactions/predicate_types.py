@@ -58,7 +58,7 @@ class Or[Tfl,Tfr](BinaryPredicate[Tfl, Tfr]):
     operator = lambda _, a, b: a or b
 
     @override
-    def __init__(self, left: Predicate[Tfl]|Tfl, right: Predicate[Tfr]|Tfr) -> None:
+    def __init__(self, left: Predicate[Tfl], right: Predicate[Tfr]) -> None:
         super().__init__(left, right)
 
 class Eq[Tf](BinaryPredicate[Tf, Tf]):

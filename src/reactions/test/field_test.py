@@ -109,7 +109,7 @@ class TestField(TestCase):
 
         # No operators for these predicates
         self.assertFalse((Not(Boolean(C.field_a))).evaluate(c))
-        self.assertTrue(Or(C.field_b, True).evaluate(c))
+        self.assertTrue(Or(C.field_b==False, C.field_b==True).evaluate(c))
         self.assertFalse(And(Boolean(C.field_b), Boolean(True)).evaluate(c))
         self.assertFalse(And(Boolean(True), Boolean(C.field_b)).evaluate(c))
 
