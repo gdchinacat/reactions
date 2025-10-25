@@ -76,7 +76,7 @@ class FieldWatcherTest(TestCase):
             @ FieldWatcher.manage
             async def _watch(self,
                              watched: Watched,
-                             change: FieldChange[Watched, int]) -> None:  # todo bool is wrong without static type error
+                             change: FieldChange[Watched, int]) -> None:
                 assert isinstance(self, Watcher), f'got {type(self)=}'
                 assert isinstance(watched, Watched), f'got {type(watched)=}'
                 self.change_events.append((change.old, change.new))
@@ -133,7 +133,6 @@ class FieldWatcherTest(TestCase):
             called = False
             @ State.field == True
             @ FieldWatcher.manage
-            # todo - incorrect decortated FieldChange types not detected
             async def _true(self,
                             state: State,
                             change: FieldChange[State, bool]) -> None:
