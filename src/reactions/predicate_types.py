@@ -16,7 +16,7 @@
 The predicate implementation types.
 '''
 
-from typing import overload, override
+from typing import overload, override, Never
 import operator
 
 from .field_descriptor import Evaluator, Reaction
@@ -117,7 +117,7 @@ class ComparisonPredicates[Ti, Tf](Evaluator[Ti, Tf, Tf]):
     #       error is valid. However, this is what the implementation needs to
     #       so so silence the error.
     ###########################################################################
-    def __contains__(self, other: PredicateArgument[Tf]) -> Predicate[Tf]: # todo NoReturn
+    def __contains__(self, other: PredicateArgument[Tf]) -> Never:
         '''not implemented'''
         raise NotImplementedError('use Contains(self, other) instead')
 
