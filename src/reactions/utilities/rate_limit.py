@@ -47,37 +47,41 @@ class RateLimit:
         '''create a RateLimit at the given rate per second'''
         self.time_per_tick = 1 / rate if rate > 0 else 0
 
-    def rate_falling_behind(self, overrun: float) -> None:
+    def skipped_tick(self, overrun: float) -> None:
         '''
         Called when the rate is not maintained. Subclasses can override to
         customize how this event is handled.
         overrun: the time in seconds the next cycle was missed by.
         '''
+        print(f'{self.tick} falling behind {overrun*1000:.3f}')
 
     def delay(self) -> Coroutine[None, None, None]:
         '''delay until the next tick should happen'''
         self.tick += 1
+        _time = time()
         if self._next_tick_time == 0:
             delay: float = 0
-            self._next_tick_time = time() + self.time_per_tick
+            self._next_tick_time = _time + self.time_per_tick
         else:
-            delay = self._next_tick_time - time()
+            delay = self._next_tick_time - _time
             if delay >= 0:
                 self._next_tick_time += self.time_per_tick
             else:
                 # Missed time at which to tick.
-                self.rate_falling_behind(abs(delay))
+                self.skipped_tick(abs(delay))
                 delay = 0
                 if self.time_per_tick > 0:
                     self._next_tick_time += 2 * self.time_per_tick
                 else:
-                    self._next_tick_time = time()
-        # delay can be greater than time_per_tick if a tick was missed
-        # causing it to be advanced two tick works and processing the
-        # delay=0 tick took less than time_per_tick, leaving more than
-        # a tick worth. In that case undo the skip...
-        if delay > self.time_per_tick:
-            print(f'todo - why is delay={delay*1000:.2f} > time_per_tick={self.time_per_tick*1000:.2f}')
-        return sleep(delay)  # returns coroutine, doesn't actually sleep
+                    self._next_tick_time = _time
+        if self.time_per_tick > 0:
+            if delay > self.time_per_tick:
+                # delay can be greater than time_per_tick if a tick was missed
+                # causing it to be advanced two time_per_ticks and processing
+                # the delay=0 tick completed before the skipped tick would have
+                # been scheduled
+                delay -= self.time_per_tick
+            assert delay < self.time_per_tick
+        self.last_delay = delay
+        return sleep(delay)
     __call__ = delay
-

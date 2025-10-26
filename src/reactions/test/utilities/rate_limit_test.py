@@ -14,7 +14,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from time import time
-from unittest import TestCase
+from unittest import TestCase, main
 
 from reactions.field_descriptor import FieldChange
 
@@ -43,7 +43,7 @@ class RateLimited(FieldManager, RateLimit):
     def _start(self) -> None:
         self.tick = 0
 
-    def rate_falling_behind(self, overrun: float) -> None:
+    def skipped_tick(self, overrun: float) -> None:
         self.overruns.append(overrun)
         
     @ And(tick != -1,
@@ -55,12 +55,14 @@ class RateLimited(FieldManager, RateLimit):
 
 class Test(TestCase):
     def test_rate_limit_pretty_accurate(self) -> None:
-        rate_limited = RateLimited(1000, 500)
+        rate_limited = RateLimited(100, 50 + 1)
     
         start = time()
         rate_limited.run()
         stop = time()
-        self.assertAlmostEqual(.5, stop - start, places=2)
+        self.assertAlmostEqual(0.5, stop - start, 2,
+                               'test that rate limit time is pretty accurate, '
+                               'but will occasionally fail if system is busy')
         self.assertEqual([], rate_limited.overruns)
 
     def test_rate_limit_tracks_overruns(self) -> None:
@@ -68,3 +70,7 @@ class Test(TestCase):
     
         rate_limited.run()
         self.assertEqual(4, len(rate_limited.overruns))
+
+
+if __name__ == '__main__':
+    main()

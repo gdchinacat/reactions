@@ -64,7 +64,7 @@ class TrafficLight(FieldManager):
     def _start(self) -> None:
         self.ticks = 0
 
-    def rate_falling_behind(self, overrun: float)->None:
+    def skipped_tick(self, overrun: float)->None:
         logger.error(f'{self} tick missed by {overrun:.2f}s')
 
     @And(color == Color.RED,
