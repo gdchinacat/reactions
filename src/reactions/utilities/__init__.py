@@ -18,5 +18,6 @@ Utilities for state models.
 '''
 
 from .rate_limit import RateLimit
+from .field_utilities import adjust_while
 
-__all__ = ['RateLimit']
+__all__ = ['RateLimit', 'adjust_while']

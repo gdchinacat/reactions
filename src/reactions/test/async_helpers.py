@@ -26,7 +26,7 @@ AsyncTestMethod = Callable[TestParams, Coroutine[None, None, None]]
 TestMethod = Callable[TestParams, None]
 TestMethodDecorator = Callable[[AsyncTestMethod[None]], TestMethod[None]]
 
-def asynctest(func: AsyncTestMethod[...]|None,
+def asynctest(func: AsyncTestMethod[...]|None = None,
               *,
               timeout:float|None=1) -> TestMethod[...]|TestMethodDecorator:
     '''

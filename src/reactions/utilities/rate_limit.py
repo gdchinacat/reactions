@@ -17,23 +17,18 @@ A RateLimit mixin utility that provides a coroutine to delay to limit how
 often it is called. Provides FPS like characteristics.
 '''
 
-from abc import ABC, abstractmethod
 from asyncio import sleep
 from collections.abc import Coroutine
 from time import time
 
 
-class RateLimit(ABC):
+class RateLimit:
     '''
-    Mixin to allow state models to react at a constant rate.
-
-    Usage:
-    class State(Reactor, RateLimit):
-        time_per_tick = 1/60  # 60 FPS
-
-        async def  _loop(...):
-            # do your per loop stuff
-            await self.delay()
+    Rate limit class that provides a coroutine to await to restrict delay()
+    call rate.
+    rate_limit = RateLimit(60)  # 60 FPS
+    ...
+    await rate_limit()
     '''
 
     _next_tick_time: float = 0
@@ -42,28 +37,32 @@ class RateLimit(ABC):
     than a regular space between ticks.
     '''
 
-    @property
-    @abstractmethod
-    def time_per_tick(self) -> float:
-        '''
-        The time per update, in seconds
-        '''
+    tick = 0
+    '''tick is incremented each time delay is called'''
 
-    @abstractmethod
+    time_per_tick: float = 0
+    '''the time in seconds per tick'''
+
+    def __init__(self, rate: int = 60) -> None:
+        '''create a RateLimit at the given rate per second'''
+        self.time_per_tick = 1 / rate if rate > 0 else 0
+
     def rate_falling_behind(self, overrun: float) -> None:
         '''
-        Called when the rate is not maintained.
+        Called when the rate is not maintained. Subclasses can override to
+        customize how this event is handled.
         overrun: the time in seconds the next cycle was missed by.
         '''
 
     def delay(self) -> Coroutine[None, None, None]:
         '''delay until the next tick should happen'''
+        self.tick += 1
         if self._next_tick_time == 0:
             delay: float = 0
             self._next_tick_time = time() + self.time_per_tick
         else:
             delay = self._next_tick_time - time()
-            if delay > 0:
+            if delay >= 0:
                 self._next_tick_time += self.time_per_tick
             else:
                 # Missed time at which to tick.
@@ -73,4 +72,12 @@ class RateLimit(ABC):
                     self._next_tick_time += 2 * self.time_per_tick
                 else:
                     self._next_tick_time = time()
+        # delay can be greater than time_per_tick if a tick was missed
+        # causing it to be advanced two tick works and processing the
+        # delay=0 tick took less than time_per_tick, leaving more than
+        # a tick worth. In that case undo the skip...
+        if delay > self.time_per_tick:
+            print(f'todo - why is delay={delay*1000:.2f} > time_per_tick={self.time_per_tick*1000:.2f}')
         return sleep(delay)  # returns coroutine, doesn't actually sleep
+    __call__ = delay
+

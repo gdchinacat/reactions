@@ -383,7 +383,7 @@ class FieldWatcher[Ti](Reactant, ABC):
     watched: Ti
     '''The instance being watched.'''
 
-    _reactions: set[_Reaction[Ti, object, object]]
+    _reactions: set[_Reaction[Ti, object, object]]  # todo - unordered makes reaction order unstable
     '''
     The reactions FieldWatcher needs to register bound reactions for when
     instances are initialized.

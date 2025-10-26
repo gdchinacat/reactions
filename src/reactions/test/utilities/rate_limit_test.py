@@ -24,7 +24,7 @@ from ...utilities import RateLimit
 
 
 class RateLimited(FieldManager, RateLimit):
-    tick: Field[RateLimited, int] = Field(-1)
+    tick: Field[RateLimited, int] = Field(-1)  # replace RateLimit.tick
     stop_at: Field[RateLimited, int] = Field(0)
     time_per_tick: float = 0
 
@@ -33,11 +33,10 @@ class RateLimited(FieldManager, RateLimit):
         rate: number of ticks per second
         stop_at: stop ticking when the tick count reaches stop_at
         '''
-        super().__init__()
+        super().__init__(rate)
         self.overruns: list[float] = []
 
         self.stop_at = stop_at
-        self.time_per_tick = 1 / rate if rate > 0 else 0
 
     (stop_predicate := tick == stop_at)(FieldManager.astop)
 
@@ -51,7 +50,7 @@ class RateLimited(FieldManager, RateLimit):
           Not(stop_predicate))
     async def _(self, _: FieldChange[RateLimited, int]) -> None:
         await self.delay()
-        self.tick += 1
+        # no need to increment tick since delay() does that.
 
 
 class Test(TestCase):

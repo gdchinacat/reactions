@@ -21,7 +21,7 @@ from ... import Field, And, FieldManager, FieldChange, RateLimit
 
 
 NUMBER_OF_TRAFFIC_LIGHTS = 1_000
-TIME_PER_TICK = 1/3
+TICKS_PER_SECOND = 3
 TICKS_PER_LIGHT = 1
 CYCLES = 2
 
@@ -40,7 +40,7 @@ type TlFc[Tf] = FieldChange[TrafficLight, Tf]
 type IntOrColorFieldChange = TlFc[int|Color]
 
 
-class TrafficLight(FieldManager, RateLimit):
+class TrafficLight(FieldManager):
     '''
     simple model that implements a traffic light:
     '''
@@ -56,11 +56,10 @@ class TrafficLight(FieldManager, RateLimit):
 
     sequence: list[Color]
 
-    time_per_tick = TIME_PER_TICK
-
     def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
         self.sequence = []
+        self.rate_limit = RateLimit(TICKS_PER_SECOND)
 
     def _start(self) -> None:
         self.ticks = 0
@@ -100,7 +99,7 @@ class TrafficLight(FieldManager, RateLimit):
         if self.cycles == CYCLES:
             self.stop()
         else:
-            await self.delay()
+            await self.rate_limit()
             self.ticks += 1
 
     def __str__(self) -> str:
