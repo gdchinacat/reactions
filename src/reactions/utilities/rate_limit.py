@@ -53,7 +53,6 @@ class RateLimit:
         customize how this event is handled.
         overrun: the time in seconds the next cycle was missed by.
         '''
-        print(f'{self.tick} falling behind {overrun*1000:.3f}')
 
     def delay(self) -> Coroutine[None, None, None]:
         '''delay until the next tick should happen'''
