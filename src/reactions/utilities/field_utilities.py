@@ -22,7 +22,7 @@ from ..field import Field, FieldWatcher
 
 
 def adjust_while[Tw, T](
-        field: Field[T, bool], attr: str, adj: int,
+        field: Field[T, bool], attr: str, adj: float,
         namespace: dict[str, object],
         watcher: bool = False) -> None:
     '''
@@ -40,7 +40,7 @@ def adjust_while[Tw, T](
     '''
     for (v, _adj, action) in ((True, adj, 'pressed'),
                               (False, -adj, 'released')):
-        def create_reaction(v: bool, _adj: int, action: str) -> None:
+        def create_reaction(v: bool, _adj: float, action: str) -> None:
             '''
             create a reaction in the namespace that adjusts the value
             in attr by _adj amount when field changes to v.

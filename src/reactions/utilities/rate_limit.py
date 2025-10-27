@@ -17,9 +17,17 @@ A RateLimit mixin utility that provides a coroutine to delay to limit how
 often it is called. Provides FPS like characteristics.
 '''
 
-from asyncio import sleep
-from collections.abc import Coroutine
+# TODO - neither of these classes really have anything to do with reactions,
+# at best RateLimit is handy for slowing down self-driving state machines,
+# and Updatable uses RateLimit. Should they be reimplemented to use reactions?
+# Moved to a different package?
+
+from abc import ABC, abstractmethod
+from asyncio import sleep, create_task, Task
+from collections.abc import Coroutine, AsyncIterator
+from contextlib import asynccontextmanager
 from time import time
+from typing import Self
 
 
 class RateLimit:
@@ -84,3 +92,52 @@ class RateLimit:
         self.last_delay = delay
         return sleep(delay)
     __call__ = delay
+
+
+class Updatable(ABC):  # todo this is a horrible name
+    '''
+    Updatable provides periodic updates to subclasses.
+
+    Usage:
+    class Updater(Updtabable):
+        async def update(self):
+            ...
+
+    ...
+        with Updater(60).execute() as updater:
+           # called 60 times per second
+           ...
+
+    Updatable.execute() is a context manager that yields itself. While entered
+    it calls .update() at the fixed rate. It executes in a newly created
+    asyncio task.
+    '''
+
+    __rate_limit: RateLimit
+    __task: Task[None]|None = None
+    __stop = False
+
+    def __init__(self, rate: int, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self.__rate_limit = RateLimit(rate)
+
+    @abstractmethod
+    async def update(self) -> None: ...
+
+    async def __loop(self) -> None:
+        while not self.__stop:
+            await self.update()
+            await self.__rate_limit()
+
+    @asynccontextmanager
+    async def execute(self) -> AsyncIterator[Self]:
+        '''Context manager that runs a task to call update() at the rate.'''
+        # todo - the class is not a context manager and this method is named
+        #        execute() rather than run so it can be mixed in with
+        #        FieldWatcher/Reactant that already has those methods.
+        self.__task = create_task(self.__loop())
+        try:
+            yield self
+        finally:
+            self.__stop = True
+            await self.__task

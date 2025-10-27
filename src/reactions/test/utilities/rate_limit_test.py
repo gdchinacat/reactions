@@ -13,14 +13,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+from asyncio import sleep
 from time import time
 from unittest import TestCase, main
 
-from reactions.field_descriptor import FieldChange
-
 from ...field import FieldManager, Field
+from ...field_descriptor import FieldChange
 from ...predicate_types import And, Not
-from ...utilities import RateLimit
+from ...test.async_helpers import asynctest
+from ...utilities import RateLimit, Updatable
 
 
 class RateLimited(FieldManager, RateLimit):
@@ -53,7 +54,7 @@ class RateLimited(FieldManager, RateLimit):
         # no need to increment tick since delay() does that.
 
 
-class Test(TestCase):
+class TestRateLimit(TestCase):
     def test_rate_limit_pretty_accurate(self) -> None:
         rate_limited = RateLimited(100, 50 + 1)
     
@@ -70,6 +71,29 @@ class Test(TestCase):
     
         rate_limited.run()
         self.assertEqual(4, len(rate_limited.overruns))
+
+class TestUpdatable(TestCase):
+    @asynctest
+    async def test_updatable(self) -> None:
+        class Updater(Updatable):
+            deltas: list[float]
+            _last_update = 0.0
+            def __init__(self, rate: int):
+                super().__init__(rate)
+                self.deltas = []
+            async def update(self) -> None:
+                if self._last_update != 0:
+                    _time = time()
+                    self.deltas.append(_time - self._last_update)
+                    self._last_update = _time
+        class _Exception(Exception): ...
+
+        with self.assertRaises(_Exception):
+            async with Updater(10).execute() as updater:
+                await sleep(0.51)  # let updater run for 5 complete updates
+                raise _Exception()
+        for delta in updater.deltas:
+            self.assertAlmostEqual(.1,  delta)
 
 
 if __name__ == '__main__':
