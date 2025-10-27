@@ -15,10 +15,12 @@
 '''
 Executor test.
 '''
+from asyncio import sleep
 from unittest import TestCase, main
 
 from ..error import ExecutorAlreadyStarted
 from ..executor import Executor
+from ..field import Field, FieldManager
 from .async_helpers import asynctest
 
 
@@ -32,6 +34,33 @@ class ExecutorTest(TestCase):
                 executor.start()
         assert executor.task
         self.assertTrue(executor.task.done())
+
+    @asynctest
+    async def test_reactions_serialized(self) -> None:
+        test = self
+        class C(FieldManager):
+            field = Field['C', bool](False)
+            reaction_1_done = False
+            done = False
+
+            def _start(self) -> None:
+                self.field = True
+
+            @field == True
+            async def reaction_1(self, *_: object) -> None:
+                await sleep(.5)
+                self.reaction_1_done = True
+
+            @field == True
+            async def reaction_2(self, *_: object) -> None:
+                test.assertTrue(self.reaction_1_done)
+                self.stop()
+                self.done = True
+
+        c = C()
+        async with c:
+            await c.executor
+        self.assertTrue(c.done)
 
 
 if __name__ == "__main__":
