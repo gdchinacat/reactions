@@ -17,7 +17,7 @@
 Utilities for state models.
 '''
 
-from .rate_limit import RateLimit, Updatable
+from .rate_limit import RateLimit, ScheduledUpdate
 from .field_utilities import adjust_while
 
-__all__ = ['RateLimit', 'Updatable', 'adjust_while']
+__all__ = ['RateLimit', 'ScheduledUpdate', 'adjust_while']

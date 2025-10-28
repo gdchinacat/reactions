@@ -21,7 +21,7 @@ from ...field import FieldManager, Field
 from ...field_descriptor import FieldChange
 from ...predicate_types import And, Not
 from ...test.async_helpers import asynctest
-from ...utilities import RateLimit, Updatable
+from ...utilities import RateLimit, ScheduledUpdate
 
 
 class RateLimited(FieldManager, RateLimit):
@@ -72,10 +72,10 @@ class TestRateLimit(TestCase):
         rate_limited.run()
         self.assertEqual(4, len(rate_limited.overruns))
 
-class TestUpdatable(TestCase):
+class TestScheduledUpdate(TestCase):
     @asynctest
-    async def test_updatable(self) -> None:
-        class Updater(Updatable):
+    async def test_scheduled_update(self) -> None:
+        class Updated(ScheduledUpdate):
             deltas: list[float]
             _last_update = 0.0
             def __init__(self, rate: int):
@@ -89,7 +89,7 @@ class TestUpdatable(TestCase):
         class _Exception(Exception): ...
 
         with self.assertRaises(_Exception):
-            async with Updater(10).execute() as updater:
+            async with Updated(10).execute() as updater:
                 await sleep(0.51)  # let updater run for 5 complete updates
                 raise _Exception()
         for delta in updater.deltas:

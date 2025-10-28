@@ -19,7 +19,7 @@ often it is called. Provides FPS like characteristics.
 
 # TODO - neither of these classes really have anything to do with reactions,
 # at best RateLimit is handy for slowing down self-driving state machines,
-# and Updatable uses RateLimit. Should they be reimplemented to use reactions?
+# and ScheduledUpdate uses RateLimit. Should they be reimplemented to use reactions?
 # Moved to a different package?
 
 from abc import ABC, abstractmethod
@@ -94,9 +94,9 @@ class RateLimit:
     __call__ = delay
 
 
-class Updatable(ABC):  # todo this is a horrible name
+class ScheduledUpdate(ABC):
     '''
-    Updatable provides periodic updates to subclasses.
+    ScheduledUpdate provides periodic updates to subclasses.
 
     Usage:
     class Updater(Updtabable):
@@ -108,7 +108,7 @@ class Updatable(ABC):  # todo this is a horrible name
            # called 60 times per second
            ...
 
-    Updatable.execute() is a context manager that yields itself. While entered
+    ScheduledUpdate.execute() is a context manager that yields itself. While entered
     it calls .update() at the fixed rate. It executes in a newly created
     asyncio task.
     '''
