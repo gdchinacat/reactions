@@ -20,7 +20,7 @@ from asyncio import run
 from collections.abc import Awaitable, Iterator, MutableMapping
 from logging import getLogger
 from types import MethodType, TracebackType, MappingProxyType, NoneType
-from typing import overload, NoReturn, Self, Any, Iterable
+from typing import overload, NoReturn, Self, Iterable
 
 from reactions.predicate import CustomFieldReactionConfiguration
 
@@ -383,7 +383,7 @@ class FieldWatcher[Ti](Reactant, ABC):
     watched: Ti
     '''The instance being watched.'''
 
-    _reactions: set[_Reaction[Ti, object, object]]  # todo - unordered makes reaction order unstable
+    _reactions: list[_Reaction[Ti, object, object]]
     '''
     The reactions FieldWatcher needs to register bound reactions for when
     instances are initialized.
@@ -434,7 +434,7 @@ class FieldWatcher[Ti](Reactant, ABC):
         '''Initialize the reactions for the class.'''
         super().__init_subclass__()
 
-        cls._reactions = set(value for value in cls.__dict__.values()
+        cls._reactions = list(value for value in cls.__dict__.values()
                              if isinstance(value, _Reaction))
         logger.info('%s has bound reactions: %s', cls, cls._reactions)
 
