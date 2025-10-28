@@ -268,7 +268,7 @@ class BoundFieldCreatorMixin:
         return nascent
 
 
-class Reactant():
+class Reactant(ABC):
     '''
     Mixin to give a class a reaction executor and methods to manage its
     lifecycle.
@@ -444,8 +444,3 @@ class FieldWatcher[Ti](Reactant, ABC):
         they use the watched reaction executor. This is implemented as a no op
         so subclasses don't have to implement this method.
         '''
-
-    def __replace__(self, *args: object, **kwargs: object) -> NoReturn:
-        # Base classes both implement __replace__, Until there is an actual
-        # need for this functionality it is not implemented.
-        raise NotImplementedError()
