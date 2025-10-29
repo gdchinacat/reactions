@@ -16,10 +16,11 @@
 
 from unittest import main, TestCase
 
-from ... import FieldManager, Field, And, Not, FieldWatcher, FieldChange
+from ... import (ExecutorFieldManager, Field, And, Not, FieldWatcher,
+                 FieldChange)
 
 
-class Watched(FieldManager):
+class Watched(ExecutorFieldManager):
     '''
     Example class that has a field to be watched by Watcher. Class counts the
     stop_predicate value then stops.
@@ -30,7 +31,7 @@ class Watched(FieldManager):
     stop_predicate = field >= 5
     '''the condition at which to stop'''
 
-    stop_predicate(FieldManager.astop)
+    stop_predicate(ExecutorFieldManager.astop)
     '''call FieldManager.astop when the stop predicate becomes True'''
 
     def _start(self) -> None:

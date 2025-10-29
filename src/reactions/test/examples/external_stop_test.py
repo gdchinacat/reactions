@@ -20,16 +20,16 @@ reaction predicate checks this flag and stops processing.
 '''
 from unittest import TestCase, main
 
-from ... import Field, FieldManager, FieldChange
+from ... import Field, ExecutorFieldManager, FieldChange
 
 
-class Counter(FieldManager):
+class Counter(ExecutorFieldManager):
     done: Field[Counter, bool] = Field(False) # field to  indicate state should stop
     count: Field[Counter, int] = Field(-1)    # start in a quiescent state
 
     # Manual application of predicate decorator to stop the state machine when
     # done.
-    (done == True)(FieldManager.astop)
+    (done == True)(ExecutorFieldManager.astop)
 
     @ count >= 0
     async def count_(self, *_: object) -> None:

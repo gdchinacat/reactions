@@ -22,13 +22,15 @@ import asyncio
 
 
 TestParams = ParamSpec("TestParams")
-AsyncTestMethod = Callable[TestParams, Coroutine[None, None, None]]
 TestMethod = Callable[TestParams, None]
-TestMethodDecorator = Callable[[AsyncTestMethod[None]], TestMethod[None]]
+AsyncTestMethod = Callable[TestParams, Coroutine[None, None, None]]
+TestMethodDecorator = Callable[[AsyncTestMethod[TestParams]],
+                               TestMethod[TestParams]]
 
-def asynctest(func: AsyncTestMethod[...]|None = None,
+def asynctest(func: AsyncTestMethod[TestParams]|None = None,
               *,
-              timeout:float|None=1) -> TestMethod[...]|TestMethodDecorator:
+              timeout:float|None=1
+              ) -> TestMethod[TestParams]|TestMethodDecorator[TestParams]:
     '''
     Decorator to execute async test functions.
     func - function to decorate
@@ -41,9 +43,10 @@ def asynctest(func: AsyncTestMethod[...]|None = None,
     @asynctest(timeout=2)
     async def test_foo(...): ...
     '''
-    def dec(func: AsyncTestMethod[...]) -> TestMethod[...]:
+    def dec(func: AsyncTestMethod[TestParams]) -> TestMethod[TestParams]:
         @wraps(func)
-        def _asynctest(*args: object, **kwargs: object) -> None:
+        def _asynctest(*args: TestParams.args, **kwargs: TestParams.kwargs
+                       ) -> None:
             @wraps(func)
             async def async_test_runner() -> None:
                 async with asyncio.timeout(timeout):

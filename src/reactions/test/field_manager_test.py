@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 '''
-State machine test.
+FieldManager et. al. tests.
 '''
 from asyncio import Future, CancelledError, sleep, Barrier
 from collections.abc import AsyncIterator
@@ -22,11 +22,11 @@ from typing import NoReturn
 from unittest import TestCase, main
 
 from .. import (ReactionMustNotBeCalled, ExecutorAlreadyStarted, Field,
-                Executor, FieldManager, FieldChange)
+                Executor, ExecutorFieldManager, FieldChange)
 from .async_helpers import asynctest
 
 
-class State(FieldManager):
+class State(ExecutorFieldManager):
     '''
     Kitchen sink state machine for testing various aspects of State.
     '''
@@ -36,8 +36,8 @@ class State(FieldManager):
 
     infinite_loop_running: Future[None]
 
-    def __init__(self, *args: object, **kwargs: object) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(self, executor: Executor|None = None) -> None:
+        super().__init__(executor=executor)
         
         self.infinite_loop_running = Future()
 
@@ -82,7 +82,7 @@ async def running_state(skip_stop: bool = False,
             await executor
 
 
-class ReactantTest(TestCase):
+class FieldManagerTest(TestCase):
 
     @asynctest
     async def test_reaction_exception_terminates_reactor(self) -> None:
@@ -136,7 +136,7 @@ class ReactantTest(TestCase):
 
     @asynctest  # not really necessary but for State.inifinite_loop needing it
     async def test_added_fields_are_named(self) -> None:
-        '''fields added to a Reactant subclass after definition are named'''
+        '''fields added to a FieldManager subclass after definition are named'''
         obj = object()
         class _State(State):
             foo: Field[_State, object]
@@ -157,12 +157,12 @@ class ReactantTest(TestCase):
 
     @asynctest
     async def test_private_executors(self) -> None:
-        '''test that each Reactant has its own executor'''
+        '''Test that each ExecutorFieldManager has its own executor.'''
 
         # Have reactions on state instances with different reaction executors
         # wait on a barrier
         barrier = Barrier(2)
-        class State(FieldManager):
+        class State(ExecutorFieldManager):
             field = Field['State', bool](False)
             @ field  == True
             async def field_(self, *_: object) -> None:
@@ -171,8 +171,8 @@ class ReactantTest(TestCase):
 
         state1, state2 = State(), State()
 
-        async with (state1 as executor1,
-                    state2 as executor2):
+        async with (state1.executor as executor1,
+                    state2.executor as executor2):
             self.assertIsNot(executor1, executor2)
             # Since both states are waiting on the barrier, that will only
             # happen if they execute in separate executors.

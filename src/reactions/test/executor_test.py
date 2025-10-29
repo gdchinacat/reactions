@@ -20,7 +20,7 @@ from unittest import TestCase, main
 
 from ..error import ExecutorAlreadyStarted
 from ..executor import Executor
-from ..field import Field, FieldManager
+from ..field import Field, ExecutorFieldManager
 from .async_helpers import asynctest
 
 
@@ -38,7 +38,7 @@ class ExecutorTest(TestCase):
     @asynctest
     async def test_reactions_serialized(self) -> None:
         test = self
-        class C(FieldManager):
+        class C(ExecutorFieldManager):
             field = Field['C', bool](False)
             reaction_1_done = False
             done = False
@@ -58,8 +58,8 @@ class ExecutorTest(TestCase):
                 self.done = True
 
         c = C()
-        async with c:
-            await c.executor
+        async with c.executor:
+            c._start()
         self.assertTrue(c.done)
 
 

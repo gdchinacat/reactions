@@ -21,6 +21,7 @@ from unittest import TestCase, main
 
 from ..error import (MustNotBeCalled, InvalidPredicateExpression,
                      FieldAlreadyBound, FieldConfigurationError)
+from ..executor import Executor
 from ..field import (Field, BoundField, FieldManager, FieldWatcher,
                      FieldManagerMeta)
 from ..field_descriptor import FieldChange
@@ -197,7 +198,7 @@ class TestField(TestCase):
         watched = Watched()
 
         # at this point there is only a single reaction on Watcher
-        watcher = Watcher(watched)
+        watcher = Watcher(watched, executor=Executor())
         reactions = watcher._reactions  # pylint: disable=protected-access
         self.assertEqual(1, len(reactions))
 
@@ -207,7 +208,7 @@ class TestField(TestCase):
         Watcher._false = _false  # unsupported, don't do this outside tests
 
         # verify Watcher reactions hasn't changed (indicating it was cached)
-        watcher = Watcher(watched)
+        watcher = Watcher(watched, executor=Executor())
         reactions = watcher._reactions  # pylint: disable=protected-access
         self.assertEqual(1, len(reactions))
 

@@ -17,7 +17,7 @@ from unittest import TestCase, main
 
 from asyncio import sleep
 
-from ...field import Field, FieldManager, FieldWatcher
+from ...field import Field, ExecutorFieldManager, FieldWatcher
 from ...test.async_helpers import asynctest
 from ...utilities import adjust_while
 
@@ -26,7 +26,7 @@ class Adjusted:
     adjusted = 0
 
 
-class _C(Adjusted, FieldManager):
+class _C(Adjusted, ExecutorFieldManager):
     field: Field['_C', bool]
 
     def _start(self) -> None: ...

@@ -24,7 +24,7 @@ is only inspired by it.
 The basic idea is that you implement reaction methods that are called when
 predicates become true. For example, this class counts upwards forever.
 
-class Counter(Reactant):
+class Counter(ExecutorFieldManager):
     count = Field(-1)
 
     @ count >= 0

@@ -24,9 +24,9 @@ often it is called. Provides FPS like characteristics.
 
 from abc import ABC, abstractmethod
 from asyncio import sleep, create_task, Task
-from collections.abc import Coroutine, AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import Coroutine
 from time import time
+from types import TracebackType
 from typing import Self
 
 
@@ -89,7 +89,6 @@ class RateLimit:
                 # been scheduled
                 delay -= self.time_per_tick
             assert delay < self.time_per_tick
-        self.last_delay = delay
         return sleep(delay)
     __call__ = delay
 
@@ -122,22 +121,24 @@ class ScheduledUpdate(ABC):
         self.__rate_limit = RateLimit(rate)
 
     @abstractmethod
-    async def update(self) -> None: ...
+    async def update(self) -> None:
+        '''
+        update() is called periodically on the specified schedule.
+        '''
 
     async def __loop(self) -> None:
         while not self.__stop:
             await self.update()
             await self.__rate_limit()
 
-    @asynccontextmanager
-    async def execute(self) -> AsyncIterator[Self]:
-        '''Context manager that runs a task to call update() at the rate.'''
-        # todo - the class is not a context manager and this method is named
-        #        execute() rather than run so it can be mixed in with
-        #        FieldWatcher/Reactant that already has those methods.
+    async def __aenter__(self) -> Self:
         self.__task = create_task(self.__loop())
-        try:
-            yield self
-        finally:
-            self.__stop = True
-            await self.__task
+        return self
+
+    async def __aexit__(self,
+                        exc_type: type[BaseException]|None,
+                        exc_val: BaseException|None,
+                        exc_tb: TracebackType|None) -> None:
+        self.__stop = True
+        assert self.__task  # set in __aenter__
+        await self.__task

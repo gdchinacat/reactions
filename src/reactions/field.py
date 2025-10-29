@@ -15,16 +15,16 @@
 The public facing Field implementation.
 '''
 
-from abc import ABCMeta, abstractmethod, ABC
-from asyncio import run
-from collections.abc import Awaitable, Iterator, MutableMapping
+from abc import ABCMeta, ABC
+from collections.abc import Iterator, MutableMapping, Awaitable
 from logging import getLogger
-from types import MethodType, TracebackType, MappingProxyType, NoneType
-from typing import overload, NoReturn, Self, Iterable
+from types import MethodType, MappingProxyType, NoneType
+from typing import Self, Iterable
 
 from reactions.predicate import CustomFieldReactionConfiguration
 
-from .error import FieldAlreadyBound, FieldConfigurationError
+from .error import (FieldAlreadyBound, FieldConfigurationError,
+                    FieldWatcherHasNoExecutorError)
 from .executor import Executor
 from .field_descriptor import (FieldDescriptor, FieldReaction, FieldChange,
                                _BoundField, BoundReaction)
@@ -32,7 +32,7 @@ from .predicate import _Reaction
 from .predicate_types import ComparisonPredicates
 
 
-__all__ = ['Field', 'FieldManager', 'FieldWatcher']
+__all__ = ['Field', 'FieldManager', 'ExecutorFieldManager', 'FieldWatcher']
 
 logger = getLogger()
 
@@ -267,106 +267,75 @@ class BoundFieldCreatorMixin:
             field_._bind(nascent)
         return nascent
 
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        # This is necessary because object.__init__() does not appear to be
+        # called if __new__() is implemented and the subclass does not
+        # implement __init__(). Without this method a call to create a
+        # subclass without an __init__ will accept any args (because __new__()
+        # has to in order to support whatever the subclasses accept), but then
+        # no __init__() is called to raise an exception with invalid
+        # arguments. This is consistent from python 3.9 forward (and probably
+        # back, I just didn't test lower than that), so I doubt it's an actual
+        # bug, and you just have to implement __init__() if you implement
+        # __new__().
+        super().__init__(*args, **kwargs)
 
-class Reactant(ABC):
+
+class FieldManager(ABC, metaclass=FieldManagerMeta):
     '''
-    Mixin to give a class a reaction executor and methods to manage its
-    lifecycle.
+    Base class for classes with Field attributes.
+    Uses FieldManagerMeta as metaclass so that subclasses don't have to do it.
+    If the subclass has reactions it should probably subclass
+    ExecutorFieldManager since reactions require an executor.
+    '''
 
-    Not intended for direct use by client code, FieldManager and
-    FieldWatcher should be used instead.
-
-    Reactants are asynchronous context managers that start on enter and stop
-    on exit.
+class ExecutorFieldManager(FieldManager):
+    '''
+    A field manager with an intrinsic executor for use by reactions.
+    Has some simple wrappers around the executor lifecycle methods for
+    convenience.
     '''
 
     executor: Executor
-    '''The Executor that predicates will use to execute reactions.'''
 
-    @overload
     def __init__(self,
                  *args: object,
                  executor: Executor|None = None,
-                 **kwargs: object): ...
-                 
-    @overload
-    def __init__(self,
-                 *args: object,
-                 **kwargs: object): ...
-
-    def __init__(self,
-                 *args: object,
-                 **kwargs: object) -> None:
-        executor = kwargs.pop('executor', None)
-        assert executor is None or isinstance(executor, Executor)
-        self.executor = executor or Executor()
+                 **kwargs: object
+                 ) -> None:
+        '''
+        If executor is not provided one will be created.
+        '''
         super().__init__(*args, **kwargs)
+        self.executor = executor or Executor()
 
-    @abstractmethod
     def _start(self) -> None:
-        '''
-        Subclasses must implement this to start the state machine execution.
-        '''
+        '''subclasses can override this to take action when the executor is
+        started through methods on this class'''
 
-    async def start(self) -> Awaitable[None]:
-        '''
-         Start processing the state machine. Returns a future that indicates
-         when the state machine has entered a terminal state. If an exception
-         caused termination of the state it is available as the futures
-         exception.
-         '''
-        self.executor.start()
+    def start(self) -> Awaitable[None]:
+        '''Start the executor and then call _start().'''
+        awaitable = self.executor.start()
         self._start()
-        return self.executor
+        return awaitable
 
-    def run(self) -> None:
-        '''run and wait until complete'''
-        async def _run() -> None:
-            awaitable = await self.start()
-            await awaitable
-        run(_run())
-
-    def stop(self, timeout: float|None=2) -> None:
-        '''
-        stop the state processing.
-        Args:
-            timeout - time in seconds to wait for the shutdown to complete
-                      normally before canceling the task.
-        '''
-        self.executor.stop(timeout)
+    def stop(self) -> Awaitable[None]:
+        return self.executor.stop()
 
     async def astop(self, *_: object) -> None:
         '''
-        Async stop:
-        (done == True)(Reactant.astop)
+        Helper to stop the executor. Does not wait for the executor to stop,
+        just requests it stops.
+        (done == True)(ExecutorFieldManager.astop)
         '''
-        self.stop()
+        self.executor.stop()
 
-    def cancel(self) -> None:
-        self.stop(0)
-
-    async def __aenter__(self)->Awaitable[None]:
-        return await self.start()
-
-    async def __aexit__(self,
-                        exc_type: type[BaseException]|None,
-                        exc_val: BaseException|None,
-                        exc_tb: TracebackType|None) -> bool:
-        self.stop()
-        await self.executor
-        return False
+    def run(self) -> None:
+        '''run the executor and call _start()'''
+        return self.executor.run(start=self._start)
 
 
-
-class FieldManager(Reactant, ABC, metaclass=FieldManagerMeta):
-    '''
-    Base class for classes with Field attributes.
-
-    Provides management of fields (naming, bound field creation).
-    '''
-
-
-class FieldWatcher[Ti](Reactant, ABC):
+class FieldWatcher[Ti](ABC):
     '''
     Base class to allow subclasses to watch Fields on other classes.
 
@@ -389,6 +358,9 @@ class FieldWatcher[Ti](Reactant, ABC):
     instances are initialized.
     '''
 
+    executor: Executor
+    '''The executor used for the FieldWatcher reactions.'''
+
     def __init__(self,
                  watched: Ti,
                  *args: object,
@@ -401,22 +373,22 @@ class FieldWatcher[Ti](Reactant, ABC):
         assert isinstance(executor, (Executor, NoneType))
         if not executor:
             # Watcher will use the executor of watched if an executor is
-            # not provided. Ti is not limited to things that have an
-            # executor since it doesn't need to have an instance if only
-            # bound reactions are used (ie classes that provide fields
-            # for others to what but don't themselves have any reactions).
-            # Typing for either this or that is non-obvious and skipped.
-            # It is taken on blind faith that callers will provide an
-            # executor if the type they are watching don't have an
-            # executor. The exception that results if this blind faith is
-            # misplaced occurs at definition time and will be trivially
-            # noticed on first execution. It's not great, but the risk of
-            # horrible things happening is minimal.
-            # A similar issue exists with predicate reactions.
-            executor = self.watched.executor  # type: ignore # blind faith
-        super().__init__(*args,
-                         executor=executor,
-                         **kwargs)
+            # not provided.
+            if hasattr(self.watched, 'executor'):
+                executor = self.watched.executor
+        if executor is None:
+            # Ti is not limited to things that have an executor since it
+            # doesn't need to have an executor if only # bound reactions are
+            # used (ie classes that provide fields for others to watch but
+            # don't themselves have any reactions). Typing for either this is
+            # non-obvious and no static type check errors will be detected.
+            # Rather a runtime error is raised at runtime if a FieldWatcher is
+            # initialized and an executor is neither provided nor available on
+            # the watcher.
+            raise FieldWatcherHasNoExecutorError()
+
+        self.executor = executor
+        super().__init__(*args, **kwargs)
 
         # Configure the bound reactions.
         for reaction in self._reactions:

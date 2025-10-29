@@ -31,7 +31,7 @@ from typing import overload, ClassVar, Self, Coroutine, Any
 from .error import MustNotBeCalled
 
 
-__all__ = ['FieldReaction', 'FieldChange', 'Reaction']
+__all__ = ['FieldReaction', 'FieldChange', 'Reaction', 'ReactionCoroutine']
 
 
 type FieldReaction[Ti, Tf] = Callable[[FieldChange[Ti, Tf]], None]

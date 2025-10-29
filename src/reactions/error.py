@@ -21,8 +21,8 @@ from typing import NoReturn
 
 __all__ = ['MustNotBeCalled', 'ReactionMustNotBeCalled',
            'ExecutorError', 'ExecutorNotStarted', 'ExecutorAlreadyStarted',
-           'PredicateError', 'InvalidPredicateExpression', 'ExecutorStopped']
-
+           'PredicateError', 'InvalidPredicateExpression', 'ExecutorStopped',
+           'ReactionConfigurationError', 'FieldWatcherHasNoExecutorError']
 
 class MustNotBeCalled(RuntimeError):
     '''
@@ -105,6 +105,17 @@ class FieldAlreadyBound(FieldConfigurationError):
     Internal error indicating an instance already has a binding for a Field.
     Users aren't responsible and shouldn't need to bind fields directly. It
     indicates the FieldBinder has a fault.
+    '''
+
+class ReactionConfigurationError(RuntimeError):
+    '''Error indicating a reaction is not properly defined.'''
+
+
+class FieldWatcherHasNoExecutorError(ReactionConfigurationError):
+    '''
+    A FieldWatcher subclass has not be provided an executor. Either the class
+    it is watching must have an executor or one must be provided when the
+    FieldWatcher is initialized.
     '''
 
 

@@ -13,10 +13,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 '''
-Utilifies related to Fields.
+Utilities related to Fields.
 '''
-from typing import TypeVar
-
 
 from ..field import Field, FieldWatcher
 

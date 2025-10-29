@@ -18,7 +18,7 @@ Predicate test
 from unittest import TestCase, main
 
 from ..executor import Executor
-from ..field import Field, FieldManager
+from ..field import Field, ExecutorFieldManager
 from ..field_descriptor import FieldChange
 from .async_helpers import asynctest
 
@@ -41,7 +41,7 @@ class PredicateTest(TestCase):
         state instance or a watcher class.
         '''
         start = 5
-        class State(FieldManager):
+        class State(ExecutorFieldManager):
             field = Field['State', int](-1)
             @ field > 0
             async def decrement(self, *_: object) -> None:
@@ -58,7 +58,7 @@ class PredicateTest(TestCase):
             change_events.append((change.instance, change.field,
                                   change.old, change.new))
 
-        state.run()
+        state.executor.run(state._start)
 
         expected = ([(state, State.field, -1, start)] + # for _start
                     [(state, State.field, x, x - 1)

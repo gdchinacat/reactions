@@ -14,10 +14,11 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from enum import Enum
 from unittest import TestCase, main
-import asyncio
 import logging
 
-from ... import Field, And, FieldManager, FieldChange, RateLimit
+from ... import Field, And, ExecutorFieldManager, FieldChange, RateLimit
+from ...executor import Executor
+from ..async_helpers import asynctest
 
 
 NUMBER_OF_TRAFFIC_LIGHTS = 1_000
@@ -40,7 +41,7 @@ type TlFc[Tf] = FieldChange[TrafficLight, Tf]
 type IntOrColorFieldChange = TlFc[int|Color]
 
 
-class TrafficLight(FieldManager):
+class TrafficLight(ExecutorFieldManager):
     '''
     simple model that implements a traffic light:
     '''
@@ -56,8 +57,8 @@ class TrafficLight(FieldManager):
 
     sequence: list[Color]
 
-    def __init__(self, *args: object, **kwargs: object) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args: object, executor: Executor|None = None, **kwargs: object) -> None:
+        super().__init__(*args, executor=executor, **kwargs)
         self.sequence = []
         self.rate_limit = RateLimit(TICKS_PER_SECOND)
 
@@ -108,24 +109,23 @@ class TrafficLight(FieldManager):
 
 class TrafficLightTest(TestCase):
 
-    def test_traffic_light(self) -> None:
+    @asynctest(timeout=10)  # type: ignore  # mypy untyped decorator, but is typed
+    async def test_traffic_light(self) -> None:
         expected = [Color.GREEN, Color.YELLOW, Color.RED] * CYCLES
-        async def _run() -> None:
-            logger.info(f'Creating {NUMBER_OF_TRAFFIC_LIGHTS} traffic lights')
-            traffic_lights = [TrafficLight()
-                              for _ in range(NUMBER_OF_TRAFFIC_LIGHTS)]
+        logger.info(f'Creating {NUMBER_OF_TRAFFIC_LIGHTS} traffic lights')
+        traffic_lights = [TrafficLight()
+                          for _ in range(NUMBER_OF_TRAFFIC_LIGHTS)]
 
-            logger.info(f'starting {len(traffic_lights)} traffic lights')
-            awaitables = [(traffic_light, await traffic_light.start())
-                          for traffic_light in traffic_lights]
+        logger.info(f'starting {len(traffic_lights)} traffic lights')
+        awaitables = [(traffic_light, traffic_light.start())
+                      for traffic_light in traffic_lights]
 
-            logger.info(f'awaiting {len(awaitables)} traffic lights')
-            for traffic_light, awaitable in awaitables:
-                await awaitable
-                self.assertEqual(expected, traffic_light.sequence)
-                self.assertEqual(traffic_light.cycles, CYCLES)
-            logger.info(f'done')
-        asyncio.run(_run())
+        logger.info(f'awaiting {len(awaitables)} traffic lights')
+        for traffic_light, awaitable in awaitables:
+            await awaitable
+            self.assertEqual(expected, traffic_light.sequence)
+            self.assertEqual(traffic_light.cycles, CYCLES)
+        logger.info(f'done')
 
 
 if __name__ == "__main__":

@@ -17,14 +17,14 @@ from asyncio import sleep
 from time import time
 from unittest import TestCase, main
 
-from ...field import FieldManager, Field
+from ...field import ExecutorFieldManager, Field
 from ...field_descriptor import FieldChange
 from ...predicate_types import And, Not
 from ...test.async_helpers import asynctest
 from ...utilities import RateLimit, ScheduledUpdate
 
 
-class RateLimited(FieldManager, RateLimit):
+class RateLimited(ExecutorFieldManager, RateLimit):
     tick: Field[RateLimited, int] = Field(-1)  # replace RateLimit.tick
     stop_at: Field[RateLimited, int] = Field(0)
     time_per_tick: float = 0
@@ -39,7 +39,7 @@ class RateLimited(FieldManager, RateLimit):
 
         self.stop_at = stop_at
 
-    (stop_predicate := tick == stop_at)(FieldManager.astop)
+    (stop_predicate := tick == stop_at)(ExecutorFieldManager.astop)
 
     def _start(self) -> None:
         self.tick = 0
@@ -89,7 +89,7 @@ class TestScheduledUpdate(TestCase):
         class _Exception(Exception): ...
 
         with self.assertRaises(_Exception):
-            async with Updated(10).execute() as updater:
+            async with Updated(10) as updater:
                 await sleep(0.51)  # let updater run for 5 complete updates
                 raise _Exception()
         for delta in updater.deltas:

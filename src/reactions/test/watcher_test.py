@@ -19,13 +19,13 @@ from unittest import TestCase, main
 
 from ..error import ReactionMustNotBeCalled
 from ..executor import Executor
-from ..field import Field, FieldManager, FieldWatcher
+from ..field import Field, FieldManager, FieldWatcher, ExecutorFieldManager
 from ..field_descriptor import FieldChange
 from ..predicate_types import And
 from .async_helpers import asynctest
 
 
-class Watched(FieldManager):
+class Watched(ExecutorFieldManager):
     '''class with fields to be watched'''
 
     last_tick = Field['Watched', int](1)
@@ -85,7 +85,7 @@ class FieldWatcherTest(TestCase):
         watcher = Watcher(watched=watched,
                           executor=watched.executor)
 
-        watched.run()
+        watched.executor.run(watched._start)
 
         # last_tick + 2 for changing ticks to -1
         expected = [(x - 1, x if x != watched.last_tick + 1 else -1)
@@ -111,10 +111,10 @@ class FieldWatcherTest(TestCase):
 
         executor = Executor()
 
-        watched1 = Watched(executor=executor)
+        watched1 = Watched()
         watcher1 = Watcher(watched1, executor=executor)
 
-        watched2 = Watched(executor=executor)
+        watched2 = Watched()
         watcher2 = Watcher(watched2, executor=executor)
 
         async with executor:
@@ -145,10 +145,10 @@ class FieldWatcherTest(TestCase):
         self.assertEqual([], State.field.reactions)
 
         state = State()
-        watcher = Watcher(state)
+        watcher = Watcher(state, executor=Executor())
 
         self.assertEqual([], State.field.reactions)
-        async with state:
+        async with watcher.executor:
             state.field = True
         self.assertTrue(watcher.called)
 

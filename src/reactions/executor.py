@@ -17,8 +17,8 @@ Asynchronous reaction executor.
 '''
 
 from asyncio import (Queue, Task, create_task, QueueShutDown, sleep,
-                     get_event_loop, CancelledError)
-from collections.abc import Awaitable, Generator
+                     get_event_loop, CancelledError, run)
+from collections.abc import Awaitable, Callable, Generator
 from itertools import count
 from logging import Logger, getLogger
 from types import TracebackType
@@ -135,14 +135,21 @@ class Executor:
     # to the task and raised to waiters.
     ###########################################################################
 
-    def start(self) -> Awaitable[None]:
-        '''start the task to execute the queued reactions'''
+    def start(self, start: Callable[[], None]|None = None
+              ) -> Awaitable[None]:
+        '''
+        Start the task to execute the queued reactions.
+        start: a callable that is called once the executor is started. It is
+               useful for state machines that need a 'nudge' to get started.
+        '''
         if self.task is not None:
             raise ExecutorAlreadyStarted()
         self.task = create_task(self.execute_reactions())
+        if start is not None:
+            start()
         return self.task
 
-    def stop(self, timeout: float|None = 2) -> None:
+    def stop(self, timeout: float|None = 2) -> Awaitable[None]:
         '''stop the reaction queue with timeout (defaults to 2 seconds)'''
         if not self.task:
             raise ExecutorNotStarted()
@@ -160,6 +167,16 @@ class Executor:
                                  'took more than %.2fs', self, timeout)
                     self.task.cancel()
             get_event_loop().call_later(timeout, _cancel_task)
+        return self.task
+
+    def run(self, start: Callable[[], None]|None = None) -> None:
+        '''
+        Run and wait until complete.
+        '''
+        async def _run() -> None:
+            task = self.start(start=start)
+            await task
+        run(_run())
 
     async def execute_reactions(self) -> None:
         '''

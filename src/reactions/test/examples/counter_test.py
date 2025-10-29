@@ -14,18 +14,18 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from unittest import TestCase, main
 
-from ... import Field, FieldManager, And, FieldChange
+from ... import Field, ExecutorFieldManager, And, FieldChange
 
 
-class Counter(FieldManager):
+class Counter(ExecutorFieldManager):
     '''
     Simple model that implements a counter.
 
     It has a loop() that increments a count and a done() that completes
     execution when the count reaches a specified value.
 
-    It derives from Reactant in order to start and stop execution of the state
-    machine.
+    It derives from ExecutorFieldManager to have an executor for the reactions
+    to execute in.
     '''
 
     # annotations are required for dataclass to include in __init__
@@ -41,7 +41,7 @@ class Counter(FieldManager):
         self.count = 0
 
     # stop when the count reaches count_to
-    (count == count_to)(FieldManager.astop)
+    (count == count_to)(ExecutorFieldManager.astop)
 
     @ And(0 <= count,
           count < count_to)
