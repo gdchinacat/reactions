@@ -137,8 +137,8 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
             #      with static type hints.
             #      For now, this code just gets it and will error out
             #      if neither do. Unfortunately any errors from mistrust will
-            #      not occur until the reaction executes. PredicateArgument similar issue
-            #      exists with FieldWatcher executor assignment.
+            #      not occur until the reaction executes. PredicateArgument
+            #      similar issue exists with FieldWatcher executor assignment.
             executor_provider = getattr(  # get executor from:
                 reaction, '__self__',  # the instance reaction is bound to
                 change.instance)       # or the instance the field changed on
@@ -164,7 +164,7 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
 
         The set of fields the predicate uses are reaction()ed to have the
         predicate react() by scheduling the reaction method to be executed
-        asynchronously by the reaction executor (semantics TBD).
+        asynchronously by the reaction executor (semantics todo).
 
         The reaction is executed by the reaction executor in order of
         submission. Reactions are synchronous with respect to the other
@@ -212,12 +212,12 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
         return _Reaction(self, reaction)
 
     def configure_reaction[Tw, Ti](self,
-                                   reaction:Reaction[Ti, Tf],
+                                   reaction: Reaction[Ti, Tf],
                                    instance: Ti|None = None) -> None:
         '''configure the reaction on the fields'''
         # Add a reaction on all the fields to call self.react() with
         # func as the reaction function.
-        for field in set(self.fields):
+        for field in set(self.fields):  # todo set() order instability
             field_ = (field.bound_field(instance)
                       if instance is not None else field)
             logger.info('changes to %s will call %s', field, reaction)
