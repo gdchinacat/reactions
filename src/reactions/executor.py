@@ -200,7 +200,9 @@ class Executor:
                 await coroutine
                 await sleep(0)
             except CancelledError as ce:
-                logger.exception('%s cancelled.', self, exc_info=ce)
+                logger.exception('%s cancelled.',
+                                 coroutine.__qualname__,
+                                 exc_info=ce)
                 raise  # CancelledError needs to be propagated
             except Exception as exc:
                 # A failure in a reaction means the state is inconsistent.
