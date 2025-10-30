@@ -187,15 +187,6 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
         occur when the fields being read are updated outside a reaction
         executing in the same executor.
 
-        TODO - remove ReactionMustNotBeCalled to allow stacking predicate
-               decorators?
-
-        TODO - And() is ugly...but if we could do it by stacking predicate
-               decorators it's a lot less ugly.
-               @ field1 == 1
-               @ field2 == 2
-               Attempting this currently raises ReactionMustNotBeCalled.
-
         Field reactions are not configured if the reaction func is an instance
         of CustomFieldReactionConfiguration. This is used by FieldWatcher to
         not configure reactions that need to be bound to specific instances
