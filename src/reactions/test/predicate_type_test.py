@@ -93,6 +93,24 @@ class TestPredicate(TestCase):
         c.field = True
         self.assertTrue(And(Boolean(C.field), Boolean(C.field)).evaluate(c))
 
+    def test_chained_and(self) -> None:
+        class C:
+            field_a = Field['C', bool](False, 'C', 'field_a')
+            field_b = Field['C', bool](True, 'C', 'field_b')
+            field_c = Field['C', bool](True, 'C', 'field_c')
+
+        c = C()
+        self.assertFalse(And(Boolean(C.field_a),
+                             Boolean(C.field_b),
+                             Boolean(C.field_c),
+                            ).evaluate(c))
+
+        c.field_a = True
+        self.assertTrue(And(Boolean(C.field_a),
+                            Boolean(C.field_b),
+                            Boolean(C.field_c),
+                           ).evaluate(c))
+
     def test_and_predicate_decorate_creates_reaction(self) -> None:
         class C:
             field_a = Field['C', bool](False, 'C', 'field_a')

@@ -42,15 +42,17 @@ class Not[Tf](UnaryPredicate[Tf]):
         return super().__init__(operand)
 
 class And[Tfl, Tfr](BinaryPredicate[Tfl, Tfr]):
-    # todo? Allow And to take more than two operands? Since it can't be written
-    #       as 'foo and bar and baz' and requires And(foo, And(bar, baz)) it
-    #       is preptty clunky...And(foo, bar, baz) would be a big improvement.
     token = '!and!'
     operator = lambda _, a, b: a and b
 
     @override
-    def __init__(self, left: Predicate[Tfl], right: Predicate[Tfr]) -> None:
-        super().__init__(left, right)
+    def __init__(self, left: Predicate[Tfl],
+                 right: Predicate[Tfr],
+                 *others: Predicate[Tfr]) -> None:
+        others = (right,) + others
+        while len(others) > 1:
+            others = others[:-2] + (And(others[-2], others[-1]),)
+        super().__init__(left, others[0])
 
 class Or[Tfl,Tfr](BinaryPredicate[Tfl, Tfr]):
     token = '!or!'
