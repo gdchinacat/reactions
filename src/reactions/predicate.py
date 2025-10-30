@@ -217,7 +217,11 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
         '''configure the reaction on the fields'''
         # Add a reaction on all the fields to call self.react() with
         # func as the reaction function.
-        for field in set(self.fields):  # todo set() order instability
+        seen_fields = set[FieldDescriptor[Ti, Tf]]()
+        for field in self.fields:
+            if field in seen_fields:
+                continue
+            seen_fields.add(field)
             field_ = (field.bound_field(instance)
                       if instance is not None else field)
             logger.info('changes to %s will call %s', field, reaction)
