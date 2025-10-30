@@ -45,6 +45,8 @@ class And[Tfl, Tfr](BinaryPredicate[Tfl, Tfr]):
     # todo? Allow And to take more than two operands? Since it can't be written
     #       as 'foo and bar and baz' and requires And(foo, And(bar, baz)) it
     #       is preptty clunky...And(foo, bar, baz) would be a big improvement.
+    #       branch variadic_and has been created...it's pretty trivial to
+    #       implement, but typing it is hard.
     token = '!and!'
     operator = lambda _, a, b: a and b
 
