@@ -15,13 +15,18 @@
 '''
 Predicate test
 '''
+import asyncio
+from typing import Callable
 from unittest import TestCase, main
 
 from ..executor import Executor
-from ..field import Field, ExecutorFieldManager
+from ..field import Field, ExecutorFieldManager, BoundField
 from ..field_descriptor import FieldChange
 from .async_helpers import asynctest
 
+
+class C(ExecutorFieldManager):
+    field = Field['C', int](0)
 
 class PredicateTest(TestCase):
 
@@ -86,6 +91,43 @@ class PredicateTest(TestCase):
             state.field = True
             state.executor.stop()
         self.assertTrue(state.called)
+
+    async def _test_reactions_are_cancelable(self,
+        field_cb: Callable[[C], Field[C, int]]
+                 |Callable[[C], BoundField[C, int]]
+                 ) -> None:
+        '''
+        Test that reactions registered with predicate decorator are cancelable.
+        '''
+        # reaction that tracks the number of times it has been called.
+        calls = 0
+        async def reaction(c: C, change: FieldChange[C, int]) -> None:
+            nonlocal calls
+            calls += 1
+
+        # Create an instance and register the reaction using the callback to
+        # get the field (either C.field or C.field[c]).
+        c = C()
+        canceler = field_cb(c)(reaction).canceler
+        assert canceler is not None
+
+        # cause reaction to execute, cancel it, make same change and verify
+        # it was only called once.
+        async with c.executor:
+            c.field += 1
+            await asyncio.sleep(0) # let reaction run
+            canceler()
+            c.field += 1
+            c.executor.stop()
+        self.assertEqual(1, calls)
+
+    @asynctest
+    async def test_bound_reactions_are_cancelable(self) -> None:
+        await self._test_reactions_are_cancelable(lambda c: C.field[c])
+
+    @asynctest
+    async def test_reactions_are_cancelable(self) -> None:
+        await self._test_reactions_are_cancelable(lambda c: C.field)
 
 
 if __name__ == "__main__":

@@ -25,7 +25,7 @@ import logging
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
 from .field_descriptor import (FieldDescriptor, Evaluator, FieldChange,
-                               BoundReaction, Reaction)
+                               BoundReaction, Reaction, ReactionCanceler)
 from .logging_config import VERBOSE
 
 
@@ -77,6 +77,7 @@ class _Reaction[Tw, Ti, Tf](ReactionMustNotBeCalled):
     '''
     predicate: Predicate[Tf]
     func: Reaction[Ti, Tf] | BoundReaction[Tw, Ti, Tf]
+    canceler: ReactionCanceler | None
 
 
 class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
@@ -193,21 +194,24 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
         (rather than the classes that fields are on).
         '''
         manager = CustomFieldReactionConfiguration.manager(reaction)
+        canceler: ReactionCanceler|None = None
         if manager is not None:
             logger.info('changes to %s will use %s to '
                         'create bound reactions for %s',
                         ', '.join(str(f) for f in self.fields),
                         reaction, self)
         else:
-            self.configure_reaction(cast(Reaction[Ti, Tf], reaction))
-        return _Reaction(self, reaction)
+            canceler = self.configure_reaction(cast(Reaction[Ti, Tf],
+                                                    reaction))
+        return _Reaction(self, reaction, canceler)
 
     def configure_reaction[Tw, Ti](self,
                                    reaction: Reaction[Ti, Tf],
-                                   instance: Ti|None = None) -> None:
+                                   instance: Ti|None = None) -> ReactionCanceler:
         '''configure the reaction on the fields'''
         # Add a reaction on all the fields to call self.react() with
         # func as the reaction function.
+        cancelers = []
         seen_fields = set[FieldDescriptor[Ti, Tf]]()
         for field in self.fields:
             if field in seen_fields:
@@ -216,7 +220,12 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
             field_ = (field.bound_field(instance)
                       if instance is not None else field)
             logger.info('changes to %s will call %s', field, reaction)
-            field_.reaction(partial(self.react, reaction=reaction))
+            canceler = field_.reaction(partial(self.react, reaction=reaction))
+            cancelers.append(canceler)
+        def _canceler() -> None:
+            for canceler in cancelers:
+                canceler()
+        return _canceler
 
 
 @dataclass

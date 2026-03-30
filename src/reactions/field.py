@@ -27,7 +27,7 @@ from .error import (FieldAlreadyBound, FieldConfigurationError,
                     FieldWatcherHasNoExecutorError)
 from .executor import Executor
 from .field_descriptor import (FieldDescriptor, FieldReaction, FieldChange,
-                               _BoundField, BoundReaction)
+                               _BoundField, BoundReaction, ReactionCanceler)
 from .predicate import _Reaction
 from .predicate_types import ComparisonPredicates
 
@@ -60,13 +60,14 @@ class BoundField[Ti, Tf](_BoundField[Ti, Tf],
         # are configured.
         self.reactions = field.reactions
 
-    def reaction(self, reaction: FieldReaction[Ti, Tf]) -> None:
+    def reaction(self, reaction: FieldReaction[Ti, Tf]) -> ReactionCanceler:
         '''Add a reaction for when this bound field changes value.'''
         # ensure the bound field is using a private reactions list
         if self.reactions is self.field.reactions:
             self.reactions = list(self.field.reactions)
 
         self.reactions.append(reaction)
+        return lambda: self.reactions.remove(reaction)
 
     def react(self, change: FieldChange[Ti, Tf]) -> None:
 

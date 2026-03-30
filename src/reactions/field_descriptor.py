@@ -24,6 +24,7 @@ track and call the reactions when field values change.
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from functools import partial
 from itertools import count
 from types import MappingProxyType
 from typing import overload, ClassVar, Self, Coroutine, Any
@@ -31,7 +32,12 @@ from typing import overload, ClassVar, Self, Coroutine, Any
 from .error import MustNotBeCalled
 
 
-__all__ = ['FieldReaction', 'FieldChange', 'Reaction', 'ReactionCoroutine']
+__all__ = ['FieldReaction', 'FieldChange', 'Reaction', 'ReactionCoroutine',
+           'ReactionCanceler']
+
+
+type ReactionCanceler = Callable[[], None]
+'''ReactionCanceler is a callable that removes the reaction.'''
 
 
 type FieldReaction[Ti, Tf] = Callable[[FieldChange[Ti, Tf]], None]
@@ -104,7 +110,7 @@ class _BoundField[Ti, Tf](ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def reaction(self, reaction: FieldReaction[Ti, Tf]) -> None:
+    def reaction(self, reaction: FieldReaction[Ti, Tf]) -> ReactionCanceler:
         ''' Add a reaction to the list of reactions.'''
         raise NotImplementedError()
 
@@ -161,9 +167,13 @@ class FieldDescriptor[Ti, Tf](Evaluator[Ti, Tf, Tf], ABC):
         # instance type are checked (Ti=Any)
         self.reactions: list[FieldReaction[Any, Tf]] = []
 
-    def reaction(self, reaction: FieldReaction[Ti, Tf]) -> None:
-        ''' Add a reaction to the list of reactions.'''
+    def reaction(self, reaction: FieldReaction[Ti, Tf]) -> ReactionCanceler:
+        '''
+        Add a reaction to the list of reactions.
+        Returns a callable that removes the reaction from the list.
+        '''
         self.reactions.append(reaction)
+        return partial(self.reactions.remove, reaction)
 
     @abstractmethod
     def _bind(self, nascent_instance: Ti) -> _BoundField[Ti, Tf]:

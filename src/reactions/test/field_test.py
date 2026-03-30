@@ -17,6 +17,7 @@ Test field functionality.
 '''
 
 from dataclasses import dataclass
+from typing import Callable
 from unittest import TestCase, main
 
 from ..error import (MustNotBeCalled, InvalidPredicateExpression,
@@ -28,6 +29,9 @@ from ..field_descriptor import FieldChange
 from ..predicate import Predicate
 from ..predicate_types import Contains, Not, Or, And, Boolean
 
+
+class C(metaclass=FieldManagerMeta):
+    field = Field['C', int](0)
 
 class TestField(TestCase):
 
@@ -237,6 +241,41 @@ class TestField(TestCase):
                 field = Field['_', bool](False)
                 @field == False
                 async def _field(self, *_: object) -> None: ...
+
+    def _test_field_reaction_is_cancellable(self,
+        field_cb: Callable[[C], Field[C, int]]
+                 |Callable[[C], BoundField[C, int]]) -> None:
+        '''
+        Test that calling the return from Field.reaction(...) removes the
+        reaction.
+        '''
+        calls = 0
+        def reaction(change: FieldChange[C, int]) -> None:
+            nonlocal calls
+            calls += 1
+
+        # register a reaction on an instance of the field
+        c = C()
+        field = field_cb(c)
+        cancel = field.reaction(reaction)
+        self.assertEqual(1, len(field.reactions))
+
+        # change the field value to verify the reaction is called
+        c.field += 1
+
+        # cancel the reaction and assert the field no longer has a reaction
+        cancel()
+        self.assertEqual(0, len(field.reactions))
+
+        # change the field again and ensure the reaction wasn't called.
+        c.field += 1
+        self.assertEqual(1, calls)
+
+    def test_bound_field_reaction_is_cancellable(self) -> None:
+        self._test_field_reaction_is_cancellable(lambda c: C.field)
+
+    def test_field_reaction_is_cancellable(self) -> None:
+        self._test_field_reaction_is_cancellable(lambda c: C.field[c])
 
 
 if __name__ == '__main__':
