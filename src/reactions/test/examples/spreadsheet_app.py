@@ -1,7 +1,6 @@
 
 import asyncio
 from functools import partial
-import logging
 import re
 from threading import Thread
 import tkinter as tk
@@ -9,10 +8,11 @@ from tkinter import font as tkfont
 
 from reactions import Field, ExecutorFieldManager, Executor, FieldChange
 
-logging.basicConfig(level=5)
-
 type Number = int | float 
 type CellValue = Number | str
+
+# todo
+#    - use namedtuple for cell address rather than r, c args all over
 
 # =============================================================================
 #  CELL MODEL
@@ -26,19 +26,30 @@ class Cell(ExecutorFieldManager):
     raw = Field["Cell", str]("")
     value = Field["Cell", CellValue]("")
 
-    def __init__(self, engine: SpreadsheetEngine, row: int, col: int):
+    @raw
+    async def raw_changed(self, change: "FieldChange[Cell, str]") -> None:
+        print(f'{self} raw changed {change}')
+
+    @value
+    async def value_changed(self, change: "FieldChange[Cell, CellValue]") -> None:
+        print(f'{self} value changed {change}')
+
+    def __init__(self, engine: "SpreadsheetEngine", row: int, col: int):
         self.engine = engine
         super().__init__(executor=engine.executor)
         self.row, self.col = row, col
 
     @property
     def address(self) -> str:
+        return str(self)
+
+    def __str__(self) -> str:
         return f"{_col_name(self.col)}{self.row + 1}"
 
     def __repr__(self) -> str:
         return f"<Cell {self.address} raw={self.raw!r} value={self.value!r}>"
 
-    def _eval_formula(self, expr: str) -> CellValue:
+    def _eval_formula(self, raw: str, from_raw: bool) -> CellValue:
         # Expand range functions
         def expand_range(m: re.Match[str]) -> str:
             fn = m.group(1).upper()
@@ -57,32 +68,45 @@ class Cell(ExecutorFieldManager):
             if fn == "COUNT": return str(len(nums))
             raise ValueError(f"Unknown function {fn}")
 
-        expr = RANGE_RE.sub(expand_range, expr)
+        expr = RANGE_RE.sub(expand_range, raw)
 
         def replace_ref(m: re.Match[str]) -> str:
-            # todo - manage reactions (remove old, register new)
             cell = self.engine.cell_by_addr(m.group(0))
             if cell is None: raise ValueError(f"Unknown {m.group(0)}")
+
+            if from_raw:
+                print(f'{self} watching {cell}')
+                Cell.value[cell](self.__evaluate_value)
+
             v = cell.value
             if v is None: return "0"
             if isinstance(v, (int, float)): return repr(v)
             raise ValueError(f"{m.group(0)} is not numeric")
 
+        if from_raw:
+            # todo - remove existing reactions
+            #        update predicate decorator to put a cancel() method on
+            #        the returned 'reaction' that can be used to remove the
+            #        reaction. Store the reactions on self._reactions and
+            #        cancel them all when reevaluating.
+            pass
+
         expr = CELL_RE.sub(replace_ref, expr)
         result = eval(expr, {"__builtins__": {}},   # noqa: S307
                       {"abs": abs, "round": round, "min": min, "max": max})
-        print(f'*** evaluated {self} = {result}')
+        print(f'*** evaluated {self} {raw} = {expr} = {result}')
         if isinstance(result, (int, float)):
             return result
         else:
             return str(result)
 
-    @ raw
-    async def _evaluate(self, change: FieldChange[Cell, str]) -> None:
+    async def __evaluate(self,
+                         change: "FieldChange[Cell, str]|FieldChange[Cell, CellValue]",
+                         from_raw: bool=False) -> None:
         '''evaluate the cell value because raw value changed'''
         if self.raw.startswith("="):
             try:
-                self.value = self._eval_formula(self.raw[1:])
+                self.value = self._eval_formula(self.raw[1:], from_raw=from_raw)
             except Exception as e:
                 self.value = f"#ERR {e}"
         else:
@@ -91,6 +115,17 @@ class Cell(ExecutorFieldManager):
                 self.value = float(self.raw) if '.' in self.raw else int(self.raw)
             except ValueError:
                 self.value = self.raw
+
+    async def __evaluate_value(self,
+                               changed_cell: "Cell",
+                               change: "FieldChange[Cell, CellValue]") -> None:
+        return await self.__evaluate(change, from_raw=False)
+
+    async def __evaluate_raw(self,
+                             change: "FieldChange[Cell, str]") -> None:
+        return await self.__evaluate(change, from_raw=True)
+
+    raw(__evaluate_raw)
 
 
 # =============================================================================
@@ -157,14 +192,6 @@ class SpreadsheetEngine:
         async def _set() -> None:
             cell.raw = text.strip() if text else ''
         asyncio.run_coroutine_threadsafe(_set(), self._loop)
-
-    def display(self, row: int, col: int) -> str:
-        v = self.cells[row][col].value
-        if v is None:
-            return ""
-        if isinstance(v, float) and v == int(v):
-            return str(int(v))
-        return str(v)
 
     def cell_by_addr(self, addr: str) -> Cell | None:
         m = re.fullmatch(r"([A-Z]+)(\d+)", addr.upper())
@@ -345,22 +372,32 @@ class SpreadsheetUI:
     def _row_bg(self, r: int) -> str:
         return P["even"] if r % 2 == 0 else P["odd"]
 
-    def _select(self, row: int, col: int, event: tk.Event|None=None, commit:bool=True) -> None:
+    def _select(self, row: int, col: int,
+                event: tk.Event|None=None,
+                commit:bool=True) -> None:
         '''select the cell at row:col'''
         # turn off bg for currently selected cell
         if self._selected:
             if commit: self._commit()  # save whatever is in the function line to current cell
             self._selected_label.configure(bg=self._row_bg(self._selected.row))
 
-        self._selected = self.engine.cells[row][col]
-        label = self._labels[row][col]  # todo - use reaction to manage this
+        self._selected = self.engine.cells[row][col]  # todo - rest should be
+                                                      # reaction to update?
+        label = self._labels[row][col]
         label.configure(bg=P["sel"])
         label.focus_set()
 
         cell = self.engine.cells[row][col]
         self._addr_var.set(cell.address)
-        self._formula_var.set(cell.raw or "")
-        self._status_var.set(f"{cell.address}  =  {self.engine.display(row, col)}")
+        self._formula_var.set(cell.raw or "")  # todo - wrong thread? maybe the
+                                               # best way is to use reaction on
+                                               # self._selected to get the
+                                               # values and on_cell_changed
+                                               # like callback to update UI
+        # todo - display was removed since it was apt to access cell value from
+        #        wrong thread. Get the value from the cell widget text
+        lbl = self._labels[row][col]
+        self._status_var.set(f"{cell.address}  =  {lbl.cget('text')}")
 
     def _begin_edit(self, row: int, col: int, event: tk.Event|None=None) -> None:
         self._select(row, col, commit=False)
@@ -373,7 +410,7 @@ class SpreadsheetUI:
         if k in ("Return", "F2"):    self._begin_edit(row, col)
         elif k == "Delete":
             self.engine.set_raw(row, col, "")
-            self._refresh_cell(self.engine.cells[row][col])
+            self._refresh_cell(self.engine.cells[row][col], "", "")
             self._select(row, col, commit=False)
         elif k == "Tab":
             nc = (col + 1) % self.engine.ncols
@@ -410,31 +447,36 @@ class SpreadsheetUI:
 
     # ── UI refresh ────────────────────────────────────────────────────────────
 
-    def _refresh_cell(self, cell: Cell) -> None:
+    def _refresh_cell(self, cell: Cell, raw: str, value: str) -> None:
+        '''
+        refresh the contents of cell.
+        executes in tkinter thread, do not access cell values
+        '''
         r, c = cell.row, cell.col
-        display = self.engine.display(r, c)
-        raw = cell.raw or ""
-        fg = (P["error"]     if isinstance(cell.value, str) and cell.value.startswith("#ERR")
+        raw = raw or ""
+        fg = (P["error"]     if isinstance(value, str) and value.startswith("#ERR")
               else P["formula"] if raw.startswith("=")
               else P["text"])
         lbl = self._labels[r][c]
-        lbl.configure(text=display, fg=fg)
-        if cell == self._selected:
-            self._status_var.set(f"{cell.address}  =  {display}")
+        lbl.configure(text=value, fg=fg)
+        if cell is self._selected:
+            self._status_var.set(f"{cell.address}  =  {value}")
 
     async def _on_cell_changed(self, cell: Cell,
                                change: FieldChange[Cell, CellValue]) -> None:
-        """Called by engine reactions — schedule Tk update on main thread."""
-        self.root.after(0, lambda: self._refresh_cell(cell))
+        '''reaction when cell value changes - refresh cell'''
 
+        value = change.new or ""
+        if isinstance(value, float) and value == int(value):
+            value = int(value)
+        value = str(value)
 
-# =============================================================================
-#  ENTRY POINT
-# =============================================================================
+        self.root.after(0, lambda: self._refresh_cell(cell, cell.raw, value))
+
 
 def main() -> None:
     root = tk.Tk()
-    root.title("Reactive Spreadsheet  —  gdchinacat/reactions")
+    root.title("Reactions Demo Spreadsheet")
     root.geometry("960x580")
     root.minsize(640, 400)
 
