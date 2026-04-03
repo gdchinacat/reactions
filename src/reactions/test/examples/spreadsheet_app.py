@@ -1,12 +1,16 @@
 
 import asyncio
-from functools import partial
+from functools import partial, wraps
 import re
-from threading import Thread
+from statistics import mean, StatisticsError
+from threading import Thread, Event
 import tkinter as tk
 from tkinter import font as tkfont
+from typing import Iterator, Literal, Callable
 
-from reactions import Field, ExecutorFieldManager, Executor, FieldChange
+from reactions import (Field, ExecutorFieldManager, Executor, FieldChange,
+                       ReactionCanceler)
+from pip._vendor.rich import cells
 
 type Number = int | float 
 type CellValue = Number | str
@@ -19,25 +23,27 @@ type CellValue = Number | str
 # =============================================================================
 
 class Cell(ExecutorFieldManager):
-    """One cell: stores raw user input and its evaluated value as Fields."""
+    '''
+    A spreadsheet cell.
+    Has two values, the raw value and the evaluated value. The raw values are
+    the text the user entered into the cell (str). The evaluated value is the
+    inferred type after evaluation (float, int, str).
+
+    Reactions are used to:
+        - evaluate the value when raw value changes
+        - evaluate evaluated value when referenced cell evaluated value changes
+    '''
 
     row: int
     col: int
     raw = Field["Cell", str]("")
     value = Field["Cell", CellValue]("")
 
-    @raw
-    async def raw_changed(self, change: "FieldChange[Cell, str]") -> None:
-        print(f'{self} raw changed {change}')
-
-    @value
-    async def value_changed(self, change: "FieldChange[Cell, CellValue]") -> None:
-        print(f'{self} value changed {change}')
-
     def __init__(self, engine: "SpreadsheetEngine", row: int, col: int):
         self.engine = engine
         super().__init__(executor=engine.executor)
         self.row, self.col = row, col
+        self._cancelers: dict[Cell, ReactionCanceler] = {}
 
     @property
     def address(self) -> str:
@@ -49,64 +55,79 @@ class Cell(ExecutorFieldManager):
     def __repr__(self) -> str:
         return f"<Cell {self.address} raw={self.raw!r} value={self.value!r}>"
 
-    def _eval_formula(self, raw: str, from_raw: bool) -> CellValue:
-        # Expand range functions
+    def _register_value_reaction(self, cell: Cell) -> Cell:
+        '''
+        Register a reaction for when cell.value changes. The canceler for the
+        reaction is apppended to self._cancelers.
+        The cell is returned so it can be used with map to chain generators.
+        '''
+        if cell not in self._cancelers:
+            canceler = Cell.value[cell](self.__value_change).canceler
+            self._cancelers[cell] = canceler
+        return cell
+
+    def _eval_formula(self, raw: str, register_reactions: bool) -> CellValue:
+        # todo - _eval_formula each time is pretty expensive since it has
+        #        to parse the formula whenever a referenced cell value. Keep
+        #        the AST of the regex around an only reevaluate when raw
+        #        value is updated.
+
+        watched_cells: set[Cell] = set()  # avoid duplicate reactions
         def expand_range(m: re.Match[str]) -> str:
+            '''replace aggregation functions with value'''
             fn = m.group(1).upper()
             c1, r1 = _col_index(m.group(2)), int(m.group(3)) - 1
             c2, r2 = _col_index(m.group(4)), int(m.group(5)) - 1
-            vals = [
-                self.engine.cells[r][c].value
-                for r in range(min(r1,r2), max(r1,r2)+1)
-                for c in range(min(c1,c2), max(c1,c2)+1)
-            ]
-            nums = [v for v in vals if isinstance(v, (int, float))]
-            if fn == "SUM":   return str(sum(nums))
-            if fn == "AVG":   return str(sum(nums)/len(nums)) if nums else "0"
-            if fn == "MIN":   return str(min(nums)) if nums else "0"
-            if fn == "MAX":   return str(max(nums)) if nums else "0"
-            if fn == "COUNT": return str(len(nums))
-            raise ValueError(f"Unknown function {fn}")
 
+            # Generator expressions avoid creating potentially huge lists.
+            cells: Iterator[Cell] = (self.engine.cells[r][c]
+                     for r in range(min(r1,r2), max(r1,r2)+1)
+                     for c in range(min(c1,c2), max(c1,c2)+1))
+            cells = map(self._register_value_reaction, cells)
+            nums: Iterator[int|float] = (
+                cell.value for cell in cells
+                if isinstance(cell.value, (int, float)))
+
+            func = AGGREGATION_FUNCTIONS.get(fn)
+            if func is None:
+                raise ValueError(f"Unknown function {fn}")
+            return str(func(nums))
         expr = RANGE_RE.sub(expand_range, raw)
 
         def replace_ref(m: re.Match[str]) -> str:
             cell = self.engine.cell_by_addr(m.group(0))
             if cell is None: raise ValueError(f"Unknown {m.group(0)}")
 
-            if from_raw:
-                print(f'{self} watching {cell}')
-                Cell.value[cell](self.__evaluate_value)
+            if register_reactions and cell not in watched_cells:
+                self._register_value_reaction(cell)
+                watched_cells.add(cell)
 
             v = cell.value
             if v is None: return "0"
             if isinstance(v, (int, float)): return repr(v)
             raise ValueError(f"{m.group(0)} is not numeric")
 
-        if from_raw:
-            # todo - remove existing reactions
-            #        update predicate decorator to put a cancel() method on
-            #        the returned 'reaction' that can be used to remove the
-            #        reaction. Store the reactions on self._reactions and
-            #        cancel them all when reevaluating.
-            pass
-
         expr = CELL_RE.sub(replace_ref, expr)
         result = eval(expr, {"__builtins__": {}},   # noqa: S307
                       {"abs": abs, "round": round, "min": min, "max": max})
-        print(f'*** evaluated {self} {raw} = {expr} = {result}')
         if isinstance(result, (int, float)):
             return result
         else:
             return str(result)
 
-    async def __evaluate(self,
-                         change: "FieldChange[Cell, str]|FieldChange[Cell, CellValue]",
-                         from_raw: bool=False) -> None:
-        '''evaluate the cell value because raw value changed'''
+    def __evaluate(self,
+                   change: FieldChange[Cell, str]  # raw
+                          |FieldChange[Cell, CellValue], # value
+                   register_reactions: bool=False) -> None:
+        '''
+        Update the evaluated value based on the raw value.
+        This handles both raw value change and referenced cell value change.
+        Performs data type conversion from raw string to properly typed value.
+        '''
         if self.raw.startswith("="):
             try:
-                self.value = self._eval_formula(self.raw[1:], from_raw=from_raw)
+                self.value = self._eval_formula(self.raw[1:],
+                    register_reactions=register_reactions)
             except Exception as e:
                 self.value = f"#ERR {e}"
         else:
@@ -116,16 +137,25 @@ class Cell(ExecutorFieldManager):
             except ValueError:
                 self.value = self.raw
 
-    async def __evaluate_value(self,
-                               changed_cell: "Cell",
-                               change: "FieldChange[Cell, CellValue]") -> None:
-        return await self.__evaluate(change, from_raw=False)
+    async def __value_change(self,
+                             changed_cell: "Cell",
+                             change: "FieldChange[Cell, CellValue]") -> None:
+        '''reaction for when a referenced cell value changes'''
+        self.__evaluate(change)
 
-    async def __evaluate_raw(self,
-                             change: "FieldChange[Cell, str]") -> None:
-        return await self.__evaluate(change, from_raw=True)
+    async def __raw_changed(self,
+                            change: "FieldChange[Cell, str]") -> None:
+        '''reaction for when the raw value changes'''
 
-    raw(__evaluate_raw)
+        # raw value changed, clear the existing reactions to avoid leaking them
+        # or creating duplicates when they are registered during evaluation.
+        for (cell, canceler) in self._cancelers.items():
+            canceler()
+        self._cancelers.clear()
+
+        self.__evaluate(change, register_reactions=True)
+
+    raw(__raw_changed)
 
 
 # =============================================================================
@@ -136,6 +166,28 @@ CELL_RE  = re.compile(r"\b([A-Z]+)(\d+)\b")
 RANGE_RE = re.compile(r"(SUM|AVG|MIN|MAX|COUNT)\(([A-Z]+)(\d+):([A-Z]+)(\d+)\)",
                       re.IGNORECASE)
 
+type agg_func = Callable[[Iterator[int|float]], int|float]
+
+def _zero_on_error(func: agg_func) -> agg_func:
+    '''"Safely" call and return func(nums), returning 0 if (ValueError,
+    StatisticsError) is raised.'''
+    @wraps(func)
+    def wrap(nums: Iterator[int|float]) -> int|float:
+        try:
+            return func(nums)
+        except (ValueError, StatisticsError):
+            return 0
+    return wrap
+
+
+AGGREGATION_FUNCTIONS: dict[str, agg_func] = {
+            "SUM":   sum,
+            "AVG":   _zero_on_error(mean),
+            "MIN":   _zero_on_error(min),
+            "MAX":   _zero_on_error(max),
+            "COUNT": lambda nums: sum(1 for _ in nums),
+            }
+
 
 def _col_name(idx: int) -> str:
     name, n = "", idx + 1
@@ -143,6 +195,7 @@ def _col_name(idx: int) -> str:
         n, r = divmod(n - 1, 26)
         name = chr(65 + r) + name
     return name
+
 
 def _col_index(name: str) -> int:
     r = 0
@@ -153,7 +206,10 @@ def _col_index(name: str) -> int:
 
 class SpreadsheetEngine:
     """
-    Manages an nrows × ncols grid of Cells.
+    Spreadsheet with grid of cells.
+    Has an asyncio event loop thread to process reactions for cells.
+    Updates from UI are scheduled in event loop to allow reactions they cause
+    to be responded to.
     """
 
     def __init__(self, nrows: int = 20, ncols: int = 8):
@@ -188,9 +244,12 @@ class SpreadsheetEngine:
         return len(self.cells[0]) if self.cells else 0
    
     def set_raw(self, row: int, col: int, text: str) -> None:
+        '''set the raw value of the cell'''
         cell = self.cells[row][col]
         async def _set() -> None:
+            print(f'setting {cell} to "{text}"')
             cell.raw = text.strip() if text else ''
+        print(f'scheduling set {cell} to "{text}"')
         asyncio.run_coroutine_threadsafe(_set(), self._loop)
 
     def cell_by_addr(self, addr: str) -> Cell | None:
@@ -265,7 +324,7 @@ class SpreadsheetUI:
         self.engine = engine
 
         self.executor = engine.executor # todo - needed to resolve executor for Cell.value reaction
-        Cell.value(self._on_cell_changed)
+        Cell.value(self._on_cell_changed)  # todo all UIs notified for all cell changes!
 
         self._editing = False
 
@@ -297,10 +356,10 @@ class SpreadsheetUI:
                                 bg=P["entry_bg"], insertbackground=P["cursor"],
                                 relief="flat", bd=2)
         self._fentry.pack(side="left", fill="x", expand=True, padx=(0, 6))
-        self._fentry.bind("<Return>",   self._commit)
+        self._fentry.bind("<Return>",   partial(self._commit, where='return'))
         self._fentry.bind("<Escape>",   self._cancel)
-        self._fentry.bind("<Tab>",      self._commit)
-        self._fentry.bind("<FocusOut>", self._commit)
+        self._fentry.bind("<Tab>",      partial(self._commit, where='tab'))
+        self._fentry.bind("<FocusOut>", partial(self._commit, where='focusout'))
 
         # Scrollable grid
         outer = tk.Frame(root, bg=P["bg"])
@@ -378,7 +437,7 @@ class SpreadsheetUI:
         '''select the cell at row:col'''
         # turn off bg for currently selected cell
         if self._selected:
-            if commit: self._commit()  # save whatever is in the function line to current cell
+            if commit: self._commit(where='_select')  # save whatever is in the function line to current cell
             self._selected_label.configure(bg=self._row_bg(self._selected.row))
 
         self._selected = self.engine.cells[row][col]  # todo - rest should be
@@ -431,12 +490,13 @@ class SpreadsheetUI:
         assert self._selected
         return self._labels[self._selected.row][self._selected.col]
 
-    def _commit(self, event:tk.Event|None=None) -> None:
+    def _commit(self, event:tk.Event|None=None, where:str='?') -> None:
+        print(f'commit from {where}')
         if self._selected is None: return
-        raw = self._formula_var.get().strip()  # todo - don' trim bare strings
-        self.engine.set_raw(self._selected.row, self._selected.col, raw) # todo set directly
+        raw = self._formula_var.get()
+        self.engine.set_raw(self._selected.row, self._selected.col, raw)
         self._editing = False
-        self._selected_label.focus_set() # todo move to UI subclass of cell ?
+        self._selected_label.focus_set()
 
     def _cancel(self, event:tk.Event|None=None) -> None:
         if not self._selected: return
@@ -464,14 +524,17 @@ class SpreadsheetUI:
 
     async def _on_cell_changed(self, cell: Cell,
                                change: FieldChange[Cell, CellValue]) -> None:
-        '''reaction when cell value changes - refresh cell'''
+        '''
+        reaction when cell value changes - refresh cell
+        Executes in Spreadsheet event loop. Do not access widgets.
+        '''
 
         value = change.new or ""
         if isinstance(value, float) and value == int(value):
             value = int(value)
         value = str(value)
 
-        self.root.after(0, lambda: self._refresh_cell(cell, cell.raw, value))
+        self.root.after(0, self._refresh_cell, cell, cell.raw, value)
 
 
 def main() -> None:
