@@ -78,7 +78,7 @@ class _Reaction[Tw, Ti, Tf](ReactionMustNotBeCalled):
     '''
     predicate: Predicate[Tf]
     func: Reaction[Ti, Tf] | BoundReaction[Tw, Ti, Tf]
-    canceler: ReactionCanceler | None
+    canceler: ReactionCanceler
 
 
 class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
@@ -201,6 +201,9 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
                         'create bound reactions for %s',
                         ', '.join(str(f) for f in self.fields),
                         reaction, self)
+            def todo() -> None:
+                raise NotImplementedError('implement managed cancel')
+            canceler = todo
         else:
             canceler = self.configure_reaction(cast(Reaction[Ti, Tf],
                                                     reaction))

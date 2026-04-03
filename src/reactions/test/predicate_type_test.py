@@ -148,6 +148,9 @@ class TestPredicate(TestCase):
         self.assertTrue(Boolean(object()).evaluate(None))
         self.assertFalse(Boolean(None).evaluate(None))
 
+    def test_true_predicate(self) -> None:
+        self.assertTrue(TruePredicate(None).evaluate(None))
+
     def test_comparison_creates_predicate(self) -> None:
         creator = Creator()
 

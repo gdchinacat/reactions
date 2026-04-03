@@ -165,7 +165,7 @@ class ComparisonPredicates[Ti, Tf](Evaluator[Ti, Tf, Tf]):
     def __call__[Tw](self, reaction: Reaction[Ti, Tf]
                     ) -> _Reaction[Tw, Ti, Tf]:
         '''Can be used as a decorator to create a predicate Boolean'''
-        return Boolean(self)(reaction)
+        return TruePredicate(self)(reaction)
 
     def __mod__(self, other: PredicateArgument[Tf]) -> Predicate[Tf]:
         '''Can be used as a decorator to create a predicate Boolean'''
