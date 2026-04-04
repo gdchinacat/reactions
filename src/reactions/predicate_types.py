@@ -130,7 +130,7 @@ class ComparisonPredicates[Ti, Tf](Evaluator[Ti, Tf, Tf]):
     #       error is valid. However, this is what the implementation needs to
     #       so so silence the error.
     ###########################################################################
-    def __contains__(self, other: PredicateArgument[Tf]) -> Never:
+    def __contains__(self, other: object) -> Never:
         '''not implemented'''
         raise NotImplementedError('use Contains(self, other) instead')
 
