@@ -25,7 +25,8 @@ import logging
 
 from .error import InvalidPredicateExpression, ReactionMustNotBeCalled
 from .field_descriptor import (FieldDescriptor, Evaluator, FieldChange,
-                               BoundReaction, Reaction, ReactionCanceler)
+                               BoundReaction, Reaction, ReactionCanceler,
+                               _BoundField)
 from .logging_config import VERBOSE
 
 
@@ -223,8 +224,9 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
             if field_id in seen_fields:
                 continue
             seen_fields.add(field_id)
-            field_ = (field.bound_field(instance)
-                      if instance is not None else field)
+            field_ = (field.bound_field(instance) if (
+                      instance is not None
+                      and not isinstance(field, _BoundField)) else field)
             logger.info('changes to %s will call %s', field, reaction)
             canceler = field_.reaction(partial(self.react, reaction=reaction))
             cancelers.append(canceler)
@@ -296,7 +298,8 @@ class UnaryPredicate[Tf](OperatorPredicate[Tf], ABC):
         self.operand = operand
 
     @property
-    def fields(self) -> Iterator[FieldDescriptor[Any, Tf]]:
+    def fields(self) -> ( Iterator[FieldDescriptor[Any, Tf]]
+                         |Iterator[_BoundField[Any, Tf]]):
         yield from self.operand.fields
 
     def evaluate[Ti](self, instance: Ti) -> bool:

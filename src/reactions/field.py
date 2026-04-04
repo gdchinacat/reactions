@@ -81,7 +81,7 @@ class BoundField[Ti, Tf](_BoundField[Ti, Tf],
     __repr__ = __str__
 
     @property
-    def fields(self) -> Iterator[Field[Ti, Tf]]:
+    def fields(self) -> Iterator[BoundField[Ti, Tf]]:
         yield self
 
     def evaluate(self, instance: Ti) -> Tf:
