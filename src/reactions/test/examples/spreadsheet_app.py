@@ -103,8 +103,7 @@ class Cell(ExecutorFieldManager):
                 watched_cells.add(cell)
 
             v = cell.value
-            if v is None: return "0"
-            if isinstance(v, (int, float)): return repr(v)
+            if isinstance(v, (int, float)): return str(v)
             raise ValueError(f"{m.group(0)} is not numeric")
 
         expr = CELL_RE.sub(replace_ref, expr)
@@ -247,9 +246,7 @@ class SpreadsheetEngine:
         '''set the raw value of the cell'''
         cell = self.cells[row][col]
         async def _set() -> None:
-            print(f'setting {cell} to "{text}"')
             cell.raw = text.strip() if text else ''
-        print(f'scheduling set {cell} to "{text}"')
         asyncio.run_coroutine_threadsafe(_set(), self._loop)
 
     def cell_by_addr(self, addr: str) -> Cell | None:
@@ -317,7 +314,7 @@ P = dict(
 class SpreadsheetUI:
 
     CELL_W = 10   # char width of each cell label
-    _selected = Field['SpreadsheetUI', Cell|None](None)
+    _selected: Cell|None = None
 
     def __init__(self, root: tk.Tk, engine: SpreadsheetEngine):
         self.root   = root
@@ -491,12 +488,12 @@ class SpreadsheetUI:
         return self._labels[self._selected.row][self._selected.col]
 
     def _commit(self, event:tk.Event|None=None, where:str='?') -> None:
-        print(f'commit from {where}')
         if self._selected is None: return
+        self._selected_label.focus_set()
+        if not self._editing: return
         raw = self._formula_var.get()
         self.engine.set_raw(self._selected.row, self._selected.col, raw)
         self._editing = False
-        self._selected_label.focus_set()
 
     def _cancel(self, event:tk.Event|None=None) -> None:
         if not self._selected: return
