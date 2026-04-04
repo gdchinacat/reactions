@@ -10,7 +10,6 @@ from typing import Iterator, Literal, Callable
 
 from reactions import (Field, ExecutorFieldManager, Executor, FieldChange,
                        ReactionCanceler)
-from pip._vendor.rich import cells
 
 type Number = int | float 
 type CellValue = Number | str
@@ -62,7 +61,7 @@ class Cell(ExecutorFieldManager):
         The cell is returned so it can be used with map to chain generators.
         '''
         if cell not in self._cancelers:
-            canceler = Cell.value[cell](self.__value_change).canceler
+            canceler = Cell.value[cell](self.__value_changed).canceler
             self._cancelers[cell] = canceler
         return cell
 
@@ -72,7 +71,6 @@ class Cell(ExecutorFieldManager):
         #        the AST of the regex around an only reevaluate when raw
         #        value is updated.
 
-        watched_cells: set[Cell] = set()  # avoid duplicate reactions
         def expand_range(m: re.Match[str]) -> str:
             '''replace aggregation functions with value'''
             fn = m.group(1).upper()
@@ -98,9 +96,7 @@ class Cell(ExecutorFieldManager):
             cell = self.engine.cell_by_addr(m.group(0))
             if cell is None: raise ValueError(f"Unknown {m.group(0)}")
 
-            if register_reactions and cell not in watched_cells:
-                self._register_value_reaction(cell)
-                watched_cells.add(cell)
+            if register_reactions: self._register_value_reaction(cell)
 
             v = cell.value
             if isinstance(v, (int, float)): return str(v)
@@ -137,9 +133,9 @@ class Cell(ExecutorFieldManager):
             except ValueError:
                 self.value = self.raw
 
-    async def __value_change(self,
-                             changed_cell: "Cell",
-                             change: "FieldChange[Cell, CellValue]") -> None:
+    async def __value_changed(self,
+                              changed_cell: "Cell",
+                              change: "FieldChange[Cell, CellValue]") -> None:
         '''reaction for when a referenced cell value changes'''
         self.__evaluate(change)
 
