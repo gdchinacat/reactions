@@ -132,7 +132,8 @@ class Cell(ExecutorFieldManager):
         else:
             # todo more data type support (ie date, currency)
             try:
-                self.value = float(self.raw) if '.' in self.raw else int(self.raw)
+                value = float(self.raw) if '.' in self.raw else int(self.raw)
+                self.value = value
             except ValueError:
                 self.value = self.raw
 
@@ -525,8 +526,7 @@ class SpreadsheetUI:
         reaction when cell value changes - refresh cell
         Executes in Spreadsheet event loop. Do not access widgets.
         '''
-
-        value = change.new or ""
+        value = change.new
         if isinstance(value, float) and value == int(value):
             value = int(value)
         value = str(value)
