@@ -17,8 +17,10 @@ from contextlib import contextmanager
 from typing import Any
 from unittest import TestCase, main
 
+from .async_helpers import asynctest
 from ..error import InvalidPredicateExpression
-from ..field import Field
+from ..executor import Executor
+from ..field import Field, FieldManager
 from ..field_descriptor import FieldDescriptor, FieldChange
 from ..predicate import Constant
 from ..predicate_types import (Eq, Ne, Lt, Le, Gt, Ge, Contains, Not, Or,
@@ -153,6 +155,39 @@ class TestPredicate(TestCase):
         self.assertIsInstance(creator & 0, BitwiseAnd)
         self.assertIsInstance(creator | 0, BitwiseOr)
         self.assertIsInstance(~creator, BitwiseNot)
+
+    @asynctest
+    async def test_bound_field_reactions_instance_specific(self) -> None:
+        '''
+        Test that reactions registered on instances on fields are specific
+        to that instance.
+        '''
+        class C(FieldManager):
+            field = Field['C', bool](False, 'C', 'field')
+
+        executor = Executor()
+        class CallCounter:
+            count = 0
+            def __init__(self) -> None:
+                self.executor = executor
+
+            async def reaction(self, c: C,
+                               change: FieldChange[C, bool]) -> None:
+                self.count += 1
+
+        c1, c1_call_count = C(), CallCounter()
+        c2, c2_call_count = C(), CallCounter()
+
+        C.field[c1](c1_call_count.reaction)
+        C.field[c2](c2_call_count.reaction)
+
+        async with executor:
+            c1.field = True
+            c2.field = True
+
+        self.assertEqual(1, c1_call_count.count)
+        self.assertEqual(1, c2_call_count.count)
+
 
 if __name__ == '__main__':
     main()

@@ -212,11 +212,17 @@ class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
         # Add a reaction on all the fields to call self.react() with
         # func as the reaction function.
         cancelers = []
-        seen_fields = set[FieldDescriptor[Ti, Tf]]()
+
+        # Fields aren't hashable and can't be made hashable because they
+        # implement __eq__() to return predicates. Use id(field) to eliminate
+        # duplicate reactions.
+        seen_fields = set[int]()
+
         for field in self.fields:
-            if field in seen_fields:
+            field_id = id(field)
+            if field_id in seen_fields:
                 continue
-            seen_fields.add(field)
+            seen_fields.add(field_id)
             field_ = (field.bound_field(instance)
                       if instance is not None else field)
             logger.info('changes to %s will call %s', field, reaction)

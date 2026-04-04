@@ -90,9 +90,13 @@ class Executor:
     analysis.
     '''
 
-    def __init__(self, *args: object, **kwargs: object) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(self, name:str|None=None) -> None:
+        super().__init__()
+        self.name = name
         self.queue = Queue()
+
+    def __repr__(self) -> str:
+        return f'{type(self).__name__}({self.name if self.name else ""})'
 
     def react(self,
               reaction: AnyReaction,
@@ -113,8 +117,8 @@ class Executor:
             self.queue.put_nowait((id_, reaction_coroutine, change))
         except QueueShutDown:
             raise ExecutorStopped()
-        logger.log(VERBOSE, '%d scheduled %s(..., %s, %s)',
-                   id_, reaction.__qualname__, change.old, change.new)
+        logger.log(VERBOSE, '%s %d scheduled %s(%s)',
+                   self, id_, reaction.__qualname__, change)
 
     ###########################################################################
     # Task life cycle:

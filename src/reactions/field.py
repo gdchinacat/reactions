@@ -76,13 +76,13 @@ class BoundField[Ti, Tf](_BoundField[Ti, Tf],
             reaction(change)
 
     def __str__(self) -> str:
-        return (f'{self.field.classname}({id(self.instance)})'
+        return (f'{type(self)}({self.instance})'
                 f'.{self.field.attr}')
     __repr__ = __str__
 
     @property
     def fields(self) -> Iterator[Field[Ti, Tf]]:
-        yield self.field
+        yield self
 
     def evaluate(self, instance: Ti) -> Tf:
         return self.field.evaluate(instance)
@@ -110,10 +110,6 @@ class Field[Ti, Tf](FieldDescriptor[Ti, Tf],
     def set_names(self, classname:str, attr:str) -> None:
         super().set_names(classname, attr)
         self._attr_bound: str = self._attr + '_bound'   # bound field
-
-    def __hash__(self) -> int:
-        '''make Field hashable/immutable'''
-        return id(self)
 
     def bound_field(self, instance: Ti) -> BoundField[Ti, Tf]:
         '''

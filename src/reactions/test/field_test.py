@@ -277,6 +277,31 @@ class TestField(TestCase):
     def test_field_reaction_is_cancellable(self) -> None:
         self._test_field_reaction_is_cancellable(lambda c: C.field[c])
 
+    def test_bound_field_reactions_instance_specific(self) -> None:
+        '''
+        Test that reactions registered on instaces on fields are specific
+        to that instance.
+        '''
+        class C(FieldManager):
+            field = Field['C', bool](False, 'C', 'field')
+
+        class CallCounter:
+            count = 0
+            def reaction(self, change: FieldChange[C, bool]) -> None:
+                self.count += 1
+
+        c1, c1_call_count = C(), CallCounter()
+        c2, c2_call_count = C(), CallCounter()
+
+        C.field[c1].reaction(c1_call_count.reaction)
+        C.field[c2].reaction(c2_call_count.reaction)
+
+        c1.field = True
+        c2.field = True
+
+        self.assertEqual(1, c1_call_count.count)
+        self.assertEqual(1, c2_call_count.count)
+
 
 if __name__ == '__main__':
     main()

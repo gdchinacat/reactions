@@ -26,7 +26,18 @@ from .predicate import (UnaryPredicate, BinaryPredicate, Predicate,
 
 __all__ = ['Boolean', 'Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
            'Contains', 'BitwiseAnd', 'BitwiseOr', 'BitwiseNot',
-           'ComparisonPredicates']
+           'ComparisonPredicates', 'TruePredicate']
+
+
+class TruePredicate[Tf](UnaryPredicate[Tf]):
+    '''
+    Predicate that is always true.
+    '''
+
+    token = 'True'
+
+    def evaluate[Ti](self, instance:Ti)->bool:
+        return True
 
 
 class Boolean[Tf](UnaryPredicate[Tf]):
