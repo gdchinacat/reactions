@@ -1,25 +1,23 @@
-
+import ast
 import asyncio
-from functools import partial, wraps
+from functools import partial, wraps, cached_property
 import re
 from statistics import mean, StatisticsError
 from threading import Thread, Event
-import tkinter as tk
 from tkinter import font as tkfont
+from types import CodeType
 from typing import Iterator, Literal, Callable
 
 from reactions import (Field, ExecutorFieldManager, Executor, FieldChange,
                        ReactionCanceler)
+import tkinter as tk
+
 
 type Number = int | float 
 type CellValue = Number | str
 
 # todo
 #    - use namedtuple for cell address rather than r, c args all over
-
-# =============================================================================
-#  CELL MODEL
-# =============================================================================
 
 class Cell(ExecutorFieldManager):
     '''
@@ -37,6 +35,8 @@ class Cell(ExecutorFieldManager):
     col: int
     raw = Field["Cell", str]("")
     value = Field["Cell", CellValue]("")
+    import ast
+    code: CodeType|None = None
 
     def __init__(self, engine: "SpreadsheetEngine", row: int, col: int):
         self.engine = engine
@@ -54,135 +54,69 @@ class Cell(ExecutorFieldManager):
     def __repr__(self) -> str:
         return f"<Cell {self.address} raw={self.raw!r} value={self.value!r}>"
 
-    def _register_value_reaction(self, cell: Cell) -> Cell:
+    async def __value_changed(self,
+                              changed_cell: Cell,
+                              change: FieldChange[Cell, CellValue]
+                                     |FieldChange[Cell, str]) -> None:
+
         '''
-        Register a reaction for when cell.value changes. The canceler for the
-        reaction is apppended to self._cancelers.
-        The cell is returned so it can be used with map to chain generators.
-        '''
-        if cell not in self._cancelers:
-            canceler = Cell.value[cell](self.__value_changed).canceler
-            self._cancelers[cell] = canceler
-        return cell
-
-    def _eval_formula(self, raw: str, register_reactions: bool) -> CellValue:
-        # todo - _eval_formula each time is pretty expensive since it has
-        #        to parse the formula whenever a referenced cell value. Keep
-        #        the AST of the regex around an only reevaluate when raw
-        #        value is updated.
-
-        def expand_range(m: re.Match[str]) -> str:
-            '''replace aggregation functions with value'''
-            fn = m.group(1).upper()
-            c1, r1 = _col_index(m.group(2)), int(m.group(3)) - 1
-            c2, r2 = _col_index(m.group(4)), int(m.group(5)) - 1
-
-            # Generator expressions avoid creating potentially huge lists.
-            cells: Iterator[Cell] = (self.engine.cells[r][c]
-                     for r in range(min(r1,r2), max(r1,r2)+1)
-                     for c in range(min(c1,c2), max(c1,c2)+1))
-            cells = map(self._register_value_reaction, cells)
-            nums: Iterator[int|float] = (
-                cell.value for cell in cells
-                if isinstance(cell.value, (int, float)))
-
-            func = AGGREGATION_FUNCTIONS.get(fn)
-            if func is None:
-                raise ValueError(f"Unknown function {fn}")
-            return str(func(nums))
-        expr = RANGE_RE.sub(expand_range, raw)
-
-        def replace_ref(m: re.Match[str]) -> str:
-            cell = self.engine.cell_by_addr(m.group(0))
-            if cell is None: raise ValueError(f"Unknown {m.group(0)}")
-
-            if register_reactions: self._register_value_reaction(cell)
-
-            v = cell.value
-            if isinstance(v, (int, float)): return str(v)
-            raise ValueError(f"{m.group(0)} is not numeric")
-
-        expr = CELL_RE.sub(replace_ref, expr)
-        result = eval(expr, {"__builtins__": {}},   # noqa: S307
-                      {"abs": abs, "round": round, "min": min, "max": max})
-        if isinstance(result, (int, float)):
-            return result
-        else:
-            return str(result)
-
-    def __evaluate(self,
-                   change: FieldChange[Cell, str]  # raw
-                          |FieldChange[Cell, CellValue], # value
-                   register_reactions: bool=False) -> None:
-        '''
+        Reacts to referenced cell value changes.
         Update the evaluated value based on the raw value.
         This handles both raw value change and referenced cell value change.
         Performs data type conversion from raw string to properly typed value.
         '''
-        if self.raw.startswith("="):
-            try:
-                self.value = self._eval_formula(self.raw[1:],
-                    register_reactions=register_reactions)
-            except Exception as e:
-                self.value = f"#ERR {e}"
-        else:
-            # todo more data type support (ie date, currency)
-            try:
-                value = float(self.raw) if '.' in self.raw else int(self.raw)
-                self.value = value
-            except ValueError:
-                self.value = self.raw
+        if self.code is None:
+            return
 
-    async def __value_changed(self,
-                              changed_cell: "Cell",
-                              change: "FieldChange[Cell, CellValue]") -> None:
-        '''reaction for when a referenced cell value changes'''
-        self.__evaluate(change)
+        try:
+            globals, locals = self.engine.globals, self.engine.locals
+            result = eval(self.code, globals, locals)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            result = f'#ERR: {e}'
+
+        if isinstance(result, (int, float)):
+            self.value = result
+        else:
+            self.value = str(result)
 
     async def __raw_changed(self,
-                            change: "FieldChange[Cell, str]") -> None:
-        '''reaction for when the raw value changes'''
+                            change: FieldChange[Cell, str]) -> None:
+        if change.new and change.new[0] == '=':
+            # clear the code and remove registered reactions
+            self.code = None
+            for canceler in self._cancelers.values():
+                canceler()
+            self._cancelers.clear()
 
-        # raw value changed, clear the existing reactions to avoid leaking them
-        # or creating duplicates when they are registered during evaluation.
-        for (cell, canceler) in self._cancelers.items():
-            canceler()
-        self._cancelers.clear()
+            try:
+                code = compile(change.new[1:], str(self), 'eval', dont_inherit=True)
 
-        self.__evaluate(change, register_reactions=True)
+                # register reactions for referenced cells
+                for name in code.co_names:
+                    cell = self.engine.cell_by_addr(name)
+                    if cell and cell not in self._cancelers:
+                        canceler = Cell.value[cell](self.__value_changed).canceler
+                        self._cancelers[cell] = canceler
+
+                self.code = code  # only set once it's been processed fully
+                # evaluate the function
+                await self.__value_changed(self, change)
+            except Exception as e:
+                self.value = f'#ERR: {e}'
+
+        else:
+            self.code = None
+
+            # todo more data type support (ie date, currency)
+            value = change.new
+            try:
+                self.value = float(value) if '.' in value else int(value)
+            except ValueError:
+                self.value = value
 
     raw(__raw_changed)
-
-
-# =============================================================================
-#  SPREADSHEET ENGINE
-# =============================================================================
-
-CELL_RE  = re.compile(r"\b([A-Z]+)(\d+)\b")
-RANGE_RE = re.compile(r"(SUM|AVG|MIN|MAX|COUNT)\(([A-Z]+)(\d+):([A-Z]+)(\d+)\)",
-                      re.IGNORECASE)
-
-type agg_func = Callable[[Iterator[int|float]], int|float]
-
-def _zero_on_error(func: agg_func) -> agg_func:
-    '''"Safely" call and return func(nums), returning 0 if (ValueError,
-    StatisticsError) is raised.'''
-    @wraps(func)
-    def wrap(nums: Iterator[int|float]) -> int|float:
-        try:
-            return func(nums)
-        except (ValueError, StatisticsError):
-            return 0
-    return wrap
-
-
-AGGREGATION_FUNCTIONS: dict[str, agg_func] = {
-            "SUM":   sum,
-            "AVG":   _zero_on_error(mean),
-            "MIN":   _zero_on_error(min),
-            "MAX":   _zero_on_error(max),
-            "COUNT": lambda nums: sum(1 for _ in nums),
-            }
 
 
 def _col_name(idx: int) -> str:
@@ -200,6 +134,46 @@ def _col_index(name: str) -> int:
     return r - 1
 
 
+class LocalsDict(dict[str, object]):
+    '''
+    The exec() dict for locals.
+    This is essentially a cache of cell values that uses reactions to update
+    values when they change.
+    todo? - functionally there is no need to purge values when no cell raw
+    functions refer to them, or no code blocks for these reference them, but
+    it is strictly speaking wasted resources to have cell values cached
+    needlessly. In practice, I doubt it will matter, functions are unlikely to
+    change necessitating them (the code doesn't have access to the cells or
+    raw values so cells can't do meta-programming - yet). Basically, there is
+    no use case for purging the cache. Complex mechanisms to ref count code
+    references to them could be implemented to GC them...might be able to use
+    weak refs, etc. FORMALIZE THIS COMMENT
+    '''
+    def __init__(self, engine: SpreadsheetEngine) -> None:
+        self.engine = engine
+        self.executor = engine.executor
+        Cell.value(self._value_changed)
+
+    def __getitem__(self, key:str) -> object:
+        try:
+            return super().__getitem__(key)
+        except KeyError:
+            # If key looks like a cell cache value for future lookups and
+            # register reaction to update cached value on change.
+            if cell := self.engine.cell_by_addr(key):
+                #Cell.value[cell](self._value_changed)
+                value = cell.value
+                self[key] = value
+                return value
+            raise
+
+    async def _value_changed(self,
+                             cell: Cell,
+                             change: FieldChange[Cell, CellValue]
+                       ) -> None:
+        self[cell.address] = cell.value
+
+
 class SpreadsheetEngine:
     """
     Spreadsheet with grid of cells.
@@ -214,6 +188,10 @@ class SpreadsheetEngine:
             [Cell(self, r, c) for c in range(ncols)]
             for r in range(nrows)
         ]
+
+        self.globals = dict[str, object]()  # for executing cell functions
+        self.locals = LocalsDict(self)      # for executing cell functions
+ 
         # Threading - each engine has its own thread and asyncio event loop to
         # process reactions in. This allows the spreadsheet reactions to work
         # with frameworks that are not async and control the "main" thread.
@@ -229,8 +207,6 @@ class SpreadsheetEngine:
         self.thread = Thread(target=reactions_thread, daemon=True)
         self.thread.start()
 
-    # ── Public ────────────────────────────────────────────────────────────────
-
     @property
     def nrows(self) -> int:
         return len(self.cells)
@@ -238,7 +214,7 @@ class SpreadsheetEngine:
     @property
     def ncols(self) -> int:
         return len(self.cells[0]) if self.cells else 0
-   
+
     def set_raw(self, row: int, col: int, text: str) -> None:
         '''set the raw value of the cell'''
         cell = self.cells[row][col]
@@ -255,32 +231,6 @@ class SpreadsheetEngine:
         if 0 <= r < self.nrows and 0 <= c < self.ncols:
             return self.cells[r][c]
         return None
-
-    def _parse_refs(self, expr: str) -> list[str]:
-        """Return unique cell addresses referenced in expr."""
-        # Strip range functions first so we don't double-count range refs
-        expanded = RANGE_RE.sub("0", expr)
-        # Also collect individual refs inside ranges
-        range_refs = []
-        for m in RANGE_RE.finditer(expr):
-            c1, r1 = _col_index(m.group(2)), int(m.group(3))
-            c2, r2 = _col_index(m.group(4)), int(m.group(5))
-            for rr in range(min(r1,r2), max(r1,r2)+1):
-                for cc in range(min(c1,c2), max(c1,c2)+1):
-                    range_refs.append(f"{_col_name(cc)}{rr}")
-        seen, result = set(), []
-        for m in CELL_RE.finditer(expanded):
-            addr = f"{m.group(1)}{m.group(2)}"
-            if addr not in seen:
-                seen.add(addr); result.append(addr)
-        for addr in range_refs:
-            if addr not in seen:
-                seen.add(addr); result.append(addr)
-        return result
-
-# =============================================================================
-#  COLOUR PALETTE
-# =============================================================================
 
 P = dict(
     bg       = "#1e1e2e",
@@ -303,10 +253,6 @@ P = dict(
     cursor   = "#cba6f7",
 )
 
-
-# =============================================================================
-#  TKINTER UI
-# =============================================================================
 
 class SpreadsheetUI:
 
