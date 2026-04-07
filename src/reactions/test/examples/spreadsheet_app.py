@@ -54,7 +54,7 @@ class Cell(ExecutorFieldManager):
     def __repr__(self) -> str:
         return f"<Cell {self.address} raw={self.raw!r} value={self.value!r}>"
 
-    async def __value_changed(self,
+    async def _value_changed(self,
                               changed_cell: Cell,
                               change: FieldChange[Cell, CellValue]
                                      |FieldChange[Cell, str]) -> None:
@@ -65,12 +65,19 @@ class Cell(ExecutorFieldManager):
         This handles both raw value change and referenced cell value change.
         Performs data type conversion from raw string to properly typed value.
         '''
+        self.__value_changed(changed_cell, change)
+
+    def __value_changed(self,
+                              changed_cell: Cell,
+                              change: FieldChange[Cell, CellValue]
+                                     |FieldChange[Cell, str]) -> None:
         if self.code is None:
+            # If a value change is scheduled when raw changes self.code willj
+            # be None when the value changed executes, ignore it.
             return
 
         try:
-            globals, locals = self.engine.globals, self.engine.locals
-            result = eval(self.code, globals, locals)
+            result = eval(self.code, self.engine.globals, self.engine.locals)
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -81,31 +88,37 @@ class Cell(ExecutorFieldManager):
         else:
             self.value = str(result)
 
-    async def __raw_changed(self,
+    def _set_expression(self, expression: str) -> None:
+        '''
+        Set the expression for the cell by compiling it to code and registering
+        reactions for when dependent cells change.
+        '''
+        # clear the code and remove registered reactions
+        self.code = None
+        for canceler in self._cancelers.values():
+            canceler()
+        self._cancelers.clear()
+
+        try:
+            code = compile(expression, str(self), 'eval', dont_inherit=True)
+        except Exception as e:
+            self.value = f'#ERR: {e}'
+
+        # register reactions for referenced cells
+        for name in code.co_names:
+            cell = self.engine.cell_by_addr(name)
+            if cell and cell not in self._cancelers:
+                canceler = Cell.value[cell](self._value_changed).canceler
+                self._cancelers[cell] = canceler
+
+        self.code = code # only set once it's been processed fully
+
+    @ raw
+    async def _raw_changed(self,
                             change: FieldChange[Cell, str]) -> None:
         if change.new and change.new[0] == '=':
-            # clear the code and remove registered reactions
-            self.code = None
-            for canceler in self._cancelers.values():
-                canceler()
-            self._cancelers.clear()
-
-            try:
-                code = compile(change.new[1:], str(self), 'eval', dont_inherit=True)
-
-                # register reactions for referenced cells
-                for name in code.co_names:
-                    cell = self.engine.cell_by_addr(name)
-                    if cell and cell not in self._cancelers:
-                        canceler = Cell.value[cell](self.__value_changed).canceler
-                        self._cancelers[cell] = canceler
-
-                self.code = code  # only set once it's been processed fully
-                # evaluate the function
-                await self.__value_changed(self, change)
-            except Exception as e:
-                self.value = f'#ERR: {e}'
-
+            self._set_expression(change.new[1:])
+            self.__value_changed(self, change)
         else:
             self.code = None
 
@@ -115,8 +128,6 @@ class Cell(ExecutorFieldManager):
                 self.value = float(value) if '.' in value else int(value)
             except ValueError:
                 self.value = value
-
-    raw(__raw_changed)
 
 
 def _col_name(idx: int) -> str:
