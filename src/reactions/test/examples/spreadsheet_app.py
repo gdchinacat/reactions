@@ -83,10 +83,13 @@ class Cell(ExecutorFieldManager):
             traceback.print_exc()
             result = f'#ERR: {e}'
 
-        if isinstance(result, (int, float, complex)):
-            self.value = result
+        if isinstance(result, Cell):
+            if isinstance(result.value, (int, float, complex)):
+                self.value = result.value
+            else:
+                self.value = str(result.value)
         else:
-            self.value = str(result)
+            self.value = result
 
     def _set_expression(self, expression: str) -> None:
         '''
@@ -140,6 +143,11 @@ class Cell(ExecutorFieldManager):
             self.code = None
             self.value = self._convert_raw(change.new)
 
+    def __add__(self, other: Cell|CellValue) -> CellValue:
+        return self.value + (other.value if isinstance(other, Cell) else other)
+
+    def __radd__(self, other: Cell|CellValue) -> CellValue:
+        return (other.value if isinstance(other, Cell) else other) + self.value
 
 def _col_name(idx: int) -> str:
     name, n = "", idx + 1
@@ -174,7 +182,6 @@ class LocalsDict(dict[str, object]):
     def __init__(self, engine: SpreadsheetEngine) -> None:
         self.engine = engine
         self.executor = engine.executor
-        Cell.value(self._value_changed)
 
     def __getitem__(self, key:str) -> object:
         try:
@@ -184,16 +191,10 @@ class LocalsDict(dict[str, object]):
             # register reaction to update cached value on change.
             if cell := self.engine.cell_by_addr(key):
                 #Cell.value[cell](self._value_changed)
-                value = cell.value
-                self[key] = value
-                return value
+                #value = cell.value
+                self[key] = cell
+                return cell
             raise
-
-    async def _value_changed(self,
-                             cell: Cell,
-                             change: FieldChange[Cell, CellValue]
-                       ) -> None:
-        self[cell.address] = cell.value
 
 
 class SpreadsheetEngine:
