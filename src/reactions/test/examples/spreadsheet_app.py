@@ -193,7 +193,8 @@ class SpreadsheetEngine:
     to be responded to.
     """
 
-    def __init__(self, nrows: int = 20, ncols: int = 8):
+    def __init__(self, nrows: int = 20, ncols: int = 8,
+                 filename: str='/tmp/spreadsheet.raw'):
         self.executor = Executor()
         self.cells: list[list[Cell]] = [
             [Cell(self, r, c) for c in range(ncols)]
@@ -208,15 +209,39 @@ class SpreadsheetEngine:
         # with frameworks that are not async and control the "main" thread.
         # The event loop is exposed so that external updates to the cells raw
         # values can be scheduled with the event loop in a threadsafe way.
+        executor_started = Event()
         def reactions_thread() -> None:
             '''thread to run the asyncio event loop for the spreadsheet'''
             async def run() -> None:
                 self._loop = asyncio.get_running_loop()
-                await self.executor.start()
+                _await = self.executor.start()
+                executor_started.set()
+                await _await
             asyncio.run(run())
 
         self.thread = Thread(target=reactions_thread, daemon=True)
         self.thread.start()
+        executor_started.wait()
+
+        self.filename = filename
+        self._load()
+
+    async def _raw_changed(self, cell: Cell,
+                           change: FieldChange[Cell, str]) -> None:
+        with open(self.filename, 'a') as file:
+            file.write(f'{cell.address}:{change.new}\n')
+
+    def _load(self) -> None:
+        '''Load the raw values and set them on cells.'''
+        async def load()->None:
+            with open(self.filename, 'r') as file:
+                for l in file.readlines():
+                    addr, raw = l.split(':', maxsplit=1)
+                    cell = self.cell_by_addr(addr)
+                    assert cell is not None
+                    cell.raw = raw
+            Cell.raw(self._raw_changed)
+        asyncio.run_coroutine_threadsafe(load(), self._loop)
 
     @property
     def nrows(self) -> int:
