@@ -1,12 +1,13 @@
-import ast
+
 import asyncio
 from functools import partial, wraps, cached_property
+import operator
 import re
 from statistics import mean, StatisticsError
 from threading import Thread, Event
 from tkinter import font as tkfont
 from types import CodeType
-from typing import Iterator, Literal, Callable
+from typing import Iterator, Literal, Callable, Self, Any
 
 from reactions import (Field, ExecutorFieldManager, Executor, FieldChange,
                        ReactionCanceler)
@@ -35,14 +36,13 @@ class Cell(ExecutorFieldManager):
     col: int
     raw = Field["Cell", str]("")
     value = Field["Cell", CellValue]("")
-    import ast
     code: CodeType|None = None
 
     def __init__(self, engine: "SpreadsheetEngine", row: int, col: int):
         self.engine = engine
         super().__init__(executor=engine.executor)
         self.row, self.col = row, col
-        self._cancelers: dict[Cell, ReactionCanceler] = {}
+        self._cancelers: dict[int, ReactionCanceler] = {}
 
     @property
     def address(self) -> str:
@@ -106,15 +106,34 @@ class Cell(ExecutorFieldManager):
             code = compile(expression, str(self), 'eval', dont_inherit=True)
         except Exception as e:
             self.value = f'#ERR: {e}'
+        else:
+            # register reactions for referenced cells
+            for name in code.co_names:
+                cell = self.engine.cell_by_addr(name)
+                if cell and id(cell) not in self._cancelers:
+                    canceler = Cell.value[cell](self._value_changed).canceler
+                    self._cancelers[id(cell)] = canceler
 
-        # register reactions for referenced cells
-        for name in code.co_names:
-            cell = self.engine.cell_by_addr(name)
-            if cell and cell not in self._cancelers:
-                canceler = Cell.value[cell](self._value_changed).canceler
-                self._cancelers[cell] = canceler
+            self.code = code # only set once it's been processed fully
 
-        self.code = code # only set once it's been processed fully
+    def _convert_raw(self, raw: str) -> CellValue:
+        '''
+        Convert a raw value to most appropriate python data type.
+        The simplest type that can be coerced is returned (int, float,
+        complex).
+        '''
+        try:
+            return (float(raw) if '.' in raw else int(raw))
+        except ValueError:
+            pass
+
+        try:
+            return complex(raw)
+        except ValueError:
+            pass  # not a complex number
+        
+
+        return raw
 
     def _convert_raw(self, raw: str) -> CellValue:
         '''
@@ -143,11 +162,73 @@ class Cell(ExecutorFieldManager):
             self.code = None
             self.value = self._convert_raw(change.new)
 
-    def __add__(self, other: Cell|CellValue) -> CellValue:
-        return self.value + (other.value if isinstance(other, Cell) else other)
+    @staticmethod  # method factory
+    def __operator[Tr](value_types: tuple[type, ...],
+                           op: Callable[[Any, Any], Tr]
+                     ) -> Callable[[Cell, object], Tr]:
+        '''
+        Create an operator function that operates on the cell values rather
+        than the cells themselves.
+        '''
+        def func(self: Self, other: object) -> Tr:
+            if isinstance(_self:=self.value, value_types):
+                if isinstance(other, Cell):
+                    if isinstance(_other := other.value, value_types):
+                        return op(_self, _other)
+                if isinstance(other, value_types):
+                    return op(_self, other)
+            raise NotImplementedError(f'{op.name}{self}, {other}) not supported')
+        return func
 
-    def __radd__(self, other: Cell|CellValue) -> CellValue:
-        return (other.value if isinstance(other, Cell) else other) + self.value
+    __lt__ = __operator((int, float), operator.__lt__)
+    __le__ = __operator((int, float), operator.__le__)
+    __eq__ = __operator((int, float), operator.__eq__)
+    __ne__ = __operator((int, float), operator.__ne__)
+    __gt__ = __operator((int, float), operator.__gt__)
+    __ge__ = __operator((int, float), operator.__ge__)
+
+    __add__ = __operator((int, float, complex), operator.__add__)
+    __sub__ = __operator((int, float, complex), operator.__sub__)
+    __mul__ = __operator((int, float, complex), operator.__mul__)
+    __matmul__ = __operator((int, float, complex), operator.__matmul__)
+    __truediv__ = __operator((int, float, complex), operator.__truediv__)
+    __floordiv__ = __operator((int, float, complex), operator.__floordiv__)
+    __mod__ = __operator((int, float, complex), operator.__mod__)
+    __divmod__ = __operator((int, float), divmod)
+    __pow__ = __operator((int, float, complex), operator.__pow__)
+    __lshift__ = __operator((int, float, complex), operator.__lshift__)
+    __rshift__ = __operator((int, float, complex), operator.__rshift__)
+    __and__ = __operator((int, float, complex), operator.__and__)
+    __xor__ = __operator((int, float, complex), operator.__xor__)
+    __or__ = __operator((int, float, complex), operator.__or__)
+
+    @staticmethod
+    def _reverse(func: Callable[[object, object], object]
+                 ) -> Callable[[object, object], object]:
+        def dec(a: object, b: object) -> object:
+            return func(b, a)
+        return dec
+
+    __radd__ = __operator((int, float, complex), _reverse(operator.__add__))
+    __rsub__ = __operator((int, float, complex), _reverse(operator.__sub__))
+    __rmul__ = __operator((int, float, complex), _reverse(operator.__mul__))
+    __rmatmul__ = __operator((int, float, complex),
+                             _reverse(operator.__matmul__))
+    __rtruediv__ = __operator((int, float, complex),
+                              _reverse(operator.__truediv__))
+    __rfloordiv__ = __operator((int, float, complex),
+                               _reverse(operator.__floordiv__))
+    __rmod__ = __operator((int, float, complex), _reverse(operator.__mod__))
+    __rdivmod__ = __operator((int, float), lambda a, b: divmod(b, a))
+    __rpow__ = __operator((int, float, complex), _reverse(operator.__pow__))
+    __rlshift__ = __operator((int, float, complex),
+                             _reverse(operator.__lshift__))
+    __rrshift__ = __operator((int, float, complex),
+                             _reverse(operator.__rshift__))
+    __rand__ = __operator((int, float, complex), _reverse(operator.__and__))
+    __rxor__ = __operator((int, float, complex), _reverse(operator.__xor__))
+    __ror__ = __operator((int, float, complex), _reverse(operator.__or__))
+
 
 def _col_name(idx: int) -> str:
     name, n = "", idx + 1
@@ -213,8 +294,9 @@ class SpreadsheetEngine:
             for r in range(nrows)
         ]
 
-        self.globals = dict[str, object]()  # for executing cell functions
-        self.locals = LocalsDict(self)      # for executing cell functions
+        # Execution context
+        self.globals = dict[str, object]()
+        self.locals = LocalsDict(self)
  
 
         # Initialize with useful things.
@@ -241,7 +323,7 @@ from math import *
 
         self.thread = Thread(target=reactions_thread, daemon=True)
         self.thread.start()
-        executor_started.wait()
+        executor_started.wait()  # don't let reactions run before executor
 
         self.filename = filename
         self._load()
@@ -284,7 +366,7 @@ from math import *
                     addr, raw = l.strip().split(':', maxsplit=1)
                     cell = self.cell_by_addr(addr)
                     assert cell is not None
-                    cell.raw = raw
+                    cell.raw = raw.strip()
             Cell.raw(self._raw_changed)
         asyncio.run_coroutine_threadsafe(load(), self._loop)
 
