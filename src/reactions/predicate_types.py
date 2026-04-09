@@ -26,7 +26,7 @@ from .predicate import (UnaryPredicate, BinaryPredicate, Predicate,
 
 __all__ = ['Boolean', 'Not', 'And', 'Or', 'Eq', 'Ne', 'Lt', 'Le', 'Gt', 'Ge',
            'Contains', 'BitwiseAnd', 'BitwiseOr', 'BitwiseNot',
-           'ComparisonPredicates', 'TruePredicate']
+           'ComparisonPredicates', 'TruePredicate', 'Mod']
 
 
 class TruePredicate[Tf](UnaryPredicate[Tf]):
@@ -100,6 +100,10 @@ class Ge[Tf](BinaryPredicate[Tf, Tf]):
 class Contains[Tf](BinaryPredicate[Tf, Tf]):
     token = 'contains'
     operator = operator.contains
+
+class Mod[Tf](BinaryPredicate[Tf, Tf]):
+    token = '%'
+    operator = operator.mod
 
 # BitwiseAnd and BitwiseOr aren't strictly predicates since they don't evaluate
 # to a bool. Still useful, so included.
@@ -180,3 +184,7 @@ class ComparisonPredicates[Ti, Tf](Evaluator[Ti, Tf, Tf]):
                     ) -> _Reaction[Tw, Ti, Tf]:
         '''Can be used as a decorator to create a predicate Boolean'''
         return Boolean(self)(reaction)
+
+    def __mod__(self, other: PredicateArgument[Tf]) -> Predicate[Tf]:
+        '''Can be used as a decorator to create a predicate Boolean'''
+        return Mod(self, other)

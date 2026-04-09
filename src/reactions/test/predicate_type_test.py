@@ -25,7 +25,7 @@ from ..field_descriptor import FieldDescriptor, FieldChange
 from ..predicate import Constant
 from ..predicate_types import (Eq, Ne, Lt, Le, Gt, Ge, Contains, Not, Or,
                 And, BitwiseAnd, BitwiseOr, BitwiseNot, Boolean,
-                ComparisonPredicates)
+                ComparisonPredicates, TruePredicate, Mod)
 
 
 class TestPredicate(TestCase):
@@ -76,6 +76,9 @@ class TestPredicate(TestCase):
     def test_contains_constant_predicate(self) -> None:
         self.assertTrue(Contains(Constant((1, )), 1).evaluate(None))
         self.assertFalse(Contains(Constant((1, )), 2).evaluate(None))
+
+    def test_mod_predicate(self) -> None:
+        self.assertEqual(Mod(Constant(10), 5).evaluate(None), 0)
 
     def test_or_predicate(self) -> None:
         class C:
@@ -155,6 +158,7 @@ class TestPredicate(TestCase):
         self.assertIsInstance(creator & 0, BitwiseAnd)
         self.assertIsInstance(creator | 0, BitwiseOr)
         self.assertIsInstance(~creator, BitwiseNot)
+        self.assertIsInstance(creator % 1, Mod)
 
     @asynctest
     async def test_bound_field_reactions_instance_specific(self) -> None:
