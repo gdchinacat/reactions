@@ -221,6 +221,7 @@ class SpreadsheetEngine:
 from time import time
 from math import *
         ''', self.globals, self.locals)
+        self.locals['sheet'] = self
 
         # Threading - each engine has its own thread and asyncio event loop to
         # process reactions in. This allows the spreadsheet reactions to work
@@ -243,6 +244,31 @@ from math import *
 
         self.filename = filename
         self._load()
+
+    def __getitem__(self, key: (tuple[int, int]|slice|str)
+                    ) -> CellValue|Iterator[CellValue]:
+        if isinstance(key, slice):
+            def _iter() -> Iterator[CellValue]:
+                if not (isinstance(key.start, str)
+                        and isinstance(key.stop, str)):
+                    raise ValueError(f'invalid slice: {slice}')
+                start = self.cell_by_addr(key.start)
+                stop = self.cell_by_addr(key.stop)
+                if not start: raise ValueError(f'invalid cell reference: {key.start}')
+                if not stop: raise ValueError(f'invalid cell reference: {key.stop}')
+                yield start.value
+                # todo - all cells between!!!
+                yield stop.value
+            return _iter()
+        if isinstance(key, tuple):
+            row, col = key
+            return self.cells[row][col].value
+        elif isinstance(key, str):
+            cell = self.cell_by_addr(key)
+            if not cell: raise ValueError(f'invalid cell reference: {key}')
+            return cell.value
+        else:
+            raise ValueError(f'invalid cell reference type: {type(key)}({key})')
 
     async def _raw_changed(self, cell: Cell,
                            change: FieldChange[Cell, str]) -> None:
