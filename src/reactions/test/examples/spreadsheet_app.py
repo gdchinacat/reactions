@@ -1,5 +1,6 @@
 
 import asyncio
+from fractions import Fraction
 from functools import partial, wraps, cached_property
 import operator
 import re
@@ -14,7 +15,7 @@ from reactions import (Field, ExecutorFieldManager, Executor, FieldChange,
 import tkinter as tk
 
 
-type Number = int | float | complex
+type Number = int | float | complex | Fraction
 type CellValue = Number | str
 
 # todo
@@ -53,6 +54,9 @@ class Cell(ExecutorFieldManager):
 
     def __repr__(self) -> str:
         return f"<Cell {self.address} raw={self.raw!r} value={self.value!r}>"
+
+    def __int__(self) -> int: return int(self.value or 0)
+    def __float__(self) -> float: return float(self.value or 0)
 
     async def _value_changed(self,
                               changed_cell: Cell,
@@ -130,23 +134,10 @@ class Cell(ExecutorFieldManager):
         try:
             return complex(raw)
         except ValueError:
-            pass  # not a complex number
-        
-
-        return raw
-
-    def _convert_raw(self, raw: str) -> CellValue:
-        '''
-        Convert the raw string value into the most appropriate data type.
-        '''
-        # todo more data type support (ie date, currency)
-        try:
-            return float(raw) if '.' in raw else int(raw)
-        except ValueError:
             pass
-
+        
         try:
-            return complex(raw)
+            return Fraction(raw)
         except ValueError:
             pass
 
@@ -173,11 +164,12 @@ class Cell(ExecutorFieldManager):
         def func(self: Self, other: object) -> Tr:
             if isinstance(_self:=self.value, value_types):
                 if isinstance(other, Cell):
-                    if isinstance(_other := other.value, value_types):
-                        return op(_self, _other)
-                if isinstance(other, value_types):
-                    return op(_self, other)
-            raise NotImplementedError(f'{op.name}{self}, {other}) not supported')
+                    #if isinstance(_other := other.value, value_types):
+                    return op(_self, other.value)
+                #if isinstance(other, value_types):
+                return op(_self, other)
+            #raise NotImplementedError(f'{op}({self}, {other}) not supported')
+            return NotImplemented
         return func
 
     __lt__ = __operator((int, float), operator.__lt__)
@@ -187,17 +179,17 @@ class Cell(ExecutorFieldManager):
     __gt__ = __operator((int, float), operator.__gt__)
     __ge__ = __operator((int, float), operator.__ge__)
 
-    __add__ = __operator((int, float, complex), operator.__add__)
-    __sub__ = __operator((int, float, complex), operator.__sub__)
-    __mul__ = __operator((int, float, complex), operator.__mul__)
-    __matmul__ = __operator((int, float, complex), operator.__matmul__)
-    __truediv__ = __operator((int, float, complex), operator.__truediv__)
-    __floordiv__ = __operator((int, float, complex), operator.__floordiv__)
-    __mod__ = __operator((int, float, complex), operator.__mod__)
-    __divmod__ = __operator((int, float), divmod)
-    __pow__ = __operator((int, float, complex), operator.__pow__)
-    __lshift__ = __operator((int, float, complex), operator.__lshift__)
-    __rshift__ = __operator((int, float, complex), operator.__rshift__)
+    __add__ = __operator((int, float, complex, Fraction), operator.__add__)
+    __sub__ = __operator((int, float, complex, Fraction), operator.__sub__)
+    __mul__ = __operator((int, float, complex, Fraction), operator.__mul__)
+    __matmul__ = __operator((int, float, complex, Fraction), operator.__matmul__)
+    __truediv__ = __operator((int, float, complex, Fraction), operator.__truediv__)
+    __floordiv__ = __operator((int, float, complex, Fraction), operator.__floordiv__)
+    __mod__ = __operator((int, float, complex, Fraction), operator.__mod__)
+    __divmod__ = __operator((int, float, Fraction), divmod)
+    __pow__ = __operator((int, float, complex, Fraction), operator.__pow__)
+    __lshift__ = __operator((int, float, complex, Fraction), operator.__lshift__)
+    __rshift__ = __operator((int, float, complex, Fraction), operator.__rshift__)
     __and__ = __operator((int, float, complex), operator.__and__)
     __xor__ = __operator((int, float, complex), operator.__xor__)
     __or__ = __operator((int, float, complex), operator.__or__)
@@ -329,27 +321,34 @@ from math import *
         self._load()
 
     def __getitem__(self, key: (tuple[int, int]|slice|str)
-                    ) -> CellValue|Iterator[CellValue]:
+                    ) -> Cell|Iterator[Cell]:
+        # todo - add reactions on cells, which this execution context doesn't
+        #        really have, so somehow plumb it out to Cell._value_changed.
         if isinstance(key, slice):
-            def _iter() -> Iterator[CellValue]:
-                if not (isinstance(key.start, str)
-                        and isinstance(key.stop, str)):
-                    raise ValueError(f'invalid slice: {slice}')
-                start = self.cell_by_addr(key.start)
-                stop = self.cell_by_addr(key.stop)
-                if not start: raise ValueError(f'invalid cell reference: {key.start}')
-                if not stop: raise ValueError(f'invalid cell reference: {key.stop}')
-                yield start.value
-                # todo - all cells between!!!
-                yield stop.value
+            if not (isinstance(key.start, Cell)
+                    and isinstance(key.stop, Cell)):
+                raise ValueError(f'invalid slice: {slice}')
+            def _iter() -> Iterator[Cell]:
+                # todo support Ellipsis
+                r1, c1 = key.start.row, key.start.col
+                r2, c2 = key.stop.row, key.stop.col
+                if r1 > r2:
+                    r1, r2 = r2, r1
+                if c1 > c2:
+                    c1, c2 = c2, c1
+                for r in range(r1, r2 + 1):
+                    for c in range(c1, c2 + 1):
+                        cell = self.cells[r][c]
+                        if cell.value != '':  # todo what if we want ''?
+                            yield cell
             return _iter()
         if isinstance(key, tuple):
             row, col = key
-            return self.cells[row][col].value
+            return self.cells[row][col]
         elif isinstance(key, str):
             cell = self.cell_by_addr(key)
             if not cell: raise ValueError(f'invalid cell reference: {key}')
-            return cell.value
+            return cell
         else:
             raise ValueError(f'invalid cell reference type: {type(key)}({key})')
 
