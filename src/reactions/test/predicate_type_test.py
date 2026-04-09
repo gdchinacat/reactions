@@ -28,6 +28,16 @@ from ..predicate_types import (Eq, Ne, Lt, Le, Gt, Ge, Contains, Not, Or,
                 ComparisonPredicates, TruePredicate, Mod)
 
 
+class C: ...
+class Creator(ComparisonPredicates[C, int]):
+    def evaluate(self, instance: C)->bool:
+        raise NotImplementedError()
+
+    @property
+    def fields(self)->Iterator[FieldDescriptor[C, int]]:
+        raise NotImplementedError()
+
+
 class TestPredicate(TestCase):
 
     @contextmanager
@@ -139,14 +149,6 @@ class TestPredicate(TestCase):
         self.assertFalse(Boolean(None).evaluate(None))
 
     def test_comparison_creates_predicate(self) -> None:
-        class C: ...
-        class Creator(ComparisonPredicates[C, int]):
-            def evaluate(self, instance: C)->bool:
-                raise NotImplementedError()
-            @property
-            def fields(self)->Iterator[FieldDescriptor[C, int]]:
-                raise NotImplementedError()
-
         creator = Creator()
 
         self.assertIsInstance(creator == 0, Eq)
@@ -158,7 +160,20 @@ class TestPredicate(TestCase):
         self.assertIsInstance(creator & 0, BitwiseAnd)
         self.assertIsInstance(creator | 0, BitwiseOr)
         self.assertIsInstance(~creator, BitwiseNot)
-        self.assertIsInstance(creator % 1, Mod)
+        self.assertIsInstance(creator % 2, Mod)
+
+    def test_calculating_predicates_are_comparable(self) -> None:
+        '''
+        The 'calculating' predicate operators (i.e. mod, bitwise or, etc)
+        should produce a predicate that is comparable to support expressions
+        like '@ field % 2 == 1 # odd values only'.
+        '''
+        creator = Creator()
+
+        self.assertIsInstance(creator & 0, ComparisonPredicates)
+        self.assertIsInstance(creator | 0, ComparisonPredicates)
+        self.assertIsInstance(~creator, ComparisonPredicates)
+        self.assertIsInstance(creator % 0, ComparisonPredicates)
 
     @asynctest
     async def test_bound_field_reactions_instance_specific(self) -> None:

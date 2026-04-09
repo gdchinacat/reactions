@@ -101,24 +101,6 @@ class Contains[Tf](BinaryPredicate[Tf, Tf]):
     token = 'contains'
     operator = operator.contains
 
-class Mod[Tf](BinaryPredicate[Tf, Tf]):
-    token = '%'
-    operator = operator.mod
-
-# BitwiseAnd and BitwiseOr aren't strictly predicates since they don't evaluate
-# to a bool. Still useful, so included.
-class BitwiseAnd[Tf](BinaryPredicate[Tf, Tf]):
-    token = '&'
-    operator = operator.and_
-
-class BitwiseOr[Tf](BinaryPredicate[Tf, Tf]):
-    token = '|'
-    operator = operator.or_
-
-class BitwiseNot[Tf](UnaryPredicate[Tf]):
-    token = '~'
-    operator = operator.__not__
-
 
 class ComparisonPredicates[Ti, Tf](Evaluator[Ti, Tf, Tf]):
     '''Mixin to create predicates for the rich compparison function'''
@@ -188,3 +170,27 @@ class ComparisonPredicates[Ti, Tf](Evaluator[Ti, Tf, Tf]):
     def __mod__(self, other: PredicateArgument[Tf]) -> Predicate[Tf]:
         '''Can be used as a decorator to create a predicate Boolean'''
         return Mod(self, other)
+
+
+# These aren't strictly predicate since they don't return bool, but are useful
+# in predicate expressions. Unlike the other Predicates they are also
+# ComparisonPredicates so they can be evaluated and compared (@ field % 2 == 1)
+class BitwiseAnd[Ti, Tf](BinaryPredicate[Tf, Tf],
+                         ComparisonPredicates[Ti, Tf]):
+    token = '&'
+    operator = operator.and_
+
+class BitwiseOr[Ti, Tf](BinaryPredicate[Tf, Tf],
+                        ComparisonPredicates[Ti, Tf]):
+    token = '|'
+    operator = operator.or_
+
+class BitwiseNot[Ti, Tf](UnaryPredicate[Tf],
+                         ComparisonPredicates[Ti, Tf]):
+    token = '~'
+    operator = operator.__not__
+
+class Mod[Ti, Tf](BinaryPredicate[Tf, Tf],
+                  ComparisonPredicates[Ti, Tf]):
+    token = '%'
+    operator = operator.mod
