@@ -13,7 +13,7 @@ from reactions import (Field, ExecutorFieldManager, Executor, FieldChange,
 import tkinter as tk
 
 
-type Number = int | float 
+type Number = int | float | complex
 type CellValue = Number | str
 
 # todo
@@ -83,7 +83,7 @@ class Cell(ExecutorFieldManager):
             traceback.print_exc()
             result = f'#ERR: {e}'
 
-        if isinstance(result, (int, float)):
+        if isinstance(result, (int, float, complex)):
             self.value = result
         else:
             self.value = str(result)
@@ -113,6 +113,23 @@ class Cell(ExecutorFieldManager):
 
         self.code = code # only set once it's been processed fully
 
+    def _convert_raw(self, raw: str) -> CellValue:
+        '''
+        Convert the raw string value into the most appropriate data type.
+        '''
+        # todo more data type support (ie date, currency)
+        try:
+            return float(raw) if '.' in raw else int(raw)
+        except ValueError:
+            pass
+
+        try:
+            return complex(raw)
+        except ValueError:
+            pass
+
+        return raw
+
     @ raw
     async def _raw_changed(self,
                             change: FieldChange[Cell, str]) -> None:
@@ -121,13 +138,7 @@ class Cell(ExecutorFieldManager):
             self.__value_changed(self, change)
         else:
             self.code = None
-
-            # todo more data type support (ie date, currency)
-            value = change.new
-            try:
-                self.value = float(value) if '.' in value else int(value)
-            except ValueError:
-                self.value = value
+            self.value = self._convert_raw(change.new)
 
 
 def _col_name(idx: int) -> str:
@@ -204,6 +215,13 @@ class SpreadsheetEngine:
         self.globals = dict[str, object]()  # for executing cell functions
         self.locals = LocalsDict(self)      # for executing cell functions
  
+
+        # Initialize with useful things.
+        exec('''
+from time import time
+from math import *
+        ''', self.globals, self.locals)
+
         # Threading - each engine has its own thread and asyncio event loop to
         # process reactions in. This allows the spreadsheet reactions to work
         # with frameworks that are not async and control the "main" thread.
@@ -236,7 +254,7 @@ class SpreadsheetEngine:
         async def load()->None:
             with open(self.filename, 'r') as file:
                 for l in file.readlines():
-                    addr, raw = l.split(':', maxsplit=1)
+                    addr, raw = l.strip().split(':', maxsplit=1)
                     cell = self.cell_by_addr(addr)
                     assert cell is not None
                     cell.raw = raw
