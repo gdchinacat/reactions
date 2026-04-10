@@ -1,4 +1,83 @@
+'''
+tl;dr this is an example for how one could build a reactive spreadsheet. It has
+demonstrated the utility of reactions, exposed some shortcomings (which have
+been addressed and incorporated). It works, more or less.
 
+It aspires to be more than a spreadsheet, but getting it there involves a
+significant amount of work that is not deemed worthwhile:
+
+    The notebook (jupyter) model is more natural for those use cases than a
+    spreadsheet...spreadsheets were used and abused because they are what was
+    available, but notebooks are more flexible, easier to use than rigid grids
+    with A1, C4 type names. A spreadsheet cell with a big chunk of code is not
+    usable...you could resize and reshape it to fit, but that is fighting the
+    grid structure.
+    Pandas supports grid-based data with subscript notation...you typically
+    don't want to show it as a spreadsheet...again that was done because that's
+    what was available. There are better ways.
+    In short, spreadsheets exist as a holdover from when there wasn't anything
+    better, all business users have easy access to them, and people know how to
+    use them.
+    IMO notebooks are almost always better, they are more flexible, handle data
+    in it's native format rather than forcing it into a table. They are web
+    based so are as accessible as spreadsheets (if not more so). They aren't
+    as approachable, but mostly on the creation side. For using them they are
+    about the same.
+
+Where it stands is that it mostly works. Changes to cells in ranges aren't
+reacted to...that would require inspecting AST or watching cell access or ...
+It is more work than is warranted for this toy app. It really wants to be a
+reactive notebook like Marimo, but building on top of a spreadsheet framework
+just doesn't make sense.
+
+This is EOL. It has served its purpose, taught me a lot, highlighted the value
+of Marimo et. al. over plain old spreadsheets. I was actually amazed at how
+much could be done with so little code (cell based is where a lot of
+scaffolding a glue becomes required.
+
+This is a dead end. It works to some extent, but will never be fixed. It will
+never be formalized, unit tested, documented thoroughly. It will be used as a
+living test bed for experimenting. It is helpful for experimenting with
+reaction cycles (A1->B1->A1 ad infinitum).
+
+I had fun. But time to move on.
+
+Known bugs:
+    * =sum(sheet[A1:C1]) will update when A1 and C1 change because those are
+        locals in the code, but change to B1 will not update the sum since no
+        reaction was registered on it.
+    * startup races, sometimes the UI isn't initialized enough when reactions
+      start scheduling updates and exceptions happen and cell values aren't
+      shown.
+    * some errors in cell expressions aren't caught and reach the reaction
+      executor and result in it shutting down, terminal failure.
+    * don't trust any of the operators, they appear to work but most haven't
+      even been given a manual looking at to verify correctness (reverse ones
+      are especially questionable). Don't try to fly to the moon using this.
+    * security holes galore...=__import__(...) will give you just about
+      anything.
+    * entering raw values sometimes doesn't take effect, not sure why.
+
+Was it worth it? Yes! Learnings:
+    * Watchers are a mess...don't use them, just do Watched.foo[watched](func)
+      instead. Should maybe be ripped out of reactions completely. But this
+      would eliminate the definition time @ predicate decorations that are a
+      big readability gain. Needs more thought..only two datapoints: 1) they
+      can be made to work and 2) I avoided using them when it wasn't obvious
+      how to use them.
+    * Need to look into Jupyter and Marimo notebooks more. Should reach for
+      them instead of spreadsheets...they are probably what I want.
+    * AI can give you a huge head start but leaves a lot to be desired. If you
+      just want something that works they are great...if you want something
+      specific less so...if you want to push things to the limit they don't. I
+      asked Claud to use reactions...it imported it, it created Field members,
+      then completely bypassed reactions. When pressed it added decorators,
+      but still didn't actually use reactions for anything.
+
+End of project abandonment ramblings. Here be dragons.
+'''
+
+import ast
 import asyncio
 from fractions import Fraction
 from functools import partial, wraps, cached_property
@@ -7,13 +86,18 @@ import re
 from statistics import mean, StatisticsError
 from threading import Thread, Event
 from tkinter import font as tkfont
-from types import CodeType
+from types import CodeType, NotImplementedType
 from typing import Iterator, Literal, Callable, Self, Any
 
 from reactions import (Field, ExecutorFieldManager, Executor, FieldChange,
                        ReactionCanceler)
 import tkinter as tk
 
+EXPRESSION_INIT = '''
+from time import time
+from math import *
+import ast
+'''
 
 type Number = int | float | complex | Fraction
 type CellValue = Number | str
@@ -55,8 +139,15 @@ class Cell(ExecutorFieldManager):
     def __repr__(self) -> str:
         return f"<Cell {self.address} raw={self.raw!r} value={self.value!r}>"
 
-    def __int__(self) -> int: return int(self.value or 0)
-    def __float__(self) -> float: return float(self.value or 0)
+    def __int__(self) -> int:
+        if not isinstance(value:=self.value, (str, int, float, Fraction)):
+            raise ValueError(f'{value} cannot be converted to int')
+        return int(value)
+
+    def __float__(self) -> float:
+        if not isinstance(value:=self.value, (str, int, float, Fraction)):
+            raise ValueError(f'{value} cannot be converted to int')
+        return float(value)
 
     async def _value_changed(self,
                               changed_cell: Cell,
@@ -106,12 +197,35 @@ class Cell(ExecutorFieldManager):
             canceler()
         self._cancelers.clear()
 
+        # The expression is compiled first to an AST and then the code. The AST
+        # is used to register cell value reactions.
         try:
-            code = compile(expression, str(self), 'eval', dont_inherit=True)
+            self.ast = compile(expression, str(self), 'eval',
+                           flags=ast.PyCF_ONLY_AST, dont_inherit=True)
+            code = compile(self.ast, str(self), 'eval',  # type: ignore
+                           dont_inherit=True)
         except Exception as e:
             self.value = f'#ERR: {e}'
         else:
-            # register reactions for referenced cells
+            # Reactions for changes to referenced cells need to be registered.
+            # One conceivable way to do this is to compile an AST and inspect
+            # it for things that look like cell references. This is pretty good
+            # but doesn't capture cells that are referenced by a function call
+            # in the expression. For example, a cell could be
+            # '=some_func(cell=A1)' where some_func uses the value from some other
+            # cell, for example 'return cell.engine.cells[A1.row + 1][A1.col]'.
+            # Odd, yes, but not inconceivable. Do we want to support this?
+            # Maybe?
+            # Parsing the AST will be hard, significantly harder than tracking
+            # which cell is eval()'ing to track what cell is actually accessed.
+            # The problem with registering on access is access occurs on every
+            # evaluation and the check to see if a reaction is already
+            # registered will happen on every evaluation rather than only when
+            # the cell expression changes. I'm not too worried about raw
+            # performance for cell access during evaluation due to the use case
+            # for a spreadsheet, constantly updating cells due to cycles is not
+            # a common case (but pretty much all I do in testing).
+            # Need to sleep on this, but it's only 11:45am.
             for name in code.co_names:
                 cell = self.engine.cell_by_addr(name)
                 if cell and id(cell) not in self._cancelers:
@@ -168,8 +282,7 @@ class Cell(ExecutorFieldManager):
                     return op(_self, other.value)
                 #if isinstance(other, value_types):
                 return op(_self, other)
-            #raise NotImplementedError(f'{op}({self}, {other}) not supported')
-            return NotImplemented
+            return NotImplemented  # type: ignore
         return func
 
     __lt__ = __operator((int, float), operator.__lt__)
@@ -251,6 +364,31 @@ class LocalsDict(dict[str, object]):
     no use case for purging the cache. Complex mechanisms to ref count code
     references to them could be implemented to GC them...might be able to use
     weak refs, etc. FORMALIZE THIS COMMENT
+
+    Cells, not their values, are included in the dict. This has many tradeoffs.
+    Pros:
+        - subscripting is cleaner (no preprocessing or ugly syntax:
+          '=sum(sheet[A1:A3])' (primary benefit...may not be worth it)
+              * requires sheet, which isn't ideal (=sum(A1:B1) would be best)
+              * no preprocessing is likely red herring since registering
+                reactions is required and text processing is probably easier
+                and more reliable than AST parsing, access tracking, etc
+              * preprocessing might mess up actual slice notation if that is
+                a requirement down the road
+        - exec() functionality (like jupyter notebook cells) will almost
+          certainly want the cells to be referenced (and it *won't* be a leaky
+          abstraction at that point), each with their own locals() and
+          referencable from outside the cell.
+        - LocalsDict does need to react to cell value changes to maintain the
+          cache (also a con).
+    Cons:
+        - leaky abstraction:
+            * "=A1.raw" or worse "=setattr(A1, 'raw', 'foo')"
+            * not at all leaky in the context of executable cells a-la jupyter
+        - every evaluation of a cell requires descriptor access (no LocalsDict
+          cache -- also a pro)
+        - operator overloading required for expected things (=A1 + B1).
+
     '''
     def __init__(self, engine: SpreadsheetEngine) -> None:
         self.engine = engine
@@ -292,10 +430,7 @@ class SpreadsheetEngine:
  
 
         # Initialize with useful things.
-        exec('''
-from time import time
-from math import *
-        ''', self.globals, self.locals)
+        exec(EXPRESSION_INIT, self.globals, self.locals)
         self.locals['sheet'] = self
 
         # Threading - each engine has its own thread and asyncio event loop to
@@ -328,20 +463,14 @@ from math import *
             if not (isinstance(key.start, Cell)
                     and isinstance(key.stop, Cell)):
                 raise ValueError(f'invalid slice: {slice}')
-            def _iter() -> Iterator[Cell]:
-                # todo support Ellipsis
-                r1, c1 = key.start.row, key.start.col
-                r2, c2 = key.stop.row, key.stop.col
-                if r1 > r2:
-                    r1, r2 = r2, r1
-                if c1 > c2:
-                    c1, c2 = c2, c1
-                for r in range(r1, r2 + 1):
-                    for c in range(c1, c2 + 1):
-                        cell = self.cells[r][c]
-                        if cell.value != '':  # todo what if we want ''?
-                            yield cell
-            return _iter()
+            # todo support Ellipsis
+            r1, c1 = key.start.row, key.start.col
+            r2, c2 = key.stop.row, key.stop.col
+            if r1 > r2: r1, r2 = r2, r1
+            if c1 > c2: c1, c2 = c2, c1
+            return (self.cells[r][c]
+                    for r in range(r1, r2 + 1)
+                    for c in range(c1, c2 + 1))
         if isinstance(key, tuple):
             row, col = key
             return self.cells[row][col]
