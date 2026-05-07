@@ -17,15 +17,14 @@ from contextlib import contextmanager
 from typing import Any
 from unittest import TestCase, main
 
+from reactions import (InvalidPredicateExpression, Executor, Field,
+                       FieldManager, FieldChange, Constant,
+                       Eq, Ne, Lt, Le, Gt, Ge, Contains, Not, Or ,
+                       And, BitwiseAnd, BitwiseOr, BitwiseNot, Boolean,
+                       ComparisonPredicates, TruePredicate, Mod)
+from reactions.field_descriptor import FieldDescriptor
+
 from .async_helpers import asynctest
-from ..error import InvalidPredicateExpression
-from ..executor import Executor
-from ..field import Field, FieldManager
-from ..field_descriptor import FieldDescriptor, FieldChange
-from ..predicate import Constant
-from ..predicate_types import (Eq, Ne, Lt, Le, Gt, Ge, Contains, Not, Or,
-                And, BitwiseAnd, BitwiseOr, BitwiseNot, Boolean,
-                ComparisonPredicates, TruePredicate, Mod)
 
 
 class C: ...

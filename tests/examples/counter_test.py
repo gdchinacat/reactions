@@ -14,7 +14,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from unittest import TestCase, main
 
-from ... import Field, ExecutorFieldManager, And, FieldChange
+from reactions import Field, ExecutorFieldManager, And, FieldChange
 
 
 class Counter(ExecutorFieldManager):

@@ -21,7 +21,7 @@ from contextlib import asynccontextmanager
 from typing import NoReturn
 from unittest import TestCase, main
 
-from .. import (ReactionMustNotBeCalled, ExecutorAlreadyStarted, Field,
+from reactions import (ReactionMustNotBeCalled, ExecutorAlreadyStarted, Field,
                 Executor, ExecutorFieldManager, FieldChange)
 from .async_helpers import asynctest
 

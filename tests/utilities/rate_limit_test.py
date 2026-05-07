@@ -17,11 +17,9 @@ from asyncio import sleep
 from time import time
 from unittest import TestCase, main
 
-from ...field import ExecutorFieldManager, Field
-from ...field_descriptor import FieldChange
-from ...predicate_types import And, Not
-from ...test.async_helpers import asynctest
-from ...utilities import RateLimit, ScheduledUpdate
+from reactions import (ExecutorFieldManager, Field, FieldChange, And, Not,
+                       RateLimit, ScheduledUpdate)
+from ..async_helpers import asynctest
 
 
 class RateLimited(ExecutorFieldManager, RateLimit):

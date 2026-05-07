@@ -20,7 +20,7 @@ reaction predicate checks this flag and stops processing.
 '''
 from unittest import TestCase, main
 
-from ... import Field, ExecutorFieldManager, FieldChange
+from reactions import Field, ExecutorFieldManager, FieldChange
 
 
 class Counter(ExecutorFieldManager):

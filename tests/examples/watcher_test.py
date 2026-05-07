@@ -16,7 +16,7 @@
 
 from unittest import main, TestCase
 
-from ... import (ExecutorFieldManager, Field, And, Not, FieldWatcher,
+from reactions import (ExecutorFieldManager, Field, And, Not, FieldWatcher,
                  FieldChange)
 
 

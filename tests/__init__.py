@@ -18,7 +18,7 @@
 from logging.config import fileConfig
 from os.path import expanduser
 
-from .. import logging_config
+from reactions import logging_config
 
 
 fileConfig(f"{expanduser('~')}/logging.config")

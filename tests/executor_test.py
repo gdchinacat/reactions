@@ -18,9 +18,8 @@ Executor test.
 from asyncio import sleep
 from unittest import TestCase, main
 
-from ..error import ExecutorAlreadyStarted
-from ..executor import Executor
-from ..field import Field, ExecutorFieldManager
+from reactions import (ExecutorAlreadyStarted, Executor, Field,
+                       ExecutorFieldManager)
 from .async_helpers import asynctest
 
 

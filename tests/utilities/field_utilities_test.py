@@ -17,9 +17,8 @@ from unittest import TestCase, main
 
 from asyncio import sleep
 
-from ...field import Field, ExecutorFieldManager, FieldWatcher
-from ...test.async_helpers import asynctest
-from ...utilities import adjust_while
+from reactions import Field, ExecutorFieldManager, FieldWatcher, adjust_while
+from ..async_helpers import asynctest
 
 
 class Adjusted:

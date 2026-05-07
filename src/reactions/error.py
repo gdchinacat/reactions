@@ -22,7 +22,8 @@ from typing import NoReturn
 __all__ = ['MustNotBeCalled', 'ReactionMustNotBeCalled',
            'ExecutorError', 'ExecutorNotStarted', 'ExecutorAlreadyStarted',
            'PredicateError', 'InvalidPredicateExpression', 'ExecutorStopped',
-           'ReactionConfigurationError', 'FieldWatcherHasNoExecutorError']
+           'ReactionConfigurationError', 'FieldWatcherHasNoExecutorError',
+           'FieldConfigurationError', 'FieldAlreadyBound']
 
 class MustNotBeCalled(RuntimeError):
     '''

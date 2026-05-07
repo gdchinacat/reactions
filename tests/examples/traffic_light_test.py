@@ -13,11 +13,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from enum import Enum
-from unittest import TestCase, main
 import logging
+from unittest import TestCase, main
 
-from ... import Field, And, ExecutorFieldManager, FieldChange, RateLimit
-from ...executor import Executor
+from reactions import (Field, And, ExecutorFieldManager, FieldChange,
+                       RateLimit, Executor)
+
 from ..async_helpers import asynctest
 
 

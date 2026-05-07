@@ -17,11 +17,10 @@
 '''
 from unittest import TestCase, main
 
-from ..error import ReactionMustNotBeCalled
-from ..executor import Executor
-from ..field import Field, FieldManager, FieldWatcher, ExecutorFieldManager
-from ..field_descriptor import FieldChange
-from ..predicate_types import And
+from reactions import (ReactionMustNotBeCalled,
+                       Executor, Field, FieldManager, FieldWatcher,
+                       ExecutorFieldManager, FieldChange, And)
+
 from .async_helpers import asynctest
 
 

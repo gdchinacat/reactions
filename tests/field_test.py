@@ -20,15 +20,12 @@ from dataclasses import dataclass
 from typing import Callable
 from unittest import TestCase, main
 
-from ..error import (MustNotBeCalled, InvalidPredicateExpression,
-                     FieldAlreadyBound, FieldConfigurationError)
-from ..executor import Executor
-from ..field import (Field, BoundField, FieldManager, FieldWatcher,
-                     FieldManagerMeta)
-from ..field_descriptor import FieldChange
-from ..predicate import Predicate
-from ..predicate_types import Contains, Not, Or, And, Boolean
-
+from reactions import (MustNotBeCalled, InvalidPredicateExpression,
+                       FieldAlreadyBound, FieldConfigurationError, Executor,
+                       Field, FieldManager, FieldWatcher, FieldChange, 
+                       Contains, Not, Or, And, Boolean)
+from reactions.field import BoundField, FieldManagerMeta, FieldManagerMeta
+from reactions.predicate import Predicate
 
 class C(metaclass=FieldManagerMeta):
     field = Field['C', int](0)

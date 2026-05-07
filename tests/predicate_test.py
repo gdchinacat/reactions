@@ -19,9 +19,8 @@ import asyncio
 from typing import Callable
 from unittest import TestCase, main
 
-from ..executor import Executor
-from ..field import Field, ExecutorFieldManager, BoundField
-from ..field_descriptor import FieldChange
+from reactions import (Executor, Field, ExecutorFieldManager, FieldChange)
+from reactions.field import BoundField
 from .async_helpers import asynctest
 
 
