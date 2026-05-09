@@ -15,13 +15,11 @@
 '''
 .field.FieldWatcher test
 '''
-from unittest import TestCase, main
+from unittest import IsolatedAsyncioTestCase, main
 
 from reactions import (ReactionMustNotBeCalled,
                        Executor, Field, FieldManager, FieldWatcher,
                        ExecutorFieldManager, FieldChange, And)
-
-from .async_helpers import asynctest
 
 
 class Watched(ExecutorFieldManager):
@@ -60,7 +58,7 @@ class Watched(ExecutorFieldManager):
     def __repr__(self) -> str:
         return f'{type(self).__qualname__}({id(self)})'
 
-class FieldWatcherTest(TestCase):
+class FieldWatcherTest(IsolatedAsyncioTestCase):
 
     def test_automatic_predicate(self) -> None:
 
@@ -92,7 +90,6 @@ class FieldWatcherTest(TestCase):
 
         self.assertEqual(watcher.change_events, expected)
 
-    @asynctest
     async def test_automatic_dispatches_to_correct_watcher(self)->None:
         class Watched(FieldManager):
             field = Field['Watched', bool](False)
@@ -122,7 +119,6 @@ class FieldWatcherTest(TestCase):
         self.assertTrue(watcher1.reacted)
         self.assertFalse(watcher2.reacted)
 
-    @asynctest
     async def test_decorator_bound_reactions(self) -> None:
         '''test that bound reactions are handled properly'''
         class State(FieldManager):

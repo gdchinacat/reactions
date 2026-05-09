@@ -15,7 +15,8 @@
 '''
 Helpers for async testing.
 '''
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Coroutine, AsyncGenerator
+from contextlib import asynccontextmanager
 from functools import wraps
 from typing import ParamSpec
 import asyncio
@@ -26,33 +27,21 @@ TestMethod = Callable[TestParams, None]
 AsyncTestMethod = Callable[TestParams, Coroutine[None, None, None]]
 TestMethodDecorator = Callable[[AsyncTestMethod[TestParams]],
                                TestMethod[TestParams]]
+AsyncTestMethodDecorator = Callable[[AsyncTestMethod[TestParams]],
+                                    AsyncTestMethod[TestParams]]
 
-def asynctest(func: AsyncTestMethod[TestParams]|None = None,
-              *,
-              timeout:float|None=1
-              ) -> TestMethod[TestParams]|TestMethodDecorator[TestParams]:
-    '''
-    Decorator to execute async test functions.
-    func - function to decorate
-    timeout - timeout to apply
-    May be used as a plain decorator:
-    @asynctest
-    def test_foo(..): ...
+@asynccontextmanager
+async def async_timeout(timeout: float|None = 1) -> AsyncGenerator[None]:
+    """
+    asynccontextmanager wrapper around asyncio.timeout.
 
-    or with arguments:
-    @asynctest(timeout=2)
-    async def test_foo(...): ...
-    '''
-    def dec(func: AsyncTestMethod[TestParams]) -> TestMethod[TestParams]:
-        @wraps(func)
-        def _asynctest(*args: TestParams.args, **kwargs: TestParams.kwargs
-                       ) -> None:
-            @wraps(func)
-            async def async_test_runner() -> None:
-                async with asyncio.timeout(timeout):
-                    await func(*args, **kwargs)
-            asyncio.run(async_test_runner())
-        return _asynctest
-    if func is not None:
-        return dec(func)
-    return dec
+    @async_timeout(2)
+    async def foo():
+        ...
+
+    async def foo():
+        async with async_timeout(2):
+            ...
+    """
+    async with asyncio.timeout(timeout):
+        yield

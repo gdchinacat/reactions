@@ -16,16 +16,14 @@
 Executor test.
 '''
 from asyncio import sleep
-from unittest import TestCase, main
+from unittest import IsolatedAsyncioTestCase, main
 
 from reactions import (ExecutorAlreadyStarted, Executor, Field,
                        ExecutorFieldManager)
-from .async_helpers import asynctest
 
 
-class ExecutorTest(TestCase):
+class ExecutorTest(IsolatedAsyncioTestCase):
 
-    @asynctest
     async def test_executor_context_manager(self) -> None:
         executor = Executor()
         async with executor:
@@ -34,7 +32,6 @@ class ExecutorTest(TestCase):
         assert executor.task
         self.assertTrue(executor.task.done())
 
-    @asynctest
     async def test_reactions_serialized(self) -> None:
         test = self
         class C(ExecutorFieldManager):

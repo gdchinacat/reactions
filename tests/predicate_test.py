@@ -17,19 +17,17 @@ Predicate test
 '''
 import asyncio
 from typing import Callable
-from unittest import TestCase, main
+from unittest import IsolatedAsyncioTestCase, main
 
 from reactions import (Executor, Field, ExecutorFieldManager, FieldChange)
 from reactions.field import BoundField
-from .async_helpers import asynctest
 
 
 class C(ExecutorFieldManager):
     field = Field['C', int](0)
 
-class PredicateTest(TestCase):
+class PredicateTest(IsolatedAsyncioTestCase):
 
-    @asynctest
     async def test_decorator_returns__reaction(self)->None:
         '''test the object returned by decorating a reaction is correct'''
         class State:
@@ -70,7 +68,6 @@ class PredicateTest(TestCase):
 
         self.assertEqual(change_events, expected)
 
-    @asynctest
     async def test_bare_instance(self) -> None:
         '''
         Test that predicate decorations work on bare instances as long
@@ -120,11 +117,9 @@ class PredicateTest(TestCase):
             c.executor.stop()
         self.assertEqual(1, calls)
 
-    @asynctest
     async def test_bound_reactions_are_cancelable(self) -> None:
         await self._test_reactions_are_cancelable(lambda c: C.field[c])
 
-    @asynctest
     async def test_reactions_are_cancelable(self) -> None:
         await self._test_reactions_are_cancelable(lambda c: C.field)
 

@@ -15,7 +15,7 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
-from unittest import TestCase, main
+from unittest import IsolatedAsyncioTestCase, main
 
 from reactions import (InvalidPredicateExpression, Executor, Field,
                        FieldManager, FieldChange, Constant,
@@ -24,7 +24,6 @@ from reactions import (InvalidPredicateExpression, Executor, Field,
                        ComparisonPredicates, TruePredicate, Mod)
 from reactions.field_descriptor import FieldDescriptor
 
-from .async_helpers import asynctest
 
 
 class C: ...
@@ -37,7 +36,7 @@ class Creator(ComparisonPredicates[C, int]):
         raise NotImplementedError()
 
 
-class TestPredicate(TestCase):
+class TestPredicate(IsolatedAsyncioTestCase):
 
     @contextmanager
     def assertReactionAdded(self, field: FieldDescriptor[Any, Any]
@@ -177,7 +176,6 @@ class TestPredicate(TestCase):
         self.assertIsInstance(~creator, ComparisonPredicates)
         self.assertIsInstance(creator % 0, ComparisonPredicates)
 
-    @asynctest
     async def test_bound_field_reactions_instance_specific(self) -> None:
         '''
         Test that reactions registered on instances on fields are specific

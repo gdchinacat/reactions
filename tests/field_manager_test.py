@@ -19,11 +19,10 @@ from asyncio import Future, CancelledError, sleep, Barrier
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import NoReturn
-from unittest import TestCase, main
+from unittest import IsolatedAsyncioTestCase, main
 
 from reactions import (ReactionMustNotBeCalled, ExecutorAlreadyStarted, Field,
                 Executor, ExecutorFieldManager, FieldChange)
-from .async_helpers import asynctest
 
 
 class State(ExecutorFieldManager):
@@ -82,9 +81,8 @@ async def running_state(skip_stop: bool = False,
             await executor
 
 
-class FieldManagerTest(TestCase):
+class FieldManagerTest(IsolatedAsyncioTestCase):
 
-    @asynctest
     async def test_reaction_exception_terminates_reactor(self) -> None:
         class _Exception(Exception): ...
         async with running_state(skip_await=True) as (state, executor):
@@ -92,14 +90,12 @@ class FieldManagerTest(TestCase):
             with self.assertRaises(_Exception):
                 await executor
 
-    @asynctest
     async def test_already_started(self) -> None:
         async with running_state() as (_, executor):
             # trying to start it a second time raises error
             with self.assertRaises(ExecutorAlreadyStarted):
                 executor.start()
 
-    @asynctest
     async def test_stop(self) -> None:
         '''test that stop can be called multiple times in various states'''
         async with running_state(skip_stop=True,
@@ -113,13 +109,11 @@ class FieldManagerTest(TestCase):
             # It is still ok to call stop()
             executor.stop()
 
-    @asynctest
     async def test_calling_reaction_not_allowed(self) -> None:
         async with running_state() as (state, _):
             with self.assertRaises(ReactionMustNotBeCalled):
                 state.exception_()
 
-    @asynctest
     async def test_reaction_infinite_interruptable_loop(self) -> None:
         async with running_state(skip_stop=True,
                                  skip_await=True) as (state, executor):
@@ -134,7 +128,6 @@ class FieldManagerTest(TestCase):
         self.assertEqual('State', State.exception.classname)
         self.assertEqual('exception', State.exception.attr)
 
-    @asynctest  # not really necessary but for State.inifinite_loop needing it
     async def test_added_fields_are_named(self) -> None:
         '''fields added to a FieldManager subclass after definition are named'''
         obj = object()
@@ -155,7 +148,6 @@ class FieldManagerTest(TestCase):
         state = _State()
         self.assertIs(obj, state.foo)
 
-    @asynctest
     async def test_private_executors(self) -> None:
         '''Test that each ExecutorFieldManager has its own executor.'''
 

@@ -15,11 +15,10 @@
 
 from asyncio import sleep
 from time import time
-from unittest import TestCase, main
+from unittest import TestCase, IsolatedAsyncioTestCase, main
 
 from reactions import (ExecutorFieldManager, Field, FieldChange, And, Not,
                        RateLimit, ScheduledUpdate)
-from ..async_helpers import asynctest
 
 
 class RateLimited(ExecutorFieldManager, RateLimit):
@@ -70,8 +69,7 @@ class TestRateLimit(TestCase):
         rate_limited.run()
         self.assertEqual(4, len(rate_limited.overruns))
 
-class TestScheduledUpdate(TestCase):
-    @asynctest
+class TestScheduledUpdate(IsolatedAsyncioTestCase):
     async def test_scheduled_update(self) -> None:
         class Updated(ScheduledUpdate):
             deltas: list[float]

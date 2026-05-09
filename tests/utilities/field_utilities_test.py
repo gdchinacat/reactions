@@ -13,12 +13,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from unittest import TestCase, main
+from unittest import IsolatedAsyncioTestCase, main
 
 from asyncio import sleep
 
 from reactions import Field, ExecutorFieldManager, FieldWatcher, adjust_while
-from ..async_helpers import asynctest
 
 
 class Adjusted:
@@ -31,7 +30,7 @@ class _C(Adjusted, ExecutorFieldManager):
     def _start(self) -> None: ...
 
 
-class Test(TestCase):
+class Test(IsolatedAsyncioTestCase):
 
     async def _test_adjust_while(self, c: _C,
                                  watcher: Adjusted) -> None:
@@ -44,7 +43,6 @@ class Test(TestCase):
             await sleep(0)  # yield so the reaction can execute
             self.assertEqual(0, watcher.adjusted)
 
-    @asynctest
     async def test_adjust_while_watcher(self) -> None:
         class C(_C):
             field = Field['C', bool](False)
@@ -55,7 +53,6 @@ class Test(TestCase):
 
         await self._test_adjust_while(c, watcher)
 
-    @asynctest
     async def test_adjust_while_instance(self) -> None:
         class C(_C):
             field = Field['C', bool](False)

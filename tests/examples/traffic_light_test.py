@@ -14,12 +14,12 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from enum import Enum
 import logging
-from unittest import TestCase, main
+from unittest import IsolatedAsyncioTestCase, main
 
 from reactions import (Field, And, ExecutorFieldManager, FieldChange,
                        RateLimit, Executor)
 
-from ..async_helpers import asynctest
+from ..async_helpers import async_timeout
 
 
 NUMBER_OF_TRAFFIC_LIGHTS = 1_000
@@ -108,9 +108,9 @@ class TrafficLight(ExecutorFieldManager):
         return f'{self.__class__.__qualname__}({id(self)})'
     __repr__ = __str__
 
-class TrafficLightTest(TestCase):
+class TrafficLightTest(IsolatedAsyncioTestCase):
 
-    @asynctest(timeout=10)  # type: ignore  # mypy untyped decorator, but is typed
+    @async_timeout(10)
     async def test_traffic_light(self) -> None:
         expected = [Color.GREEN, Color.YELLOW, Color.RED] * CYCLES
         logger.info(f'Creating {NUMBER_OF_TRAFFIC_LIGHTS} traffic lights')
