@@ -76,8 +76,8 @@ class Evaluator[Ti, Te, Tf](ABC):
 
     @property
     @abstractmethod
-    def fields(self) -> ( Iterator[FieldDescriptor[Ti, Tf]]
-                         |Iterator[_BoundField[Ti, Tf]]):
+    def fields(self) -> ( Iterator[FieldDescriptor[Ti, Tf]
+                                   |_BoundField[Ti, Tf]]):
         raise NotImplementedError
 
     @abstractmethod

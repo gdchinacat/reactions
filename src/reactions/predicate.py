@@ -82,7 +82,6 @@ class _Reaction[Tw, Ti, Tf](ReactionMustNotBeCalled):
 
 
 class Predicate[Tf](Evaluator[Any, bool, Tf], ABC):
-    
     '''
     Predicate decorates reactions to be called when field changes cause the
     predicate to become true.
@@ -250,7 +249,7 @@ class Constant[Tf](Evaluator[Any, Tf, Tf]):
     def __str__(self) -> str:
         return str(self.value)
 
-    def evaluate[Ti](self, _: Ti) -> Tf:
+    def evaluate[Ti](self, instance: Ti) -> Tf:
         return self.value
 
     @InvalidPredicateExpression
@@ -301,8 +300,8 @@ class UnaryPredicate[Tf](OperatorPredicate[Tf], ABC):
         self.operand = operand
 
     @property
-    def fields(self) -> ( Iterator[FieldDescriptor[Any, Tf]]
-                         |Iterator[_BoundField[Any, Tf]]):
+    def fields(self) -> ( Iterator[FieldDescriptor[Any, Tf]
+                                   |_BoundField[Any, Tf]]):
         yield from self.operand.fields
 
     def evaluate[Ti](self, instance: Ti) -> bool:
