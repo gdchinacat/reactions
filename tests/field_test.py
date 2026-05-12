@@ -18,19 +18,19 @@ Test field functionality.
 
 from dataclasses import dataclass
 from typing import Callable
-from unittest import TestCase, main
+from unittest import IsolatedAsyncioTestCase, main
 
 from reactions import (MustNotBeCalled, InvalidPredicateExpression,
                        FieldAlreadyBound, FieldConfigurationError, Executor,
-                       Field, FieldManager, FieldWatcher, FieldChange, 
-                       Contains, Not, Or, And, Boolean)
-from reactions.field import BoundField, FieldManagerMeta, FieldManagerMeta
+                       Field, FieldManager, FieldWatcher, FieldChange,
+                       Contains, Not, Or, And, Boolean, ExecutorFieldManager)
+from reactions.field import BoundField
 from reactions.predicate import Predicate
 
-class C(metaclass=FieldManagerMeta):
+class C(FieldManager):
     field = Field['C', int](0)
 
-class TestField(TestCase):
+class TestField(IsolatedAsyncioTestCase):
 
     def test_class_field_eq_creates_predicate(self) -> None:
         class C:
@@ -234,7 +234,7 @@ class TestField(TestCase):
         should fail if the Fields will use attributes that are already used.
         '''
         with self.assertRaises(FieldConfigurationError):
-            class _(metaclass=FieldManagerMeta):
+            class _(FieldManager):
                 field = Field['_', bool](False)
                 @field == False
                 async def _field(self, *_: object) -> None: ...
@@ -298,6 +298,31 @@ class TestField(TestCase):
 
         self.assertEqual(1, c1_call_count.count)
         self.assertEqual(1, c2_call_count.count)
+
+    async def test_field_change_field_accessibility(self) -> None:
+        '''
+        FieldChange.field is a reference to FieldDescriptor and pyright appears
+        confused by setting an instance member to a descriptor in the dataclass
+        definition of FieldChange. Test that a FieldChange instance properly
+        exposes the field that the change is for.
+        Found by running pyright and receiving an error that
+        FieldChange.__str__() access of 'self.field' could not be found because
+        no __get__() override exists.
+        The code for FieldChange works because the descriptor is set on an
+        instance, not the type so the descriptor protocol is not invoked.
+        Pyright seems to not understand this.
+        '''
+
+        class C(ExecutorFieldManager):
+            field = Field['C', bool](False, 'C', 'field')
+
+            @ field == True
+            async def change(self, change: FieldChange[C, bool]) -> None:
+                assert change.field is C.field
+
+        c = C()
+        c.start()
+        c.field = True
 
 
 if __name__ == '__main__':

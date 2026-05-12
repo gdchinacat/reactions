@@ -23,7 +23,6 @@ track and call the reactions when field values change.
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
 from functools import partial
 from itertools import count
 from types import MappingProxyType
@@ -90,14 +89,42 @@ class Evaluator[Ti, Te, Tf](ABC):
         '''
         raise NotImplementedError()
 
-
-@dataclass(slots=True)
 class FieldChange[Ti, Tf]:
     '''A record of a field value changing.'''
-    instance: Ti
-    field: FieldDescriptor[Ti, Tf]
-    old: Tf
-    new: Tf
+    __slots__ = ('instance', 'field', 'old', 'new')
+
+    def __init__(self, instance: Ti, field: FieldDescriptor[Ti, Tf],
+                 old: Tf, new: Tf):
+        self.instance = instance
+        self.old = old
+        self.new = new
+
+        # This field is not a descriptor, but type annotating it as one on the
+        # class causes type checkers problems. A descriptor is only a
+        # descriptor when a class member is a desccriptor, not when an
+        # instance member is. In this case the descriptor is not intended to be
+        # used as a descriptor, it simply tracks which descriptor (field)
+        # changed.
+        # This assignment of an instance member to a descriptor causes type
+        # checkers difficulties if the class has a type annotation telling them
+        # the member is implemented as a descriptor, through no fault of their
+        # own.
+        # I believe this problem lies with python descriptor protocol, type
+        # annotations, and type checkers picking what they believe is the most
+        # usable behavior for an ambiguous situation.
+        # This class used to be a dataclass but that required type annotations
+        # for the members. This would create a class member typed as a
+        # descriptor on the class which would cause confusion for pyright,
+        # understandably. Changing to a plain class with an explicit __init__()
+        # without class member type annotations worked around the confusion, at
+        # least to some extent. If this __init_() was implemented with the
+        # class member type annotations in place mypy also had confusion.
+        # In summary, this member (or all instance members that contain a
+        # descriptor) should not be declared on the class, but rather done by
+        # instance assignment. I wouldn't be surprised if type checkers improve
+        # on this if they can. For now....don't type annotate this on the
+        # class.
+        self.field = field
 
     def __str__(self) -> str:
         # todo template string?
@@ -275,14 +302,14 @@ class FieldDescriptor[Ti, Tf](Evaluator[Ti, Tf, Tf], ABC):
                 # _bind the field on first access if the class doesn't do it
                 # during initialization.
                 bound_field = self._bind(instance)
-            change = FieldChange(instance, self, old, value)
+            change = FieldChange[Ti, Tf](instance, self, old, value)
             bound_field.react(change)
 
     # end Descriptor protocol.
     ###########################################################################
 
     @abstractmethod
-    def bound_field(self: Tf, instance: Ti) -> _BoundField[Ti, Tf]:
+    def bound_field(self, instance: Ti) -> _BoundField[Ti, Tf]:
         '''get the bound field for this field on instance'''
         raise NotImplementedError()
 

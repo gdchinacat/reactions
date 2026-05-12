@@ -187,7 +187,7 @@ class FieldManagerMetaDict(dict[str, object]):
 
     def __init__(self, classname: str) -> None:
         self.classname = classname
-        self['_fields'] = tuple[tuple[Field[Self, object]]]()
+        self['_fields'] = tuple[tuple[Field[Self, object]], ...]()
 
     def __setitem__(self, attr: str, value: object)->None:
         if isinstance(value, Field):
