@@ -34,18 +34,21 @@ class TruePredicate[Tf](UnaryPredicate[Tf]):
     Predicate that is always true.
     '''
 
-    token = 'True'
+    @property
+    def token(self) -> str: return 'True'
 
-    def evaluate[Ti](self, instance:Ti)->bool:
+    def evaluate(self, instance: object)->bool:
         return True
 
 
 class Boolean[Tf](UnaryPredicate[Tf]):
-    token = 'bool'
+    @property
+    def token(self) -> str: return 'bool'
     operator = bool
 
 class Not[Tf](UnaryPredicate[Tf]):
-    token = '!not!'
+    @property
+    def token(self) -> str: return '!not!'
     operator = operator.not_
 
     @override
@@ -58,7 +61,8 @@ class And[Tfl, Tfr](BinaryPredicate[Tfl, Tfr]):
     #       is preptty clunky...And(foo, bar, baz) would be a big improvement.
     #       branch variadic_and has been created...it's pretty trivial to
     #       implement, but typing it is hard.
-    token = '!and!'
+    @property
+    def token(self) -> str: return '!and!'
     operator = lambda _, a, b: a and b
 
     @override
@@ -66,7 +70,8 @@ class And[Tfl, Tfr](BinaryPredicate[Tfl, Tfr]):
         super().__init__(left, right)
 
 class Or[Tfl,Tfr](BinaryPredicate[Tfl, Tfr]):
-    token = '!or!'
+    @property
+    def token(self) -> str: return '!or!'
     operator = lambda _, a, b: a or b
 
     @override
@@ -74,31 +79,38 @@ class Or[Tfl,Tfr](BinaryPredicate[Tfl, Tfr]):
         super().__init__(left, right)
 
 class Eq[Tf](BinaryPredicate[Tf, Tf]):
-    token = '=='
     operator = operator.eq
+    @property
+    def token(self) -> str: return '=='
 
 class Ne[Tf](BinaryPredicate[Tf, Tf]):
-    token = '!='
     operator = operator.ne
+    @property
+    def token(self) -> str: return '!='
 
 class Lt[Tf](BinaryPredicate[Tf, Tf]):
-    token = '<'
     operator = operator.lt
+    @property
+    def token(self) -> str: return '<'
 
 class Le[Tf](BinaryPredicate[Tf, Tf]):
-    token = '<='
     operator = operator.le
+    @property
+    def token(self) -> str: return '<='
 
 class Gt[Tf](BinaryPredicate[Tf, Tf]):
-    token = '>'
     operator = operator.gt
+    @property
+    def token(self) -> str: return '>'
 
 class Ge[Tf](BinaryPredicate[Tf, Tf]):
-    token = '>='
+    @property
+    def token(self) -> str: return '>='
     operator = operator.ge
 
 class Contains[Tf](BinaryPredicate[Tf, Tf]):
-    token = 'contains'
+    @property
+    def token(self) -> str: return 'contains'
     operator = operator.contains
 
 
@@ -177,20 +189,24 @@ class ComparisonPredicates[Ti, Tf](Evaluator[Ti, Tf, Tf]):
 # ComparisonPredicates so they can be evaluated and compared (@ field % 2 == 1)
 class BitwiseAnd[Ti, Tf](BinaryPredicate[Tf, Tf],
                          ComparisonPredicates[Ti, Tf]):
-    token = '&'
+    @property
+    def token(self) -> str: return '&'
     operator = operator.and_
 
 class BitwiseOr[Ti, Tf](BinaryPredicate[Tf, Tf],
                         ComparisonPredicates[Ti, Tf]):
-    token = '|'
+    @property
+    def token(self) -> str: return '|'
     operator = operator.or_
 
 class BitwiseNot[Ti, Tf](UnaryPredicate[Tf],
                          ComparisonPredicates[Ti, Tf]):
-    token = '~'
+    @property
+    def token(self) -> str: return '~'
     operator = operator.__not__
 
 class Mod[Ti, Tf](BinaryPredicate[Tf, Tf],
                   ComparisonPredicates[Ti, Tf]):
-    token = '%'
+    @property
+    def token(self) -> str: return '%'
     operator = operator.mod
