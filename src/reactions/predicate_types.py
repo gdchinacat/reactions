@@ -16,7 +16,7 @@
 The predicate implementation types.
 '''
 
-from typing import overload, override, Never
+from typing import overload, override, Never, Sequence, Any
 import operator
 
 from .field_descriptor import Evaluator, Reaction
@@ -55,12 +55,8 @@ class Not[Tf](UnaryPredicate[Tf]):
     def __init__(self, operand: Predicate[Tf]) -> None:
         return super().__init__(operand)
 
-class And[Tfl, Tfr](BinaryPredicate[Tfl, Tfr]):
-    # todo? Allow And to take more than two operands? Since it can't be written
-    #       as 'foo and bar and baz' and requires And(foo, And(bar, baz)) it
-    #       is preptty clunky...And(foo, bar, baz) would be a big improvement.
-    #       branch variadic_and has been created...it's pretty trivial to
-    #       implement, but typing it is hard.
+class _And[Tfl, Tfr](BinaryPredicate[Tfl, Tfr]):
+    '''_And is a BinaryPredicate implementation used by variadic And'''
     @property
     def token(self) -> str: return '!and!'
     operator = lambda _, a, b: a and b
@@ -68,6 +64,46 @@ class And[Tfl, Tfr](BinaryPredicate[Tfl, Tfr]):
     @override
     def __init__(self, left: Predicate[Tfl], right: Predicate[Tfr]) -> None:
         super().__init__(left, right)
+
+# And overloads are to allow correct typing for small number of variadic
+# arguments. Python typing does not provide a way to accurately type this for
+# an unbounded number of arguments. This is a compromise solution.
+@overload
+def And[Tf](p1: Predicate[Tf], /) -> Predicate[Tf]: ...
+
+@overload
+def And[Tf1, Tf2](p1: Predicate[Tf1],
+                  p2: Predicate[Tf2], /) -> Predicate[Tf1|Tf2]: ...
+
+@overload
+def And[Tf1, Tf2, Tf3](p1: Predicate[Tf1],
+                       p2: Predicate[Tf2],
+                       p3: Predicate[Tf3], /) -> Predicate[Tf1|Tf2|Tf3]: ...
+
+@overload
+def And[Tf1, Tf2, Tf3,  Tf4](p1: Predicate[Tf1],
+                             p2: Predicate[Tf2],
+                             p3: Predicate[Tf3],
+                             p4: Predicate[Tf4],
+                             /) -> Predicate[Tf1|Tf2|Tf3|Tf4]: ...
+
+def And[Tf](p1: Predicate[Tf],
+            *predicates: Predicate[Any]) -> Predicate[Any]:
+    '''
+    Predicate that is true IFF all of it's argument predicates are true.
+
+    @ And(C.a == 'aar',
+          C.b == 'bar',
+          C.c != 'car',
+          ...
+          )
+    '''
+    _predicates: Sequence[Predicate[Any]] = predicates
+    ret = p1
+    while _predicates:
+        b, *_predicates = _predicates
+        ret = _And(ret, b)
+    return ret
 
 class Or[Tfl,Tfr](BinaryPredicate[Tfl, Tfr]):
     @property

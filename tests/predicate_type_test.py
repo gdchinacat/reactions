@@ -125,6 +125,20 @@ class TestPredicate(IsolatedAsyncioTestCase):
         self.assertTrue(Not(false_predicate).evaluate(c))
         self.assertFalse(Not(true_predicate).evaluate(c))
 
+    def test_variadic_and(self) -> None:
+        class C:
+            a = Field['C',bool](True, 'C', 'a')
+            b = Field['C',bool](True, 'C', 'b')
+            c = Field['C',bool](True, 'C', 'c')
+            d = Field['C',bool](True, 'C', 'd')
+        c = C()
+        # todo = Field[Any, True] should be usable as a "Predicate" because it
+        #        evaluates to a bool.
+        self.assertTrue(And(C.a == True,
+                            C.b == True,
+                            C.c == True,
+                            C.d == True).evaluate(c))
+
     def test_binary_or_predicate(self) -> None:
         self.assertEqual(0b11, BitwiseOr(0b01, 0b10).evaluate(None))
 

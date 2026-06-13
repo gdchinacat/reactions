@@ -7,3 +7,4 @@
 .pydevproject
 src/reactions/playground.py
 .venv
+.python-version
