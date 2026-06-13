@@ -127,7 +127,6 @@ class FieldChange[Ti, Tf]:
         self.field = field
 
     def __str__(self) -> str:
-        # todo template string?
         return f'{self.instance}.{self.field} {self.old} -> {self.new}'
 
 

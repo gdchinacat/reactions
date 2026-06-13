@@ -191,8 +191,6 @@ class Executor:
         '''
         while True:
             try:
-                # todo - use template string for id, args, other logging only
-                #        info.
                 (id_, coroutine, change) = await self.queue.get()
             except QueueShutDown:
                 logger.info('%s stopped', self)
