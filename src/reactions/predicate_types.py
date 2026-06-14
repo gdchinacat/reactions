@@ -112,7 +112,7 @@ def And[Tf](p1: Predicate[Tf],
         ret = _And(ret, b)
     return ret
 
-class Or[Tfl,Tfr](BinaryPredicate[Tfl, Tfr]):
+class _Or[Tfl,Tfr](BinaryPredicate[Tfl, Tfr]):
     @property
     def token(self) -> str: return '!or!'
     operator = lambda _, a, b: a or b
@@ -120,6 +120,50 @@ class Or[Tfl,Tfr](BinaryPredicate[Tfl, Tfr]):
     @override
     def __init__(self, left: Predicate[Tfl], right: Predicate[Tfr]) -> None:
         super().__init__(left, right)
+
+    def evaluate[Ti](self, instance:Ti) -> bool:
+        '''
+        Evaluate using short-circuit evaluation.
+        '''
+        return (bool(self.left.evaluate(instance))
+                or bool(self.right.evaluate(instance)))
+
+@overload
+def Or[Tf](p1: Predicate[Tf], /) -> Predicate[Tf]: ...
+
+@overload
+def Or[Tf1, Tf2](p1: Predicate[Tf1],
+                 p2: Predicate[Tf2], /) -> Predicate[Tf1|Tf2]: ...
+
+@overload
+def Or[Tf1, Tf2, Tf3](p1: Predicate[Tf1],
+                      p2: Predicate[Tf2],
+                      p3: Predicate[Tf3], /) -> Predicate[Tf1|Tf2|Tf3]: ...
+
+@overload
+def Or[Tf1, Tf2, Tf3,  Tf4](p1: Predicate[Tf1],
+                            p2: Predicate[Tf2],
+                            p3: Predicate[Tf3],
+                            p4: Predicate[Tf4],
+                            /) -> Predicate[Tf1|Tf2|Tf3|Tf4]: ...
+
+def Or[Tf](p1: Predicate[Tf],
+           *predicates: Predicate[Any]) -> Predicate[Any]:
+    '''
+    Predicate that is true if any of it's argument predicates are true.
+
+    @ Or(C.a == 'aar',
+          C.b == 'bar',
+          C.c != 'car',
+          ...
+          )
+    '''
+    _predicates: Sequence[Predicate[Any]] = predicates
+    ret = p1
+    while _predicates:
+        b, *_predicates = _predicates
+        ret = _Or(ret, b)
+    return ret
 
 class Eq[Tf](BinaryPredicate[Tf, Tf]):
     operator = operator.eq

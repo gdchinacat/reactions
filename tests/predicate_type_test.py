@@ -125,7 +125,7 @@ class TestPredicate(IsolatedAsyncioTestCase):
         self.assertTrue(Not(false_predicate).evaluate(c))
         self.assertFalse(Not(true_predicate).evaluate(c))
 
-    def test_variadic_and_true(self) -> None:
+    def test_variadic_and_true_false(self) -> None:
         class C:
             a = Field['C',bool](True, 'C', 'a')
             b = Field['C',bool](True, 'C', 'b')
@@ -139,7 +139,12 @@ class TestPredicate(IsolatedAsyncioTestCase):
                             C.c == True,
                             C.d == True).evaluate(c))
 
-    def test_variadic_and_false(self) -> None:
+        self.assertFalse(And(C.a == True,
+                             C.b == True,
+                             C.c == True,
+                             C.d == False).evaluate(c))
+
+    def test_variadic_and_short_circuits(self) -> None:
         class O:
             called: int = 0
             def __init__(self, value: bool = True):
@@ -163,6 +168,50 @@ class TestPredicate(IsolatedAsyncioTestCase):
         self.assertEqual(c.b.called, 1)
         self.assertEqual(c.c.called, 0,
                          'And did not short circuit evaluation')
+
+    def test_variadic_or_true_false(self) -> None:
+        class C:
+            a = Field['C',bool](True, 'C', 'a')
+            b = Field['C',bool](True, 'C', 'b')
+            c = Field['C',bool](True, 'C', 'c')
+            d = Field['C',bool](True, 'C', 'd')
+        c = C()
+        # todo = Field[Any, True] should be usable as a "Predicate" because it
+        #        evaluates to a bool.
+        self.assertTrue(Or(C.a == False,
+                           C.b == False,
+                           C.c == False,
+                           C.d == True).evaluate(c))
+
+        self.assertFalse(Or(C.a == False,
+                            C.b == False,
+                            C.c == False,
+                            C.d == False).evaluate(c))
+
+    def test_variadic_or_short_circuits(self) -> None:
+        class O:
+            called: int = 0
+            def __init__(self, value: bool = True):
+                self.value = value
+            def __eq__(self, other: object) -> bool:
+                self.called += 1
+                if isinstance(other, O):
+                    return other.value
+                return NotImplemented
+
+        class C:
+            a = Field['C', O](O(), 'C', 'a')
+            b = Field['C', O](O(), 'C', 'b')
+            c = Field['C', O](O(), 'C', 'c')
+
+        c = C()
+        self.assertTrue(Or(C.a == O(False),
+                           C.b == O(True),
+                           C.c == O(False)).evaluate(c))
+        self.assertEqual(c.a.called, 1)
+        self.assertEqual(c.b.called, 1)
+        self.assertEqual(c.c.called, 0,
+                         'Or did not short circuit evaluation')
 
     def test_binary_or_predicate(self) -> None:
         self.assertEqual(0b11, BitwiseOr(0b01, 0b10).evaluate(None))
