@@ -65,6 +65,13 @@ class _And[Tfl, Tfr](BinaryPredicate[Tfl, Tfr]):
     def __init__(self, left: Predicate[Tfl], right: Predicate[Tfr]) -> None:
         super().__init__(left, right)
 
+    def evaluate[Ti](self, instance:Ti) -> bool:
+        '''
+        Evaluate using short-circuit evaluation.
+        '''
+        return (bool(self.left.evaluate(instance))
+                and bool(self.right.evaluate(instance)))
+
 # And overloads are to allow correct typing for small number of variadic
 # arguments. Python typing does not provide a way to accurately type this for
 # an unbounded number of arguments. This is a compromise solution.

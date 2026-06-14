@@ -56,8 +56,6 @@ class TrafficLight(ExecutorFieldManager):
     cycles = Field['TrafficLight', int](0)
     ''' cycles: the number of times the light has gone through a full cycle '''
 
-    s = Field['TrafficLight', str]('')
-
     sequence: list[Color]
 
     def __init__(self, *args: object, executor: Executor|None = None, **kwargs: object) -> None:

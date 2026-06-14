@@ -125,7 +125,7 @@ class TestPredicate(IsolatedAsyncioTestCase):
         self.assertTrue(Not(false_predicate).evaluate(c))
         self.assertFalse(Not(true_predicate).evaluate(c))
 
-    def test_variadic_and(self) -> None:
+    def test_variadic_and_true(self) -> None:
         class C:
             a = Field['C',bool](True, 'C', 'a')
             b = Field['C',bool](True, 'C', 'b')
@@ -138,6 +138,31 @@ class TestPredicate(IsolatedAsyncioTestCase):
                             C.b == True,
                             C.c == True,
                             C.d == True).evaluate(c))
+
+    def test_variadic_and_false(self) -> None:
+        class O:
+            called: int = 0
+            def __init__(self, value: bool = True):
+                self.value = value
+            def __eq__(self, other: object) -> bool:
+                self.called += 1
+                if isinstance(other, O):
+                    return other.value
+                return NotImplemented
+
+        class C:
+            a = Field['C', O](O(), 'C', 'a')
+            b = Field['C', O](O(), 'C', 'b')
+            c = Field['C', O](O(), 'C', 'c')
+
+        c = C()
+        self.assertFalse(And(C.a == O(True),
+                             C.b == O(False),
+                             C.c == O(True)).evaluate(c))
+        self.assertEqual(c.a.called, 1)
+        self.assertEqual(c.b.called, 1)
+        self.assertEqual(c.c.called, 0,
+                         'And did not short circuit evaluation')
 
     def test_binary_or_predicate(self) -> None:
         self.assertEqual(0b11, BitwiseOr(0b01, 0b10).evaluate(None))
