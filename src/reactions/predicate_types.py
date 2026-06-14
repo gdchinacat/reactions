@@ -76,9 +76,6 @@ class _And[Tfl, Tfr](BinaryPredicate[Tfl, Tfr]):
 # arguments. Python typing does not provide a way to accurately type this for
 # an unbounded number of arguments. This is a compromise solution.
 @overload
-def And[Tf](p1: Predicate[Tf], /) -> Predicate[Tf]: ...
-
-@overload
 def And[Tf1, Tf2](p1: Predicate[Tf1],
                   p2: Predicate[Tf2], /) -> Predicate[Tf1|Tf2]: ...
 
@@ -94,8 +91,9 @@ def And[Tf1, Tf2, Tf3,  Tf4](p1: Predicate[Tf1],
                              p4: Predicate[Tf4],
                              /) -> Predicate[Tf1|Tf2|Tf3|Tf4]: ...
 
-def And[Tf](p1: Predicate[Tf],
-            *predicates: Predicate[Any]) -> Predicate[Any]:
+def And(p1: Predicate[Any],
+        p2: Predicate[Any],
+        *predicates: Predicate[Any]) -> Predicate[Any]:
     '''
     Predicate that is true IFF all of it's argument predicates are true.
 
@@ -106,7 +104,7 @@ def And[Tf](p1: Predicate[Tf],
           )
     '''
     _predicates: Sequence[Predicate[Any]] = predicates
-    ret = p1
+    ret = _And(p1, p2)
     while _predicates:
         b, *_predicates = _predicates
         ret = _And(ret, b)
@@ -129,9 +127,6 @@ class _Or[Tfl,Tfr](BinaryPredicate[Tfl, Tfr]):
                 or bool(self.right.evaluate(instance)))
 
 @overload
-def Or[Tf](p1: Predicate[Tf], /) -> Predicate[Tf]: ...
-
-@overload
 def Or[Tf1, Tf2](p1: Predicate[Tf1],
                  p2: Predicate[Tf2], /) -> Predicate[Tf1|Tf2]: ...
 
@@ -147,8 +142,9 @@ def Or[Tf1, Tf2, Tf3,  Tf4](p1: Predicate[Tf1],
                             p4: Predicate[Tf4],
                             /) -> Predicate[Tf1|Tf2|Tf3|Tf4]: ...
 
-def Or[Tf](p1: Predicate[Tf],
-           *predicates: Predicate[Any]) -> Predicate[Any]:
+def Or(p1: Predicate[Any],
+       p2: Predicate[Any],
+       *predicates: Predicate[Any]) -> Predicate[Any]:
     '''
     Predicate that is true if any of it's argument predicates are true.
 
@@ -159,7 +155,7 @@ def Or[Tf](p1: Predicate[Tf],
           )
     '''
     _predicates: Sequence[Predicate[Any]] = predicates
-    ret = p1
+    ret = _Or(p1, p2)
     while _predicates:
         b, *_predicates = _predicates
         ret = _Or(ret, b)
